@@ -164,8 +164,8 @@ opaque `thread_id`. It is not a provider session.
 
 The host claims one non-empty, bounded batch and returns an `InputClaim` with:
 
-- Opaque stable claim/input identity.
-- One or more ordered host inputs.
+- An opaque stable `claim_id`.
+- One or more ordered host inputs, each with an opaque stable `input_id`.
 - An opaque consumed checkpoint.
 - Source timestamps and one host `as_of` value.
 - The frozen run plan selected by host policy.
@@ -347,9 +347,21 @@ durable progress channel is a later product decision.
 Parallel and multi-call dispatch do not exist in v1. This removes partial
 outcome vectors, not-initiated suffixes, and multiple unresolved effects.
 
-`ToolDispatchPort` receives the validated binding, validated input, claim
-identity, model-step ordinal, remaining plan budget, and cancellation token. The
-host supplies `llm-tools` with an `InvocationPosition`:
+`ToolDispatchPort` receives the validated binding, validated input, remaining
+plan budget, cancellation token, and immutable dispatch lineage. A thread
+`DispatchLineage` contains:
+
+- The stable `claim_id`.
+- The current opaque `through_checkpoint`.
+- The ordered `input_id` values admitted through that checkpoint.
+- The model-step ordinal within the claim.
+
+An isolated one-shot instead carries its run ID and model-step ordinal; it has
+no application claim, checkpoint, or input identities. The kernel does not
+interpret or persist lineage. It supplies the lineage that was true immediately
+before dispatch so the host can bind a durable effect to every thread input
+that preceded it, including input appended mid-loop. The host supplies
+`llm-tools` with an `InvocationPosition`:
 
 - For a `Write`, host code first creates or resolves its durable effect/action
   record and uses that stable record ID for both `InvocationPosition` and
@@ -519,7 +531,11 @@ without calling the provider.
 
 Per-run limits do not bound a system that can start unlimited runs. Every thread
 run therefore requires a host-issued `AdmissionToken` proving that a rolling
-admission policy was checked before provider I/O.
+admission policy was checked before provider I/O. An isolated one-shot MUST also
+be covered by host admission: it either receives its own token or a child token
+whose turn/token allowance was already reserved by a serial parent invocation.
+It has no admission retry state; denial returns to its caller without provider
+I/O.
 
 The host policy MUST bound, per deployment or thread and rolling window:
 
@@ -533,10 +549,29 @@ exposes a priceable call. The subscription-backed AgentRuntime lane does not
 produce root-lane `CallMeta` and is not treated as per-token billable; it uses
 turn/token ceilings and `AgentQuotaExhausted` instead.
 
-The kernel reports accumulated available usage to the host, which settles the
-admission token even on failure or cancellation. A denied admission calls no
-provider and either defers until a declared instant or persists a visible
-stopped conclusion according to host policy.
+Before provider I/O, the host MUST durably reserve against the rolling policy:
+
+- One live cognitive-work slot for the exclusive root work epoch. A serial child
+  one-shot MAY share that slot only while its parent cannot perform provider or
+  tool I/O and only when its capacity was included in the root reservation.
+- The run's maximum remaining provider turns.
+- The route's configured input/output-token allowance when that usage dimension
+  is available.
+
+The resulting `AdmissionToken` identifies the run, rolling window, reserved
+capacity, and reservation state. A clean exit settles actual available usage
+and refunds unused capacity in `finally`, including ordinary failure and
+cancellation. Process death is charged conservatively: the full turn/token
+reservation remains consumed until its rolling window expires. During startup
+under the host's exclusive deployment/ownership lock, an orphaned in-flight
+reservation is marked interrupted and its live concurrency slot is released;
+its turn/token charge is not refunded. A missing or corrupt admission journal
+fails closed until explicit host repair.
+
+A denied admission calls no provider. Host policy either returns
+`deferred(until)` while leaving canonical input unconsumed, or persists a
+visible stopped conclusion. The host, not the kernel, owns deferred-work
+signalling, notification, and recovery scanning.
 
 ## 10. Kernel limits and cancellation
 
@@ -566,7 +601,8 @@ The public behavior is equivalent to:
 
 ```text
 claim one bounded non-empty host batch or return no_work/busy/deferred
-verify admission token and frozen plan tightening before provider I/O
+durably reserve admission;
+  verify its token and frozen plan tightening before provider I/O
 load/acquire compatible continuing provider session, or cold bootstrap
 
 loop within KernelLimits:
@@ -595,7 +631,9 @@ on deterministic no-progress stop:
 on shutdown/invariant interruption:
   release without arming; canonical unconsumed input drives explicit recovery
 
-always settle admission usage; release the live provider lease
+always settle/refund admission on clean exit; release the live provider lease
+on startup, release only orphaned concurrency slots;
+  retain their rolling capacity charge
 ```
 
 No database transaction remains open across provider or external tool I/O.
@@ -606,6 +644,8 @@ An isolated one-shot:
 
 - Requires `SessionMode.isolated` and a structured output contract.
 - Requires a HostTable plan containing no `ToolEffect.Write` binding.
+- Requires a host-issued admission reservation; denial returns to the caller
+  without retry or provider I/O.
 - Uses a fresh native session and no `InputCheckpointPort`, admission retry
   state, or `SessionRefPort`.
 - Uses the same structured step validation, serial tool loop, budgets, and
@@ -669,8 +709,9 @@ The release suite covers both single-run interior behavior and composed seams:
 4. Pure argument validation performs no recorder/budget/dispatch operation.
 5. Frozen plan tightening and `HostTable` exposure are proven before I/O.
 6. Exactly one serial tool call per model step; no parallel or multi-call path.
-7. `Write` execution has stable action-owned position/effect ID and durable
-   recorder; conflicts and uncertain positions never redispatch blindly.
+7. `Write` execution has stable action-owned position/effect ID, immutable
+   claim/checkpoint/input/step lineage, and a durable recorder; conflicts and
+   uncertain positions never redispatch blindly.
 8. `Pure`/`Read` one-shot behavior and the accepted BilledOnce recomputation
    cost are explicit and tested.
 9. Mid-loop human input is polled and appears once before the next model turn;
@@ -685,8 +726,12 @@ The release suite covers both single-run interior behavior and composed seams:
 14. Protocol, budget, quota, and explicit-stop outcomes consume the poison input
     and cause zero automatic successor runs for it.
 15. Crash recovery cannot exceed the durable no-progress attempt ceiling.
-16. Rolling admission rejects/defer work before provider I/O and usage is settled
-    on success, failure, and cancellation.
+16. Thread runs and isolated one-shots are covered by durable maximum turn/token
+    reservations before provider I/O. Each exclusive root work epoch reserves
+    one concurrency slot; a strictly serial child may share it only when its
+    capacity was reserved by the parent. Clean exits refund unused capacity;
+    crash recovery releases only the orphaned live slot and conservatively
+    retains the rolling capacity charge.
 17. Provider quota, expected failure, invariant defect, executor result, and
     recorder recovery remain distinct.
 18. Observation and cumulative-context bounds yield typed failures or explicit

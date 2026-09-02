@@ -40,6 +40,9 @@ Use host protocols with these semantics:
 - A host-issued rolling admission token is required before provider I/O and
   bounds provider turns, available token usage, no-progress attempts, and
   concurrency across runs.
+- Admission durably reserves the run's maximum turn/token allowance plus one
+  live slot. Clean exits refund unused capacity; after process death startup
+  releases only the orphaned slot and retains the rolling capacity charge.
 
 V1 keeps a valid conclusion if ordinary follow-up input races with
 finalization, then processes the follow-up next. It does not suppress and

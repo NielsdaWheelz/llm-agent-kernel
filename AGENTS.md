@@ -36,6 +36,9 @@ contain `llm-agent-kernel`, imported as `llm_agent_kernel`.
 - Exact model grammar: one closed `say`, `call_tool`, or `finish` value.
 - Validate the whole step and pure tool input before output or dispatch.
 - Exactly one serial tool call per model step; model supplies no call/effect ID.
+- Thread dispatch carries immutable claim, checkpoint, ordered input, and
+  model-step lineage; isolated dispatch carries run and step identity. The
+  kernel neither interprets nor persists either form.
 - Native Codex built-ins and Web are disabled; cwd is private, empty, and
   read-only; network, copied environment, MCP, and approvals are disabled.
 - Fail-stop and discard the session on any provider-native tool or permission
@@ -55,6 +58,11 @@ contain `llm-agent-kernel`, imported as `llm_agent_kernel`.
 - Deterministic no-progress stops consume poison input. Crashes are bounded by
   durable attempt counting and host-issued rolling admission before provider
   I/O.
+- Admission reserves maximum turn/token capacity and one live slot per root work
+  epoch before provider I/O. A strictly serial child one-shot may share that
+  slot only when the parent reservation includes its capacity. Clean exits
+  refund unused capacity; crash recovery releases only the orphaned slot and
+  retains its rolling capacity charge.
 - Store a successful returned session reference by generation CAS before acting
   on the model step. A stale CAS permits no dispatch or settlement.
 - Provider sessions are disposable; canonical host context must cold-bootstrap

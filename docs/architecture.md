@@ -48,7 +48,8 @@ Defines immutable provider-neutral values:
 - `AgentDefinition`, `SessionMode`, `OutputContract`, and `KernelLimits`.
 - Exact session-scoped provider configuration and deterministic fingerprint.
 - Frozen maximum profile and host-selected frozen run plan.
-- `InputClaim`, host inputs, checkpoints, conclusions, and run outcomes.
+- `InputClaim`, host inputs, checkpoints, `DispatchLineage`, conclusions, and
+  run outcomes.
 - Closed `SayStep`, `CallToolStep`, and `FinishStep` models.
 - Completed and suspended dispatch results.
 
@@ -173,11 +174,16 @@ settles its conclusion plus consumed checkpoint, and releases interrupted work.
 The host owns selection, priority, compatibility, and plan choice. The kernel
 has no `run_class`.
 
-`AdmissionPort` issues a token before provider I/O and settles available usage
-on every exit. The durable rolling policy bounds turns, reported tokens,
-consecutive no-progress attempts, and concurrent cognitive work. Subscription
-AgentRuntime is not assigned fictional per-token dollar cost; a future priceable
-lane may add a cost dimension.
+`AdmissionPort` durably reserves one live slot per exclusive root work epoch plus
+maximum turn and available token allowance before provider I/O. A strictly
+serial child one-shot may share the root slot only when its allowance was
+included in the parent reservation and the parent cannot perform provider or
+tool I/O. Clean exits settle actual usage and refund unused capacity. After
+process death, startup under the exclusive host lock releases the orphaned slot
+but preserves the conservative rolling turn/token charge until window expiry.
+Missing or corrupt admission state fails closed. Subscription AgentRuntime is
+not assigned fictional per-token dollar cost; a future priceable lane may add a
+cost dimension.
 
 `EventSink` receives bounded metadata. It is observability, not canonical input,
 delivery, or an effect recorder, and its failure is nonfatal.
@@ -186,6 +192,11 @@ delivery, or an effect recorder, and its failure is nonfatal.
 
 Bridges a validated proposal to the host dispatcher and `llm-tools`. It never
 implements a second executor or tool budget.
+
+Every thread dispatch carries immutable claim ID, current checkpoint, ordered
+admitted input IDs, and model-step ordinal. An isolated dispatch carries only
+its run ID and ordinal. The host may persist lineage with an effect; the kernel
+treats it as opaque coordination metadata.
 
 `llm_tools.RunLimits` alone owns tool-call, attempt, byte, concurrency, and tool
 elapsed limits. The frozen plan sets `max_in_flight = 1`. `KernelLimits` owns

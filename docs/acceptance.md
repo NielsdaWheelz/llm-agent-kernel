@@ -109,7 +109,9 @@ assigned to exactly one implementation slice.
   tool elapsed/deadline limits.
 - **K031** — Before `Write` executor entry, the host durably creates or resolves
   an action/effect record and uses its stable ID for both `InvocationPosition`
-  and `EffectId`; conflict or uncertain recorder state never blind-redispatches.
+  and `EffectId`. The dispatch exposes immutable claim ID, through-checkpoint,
+  ordered admitted-input IDs, and model-step ordinal; conflict or uncertain
+  recorder state never blind-redispatches.
 - **K032** — `Pure`/`Read` may use attempt-scoped positions and a non-durable
   recorder. Tests and docs expose that `Read + BilledOnce` can be billed again
   after crash or discarded one-shot.
@@ -149,10 +151,12 @@ assigned to exactly one implementation slice.
   declared stop, and repeated provider failure settle and consume a
   host-authored stopped conclusion. None automatically starts a fresh-budget
   run for the same logical input.
-- **K043** — Every thread run presents a host-issued admission token before
-  provider I/O. The rolling durable policy bounds provider turns, available
-  input/output tokens, consecutive no-progress attempts, and concurrent
-  cognitive work; usage is settled on every exit.
+- **K043** — Before provider I/O, every thread run and isolated one-shot is
+  covered by durable maximum-turn and configured token reservations. Each root
+  work epoch reserves one live cognitive slot; a strictly serial child one-shot
+  may share it only when its allowance was included in the parent reservation.
+  A clean exit refunds unused capacity; process death retains the full rolling
+  turn/token charge.
 - **K044** — Crash recovery increments the durable attempt number on the oldest
   logical input. Exceeding its ceiling stops or parks the input before provider
   I/O. Configuration defects park and trip a host circuit breaker rather than
@@ -166,8 +170,10 @@ assigned to exactly one implementation slice.
 
 - **K046** — An isolated one-shot requires isolated mode, a structured output
   contract, and a plan containing no `ToolEffect.Write`; it uses a fresh native
-  session, no claim/checkpoint/admission-retry/session-ref port, and returns only
-  a valid result or typed stop.
+  session, a host-issued admission reservation, no
+  claim/checkpoint/admission-retry/session-ref port, and returns only a valid
+  result or typed stop. Admission denial calls no provider and returns to its
+  caller without retry.
 - **K047** — One-shot sessions always close. Their results remain non-canonical
   until the caller commits them, and provider-internal continuation is never
   saved.
@@ -177,13 +183,14 @@ assigned to exactly one implementation slice.
 - **K049** — Documentation states that provider-native transcripts are
   unredacted third-party data at rest and discarding a local ref does not promise
   provider deletion.
-- **K050** — Deterministic tests inject failures at claim, admission, provider
-  terminal, session CAS, validation, recorder/effect commit, suspension,
-  settlement, release, and usage settlement boundaries.
+- **K050** — Deterministic tests inject failures at claim, admission reservation,
+  provider terminal, session CAS, validation, recorder/effect commit,
+  suspension, settlement, release, and usage settlement/refund boundaries.
 - **K051** — Multi-run race tests cover poison input, no automatic rearm,
   attempt-ceiling recovery, rolling admission, mid-loop steering, stop
   preemption, ordinary follow-up finalization, suspension/resolution, and
-  startup scanning.
+  startup scanning that releases orphaned concurrency without refunding its
+  conservative rolling charge.
 - **K052** — Opt-in live qualification exercises the exact pinned AgentRuntime
   request, event, resume, cancellation, quota, and containment behavior without
   running in ordinary CI or recording private payloads.

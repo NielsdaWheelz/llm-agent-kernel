@@ -37,7 +37,7 @@ The kernel owns:
 - Whole-step and output-contract validation.
 - Exactly one serial host tool call per model step.
 - Mid-loop input polling, preemption, cancellation, and settlement choreography.
-- Per-run limits and enforcement of host-issued cross-run admission.
+- Per-run limits and conservative host-issued cross-run admission reservations.
 - Session-reference, input-checkpoint, provider, context, dispatch, and event
   ports.
 - Isolated structured one-shot runs containing no `Write` tool.
@@ -63,7 +63,7 @@ record.
 durable host input
         |
         v
-claim non-empty batch + check rolling admission + prove plan tightening
+claim batch + reserve rolling admission + prove plan tightening
         |
         v
 open/resume contained Codex agent session
@@ -88,7 +88,9 @@ poll new compatible input --> structured provider turn
 A deterministic no-progress stop consumes the poison input with a host-authored
 conclusion. Cleanup never silently arms a fresh-budget successor. A crash can
 leave input unconsumed, but durable attempt accounting and rolling admission
-bound recovery before another provider call.
+bound recovery before another provider call. Interrupted admission retains its
+reserved rolling turn/token charge while startup releases only the orphaned
+concurrency slot.
 
 V1 commits a valid answer for the input it answered even if an ordinary
 follow-up races with finalization; the follow-up is processed next. Explicit

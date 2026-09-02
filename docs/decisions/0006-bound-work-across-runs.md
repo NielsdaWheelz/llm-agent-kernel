@@ -30,8 +30,16 @@ Bound the complete run sequence:
 - Every thread run requires a host-issued rolling admission token before
   provider I/O. At minimum the policy bounds provider turns, available reported
   input/output tokens, no-progress attempts, and concurrent cognitive work.
-- Usage settles against admission on success, failure, cancellation, and
-  interruption paths.
+- The host durably reserves maximum turn/token allowances and one live
+  concurrency slot per root work epoch before provider I/O. A strictly serial
+  child one-shot may share that slot only when its allowance is included in the
+  parent reservation.
+- Success, ordinary failure, and cancellation settle actual usage and refund
+  unused capacity in cleanup. Process interruption retains the full rolling
+  turn/token charge.
+- Startup under exclusive host ownership marks orphaned reservations
+  interrupted and releases their live concurrency slots without refunding their
+  rolling capacity. Missing or corrupt admission state fails closed.
 - Canonical unconsumed input plus explicit startup/recovery scanning, not
   cleanup recursion, drives recovery.
 
@@ -49,6 +57,8 @@ Benefits:
 Costs:
 
 - The host must persist attempt and rolling-usage facts.
+- Conservative crash charging can temporarily defer useful work that never
+  actually consumed all of its reservation.
 - Interrupted work may wait for recovery scanning rather than an immediate
   automatic successor.
 - A conservative ceiling can stop legitimate expensive work; the stopped

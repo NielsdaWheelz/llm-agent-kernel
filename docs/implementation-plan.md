@@ -83,7 +83,8 @@ Deliver:
   release with no successor arming.
 - Host-authored stopped conclusions for deterministic no-progress exits.
 - Durable attempt number and pre-I/O no-progress ceiling.
-- Host-issued rolling admission and usage settlement on every path.
+- Durable pre-I/O admission reservation, clean settlement/refund, and startup
+  release of orphaned concurrency without refunding rolling turn/token charge.
 - Circuit-breaker/parking behavior for configuration defects.
 - Multi-run, restart, race, and crash-order fixtures, including ordinary input
   arriving during finalization.
