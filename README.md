@@ -1,127 +1,104 @@
 # llm-agent-kernel
 
-`llm-agent-kernel` is a small, provider-neutral runtime for bounded tool-using
-agents. The Python distribution is `llm-agent-kernel`; applications import
-`llm_agent_kernel`.
+`llm-agent-kernel` is a small Python control plane for bounded, tool-using
+agents. Applications import `llm_agent_kernel`.
 
-It turns durable application input into a sequence of validated model steps,
-tool observations, and terminal outcomes. It preserves a hard boundary between
-reasoning and authority: models propose steps, `llm-tools` validates and executes
-granted tools, and the application decides policy, persistence, and delivery.
+It turns host-owned durable input into validated model steps, serial tool
+observations, and durable host conclusions. Reasoning never grants authority:
+the native provider containment policy and the host-selected frozen
+`llm-tools` plan jointly define what a run can do.
 
-Jarvis is the first consumer. The package is deliberately not Jarvis-specific.
+Jarvis is the first consumer, but the package is not Jarvis-specific.
 
 ## Status
 
-This repository currently specifies the v1 package. Implementation begins only
-after the specification and ADRs are accepted.
+This repository specifies v1. Runtime implementation begins only after the
+required `llm-tools` public seams are added and pinned. The target is Python
+3.12 or newer.
 
-Runtime target: Python 3.12.
+The reviewed dependency baselines are:
 
-Direct dependencies:
+- `provider-runtime` from `llm-calling` at
+  `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
+- `llm-tools` at `8df458a199703120005296ae12f997b39d208fed`
 
-- `llm-calling` (`provider-runtime`) for provider calls and resumable sessions.
-- `llm-tools` for frozen capability plans, typed prompt sections, tool schemas,
-  validation, execution, effect boundaries, and result envelopes.
+V1 uses the real subscription-backed
+`provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
+generation, MCP application tools, or provider-native application tools.
 
-## The boundary
+## Boundary
 
 The kernel owns:
 
-- A bounded run/drain loop.
-- Strict whole-step validation for `say`, `call_tools`, and `finish`.
-- Continuation and cold-bootstrap context projections.
-- Provider-session reference lifecycle through an application port.
-- Input checkpoints, exclusive plan-class drains, and race-safe idle transitions
-  through an application port.
-- Budgets, cancellation, turn-local protocol feedback, and normalized trace
-  events.
-- Fresh one-shot runs with schema-validated terminal results for recomputable
-  read-only internal cognitive work.
-- Thin adapters to `provider-runtime` and `llm-tools`.
+- Immutable definitions and complete containment fingerprints.
+- Exact Codex agent-session request mapping and lifecycle.
+- Provider-neutral cold-bootstrap and continuation context.
+- A closed `say | call_tool | finish` protocol.
+- Whole-step and output-contract validation.
+- Exactly one serial host tool call per model step.
+- Mid-loop input polling, preemption, cancellation, and settlement choreography.
+- Per-run limits and enforcement of host-issued cross-run admission.
+- Session-reference, input-checkpoint, provider, context, dispatch, and event
+  ports.
+- Isolated structured one-shot runs containing no `Write` tool.
+- Deterministic conformance tests across crash and multi-run seams.
 
-The kernel does **not** own:
+The kernel does not own:
 
-- Database schemas, migrations, queues, workflows, or schedulers.
-- Connectors, credentials, memory, approval policy, or user interfaces.
-- A tool registry, tool implementation, effect recorder, or policy engine.
-- Provider implementations or provider-shaped canonical history.
-- XML rendering or parsing.
-- Lua, generated-code execution, sandboxes, or a subagent graph.
+- Application schemas, migrations, queues, workflows, schedulers, or delivery.
+- Product context, memory, connectors, credentials, approvals, or action state.
+- Input priority, effect identity, durable effect recording, or reconciliation.
+- A second tool catalog, executor, budget, recorder, prompt renderer, or
+  provider SDK adapter.
+- Program execution, semantic discovery, or a delegation graph.
 
-Applications implement narrow ports over state they already own. Adopting this
-package must not require a new persistent table.
-
-## Terminology
-
-- **Agent definition:** immutable runtime configuration: role, stable context,
-  maximum capability envelope, provider profile, context policy, output
-  contract, and limits. It is not a database row or a running process. Each run
-  receives a frozen plan that may only narrow that envelope.
-- **Role:** the behavioral purpose and instructions inside an agent definition.
-  Several invocations may use the same role.
-- **Application thread:** the host-owned durable workstream whose ordered input
-  and terminal conclusions survive providers and processes.
-- **Run:** one host invocation asking the kernel to process an application
-  thread or perform an isolated one-shot invocation.
-- **Drain:** the exclusive processing epoch inside a run. It consumes the
-  maximal ordered input prefix eligible for one host-defined plan class until a
-  race-safe idle transition, class handoff, or bounded stop outcome.
-- **Model step:** one provider response, parsed as exactly one of `say`,
-  `call_tools`, or `finish`.
-- **Provider session:** an opaque, disposable continuation optimization. It is
-  never the canonical application thread.
-
-Thread runs use the drain shown below. Isolated one-shot runs reuse the same
-bounded step loop but open a fresh session, use no checkpoint or saved session
-reference, accept only non-effectful tools, and return a schema-valid structured
-terminal result for the host to commit. V1 thread runs require continuing
-definitions; v1 one-shot runs require isolated structured definitions.
+Owning no schema does not mean requiring no durable state. A continuing host
+with writes normally needs canonical input/conclusion/delivery state, disposable
+provider-session-reference state, and a durable `llm-tools` recorder/effect
+record.
 
 ## Execution at a glance
 
 ```text
-durable waking input
+durable host input
         |
         v
-exclusive drain claim + input checkpoint
+claim non-empty batch + check rolling admission + prove plan tightening
         |
         v
-continuation context ──────┐
-or cold-bootstrap context  │
-        |                  │
-        v                  │
-provider model step        │
-        |                  │
-strict whole-step check    │
-        |                  │
-   call_tools ──> llm-tools/host dispatch ──> observations ──┘
-        |
-   say / finish / pending approval / uncertain
+open/resume contained Codex agent session
         |
         v
-durable conclusion + consumed checkpoint
-        |
-        v
-compare-and-set idle; continue only for compatible newer input
-otherwise arm the correct class before releasing the claim
+poll new compatible input --> structured provider turn
+                                  |
+                       persist returned session ref
+                                  |
+                       validate complete model step
+                         /                    \
+                  call_tool                say / finish
+                      |                         |
+            poll, then serial dispatch      poll for stop
+                 /             \                |
+         completed          suspended      atomic settle
+             |                  |                |
+       bounded observation  durable host ref    v
+             +-------> next provider turn     return
 ```
 
-Malformed output produces no user-visible text and no tool effect. The kernel
-emits a bounded corrective diagnostic and may ask the model again. A tool
-dispatcher may return `pending_approval` after the application durably creates
-an approval request, but the kernel neither decides that policy nor executes the
-pending action.
+A deterministic no-progress stop consumes the poison input with a host-authored
+conclusion. Cleanup never silently arms a fresh-budget successor. A crash can
+leave input unconsumed, but durable attempt accounting and rolling admission
+bound recovery before another provider call.
 
-`call_tools` itself contains no user-facing prose. The model sees correlated
-results first and may then produce a separate `say`, avoiding pre-action claims
-and nonterminal delivery state.
+V1 commits a valid answer for the input it answered even if an ordinary
+follow-up races with finalization; the follow-up is processed next. Explicit
+stop/pause input can preempt. V1 also omits model-authored progress narration,
+parallel calls, and a durable generic observation store.
 
-## Design documents
+## Documents
 
 - [Specification](SPEC.md)
 - [Architecture](docs/architecture.md)
-- [ADR 0001: Library boundary](docs/decisions/0001-library-boundary.md)
-- [ADR 0002: Event-drain kernel](docs/decisions/0002-event-drain-kernel.md)
-- [ADR 0003: Provider and tool ownership](docs/decisions/0003-provider-and-tool-ownership.md)
-- [ADR 0004: Defer program agents and delegation](docs/decisions/0004-defer-program-agents-and-delegation.md)
+- [Acceptance criteria](docs/acceptance.md)
+- [Implementation plan](docs/implementation-plan.md)
+- [Architecture decisions](docs/decisions/README.md)

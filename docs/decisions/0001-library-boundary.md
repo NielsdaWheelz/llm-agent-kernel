@@ -2,19 +2,24 @@
 
 - Status: Accepted
 - Date: 2026-09-01
+- Amended: 2026-09-02
 
 ## Context
 
-Codapt2 demonstrates a strong event-driven agent control plane, but its agent
-implementation is coupled to a TypeScript/Effect/PostgreSQL workflow framework,
-multi-tenant workspaces, billing, machines, semantic discovery, and UI
-projections. Jarvis and future Python applications need the orchestration
-semantics without that product substrate.
+Codapt2 demonstrates a strong event-driven control plane, but its agent loop is
+coupled to TypeScript/Effect/PostgreSQL, multi-tenant workspaces, billing,
+machines, discovery, and UI projections. Jarvis and future Python applications
+need the reusable loop semantics without that product substrate.
 
-`provider-runtime` already owns LLM provider calls and native Codex/Claude agent
-sessions. `llm-tools` already owns typed tools, closed capability plans,
-execution, and effect contracts. Applications own their product data and
-authority.
+`provider-runtime` already owns native provider sessions. `llm-tools` already
+owns typed tools, plans, execution, budgets, replay positions, and result
+envelopes. Applications own product state and authority.
+
+The first draft overclaimed that library adoption required no persistent table.
+Schema ownership and durable-state requirements are different questions. An
+effectful continuing application needs canonical input/conclusion/delivery,
+session-reference generation state, durable effect recording, and cross-run
+admission facts even if it maps them into existing storage.
 
 ## Decision
 
@@ -23,46 +28,47 @@ newer.
 
 The package owns:
 
-- Agent definitions and explicit run limits.
-- Immutable maximum capability envelopes with host-selected frozen per-run
-  subsets.
-- Conversational and closed structured output contracts.
-- Provider-neutral continuation and bootstrap context projections.
-- A strict model-step protocol and bounded corrective feedback.
-- Bounded model/tool step loops and cancellation.
-- Fresh read-only one-shot invocation for recomputable internal roles.
-- Continuing thread drains and isolated structured one-shot runs are distinct
-  v1 façades rather than one ambiguous mode branch.
-- Session, input-checkpoint, drain/finalization, dispatcher, and event-sink
-  ports.
-- Normalized kernel events, terminal outcomes, fakes, and conformance tests.
+- Immutable agent definitions and complete containment fingerprints.
+- Provider-neutral context projections and disposable-session choreography.
+- A closed structured step protocol and whole-step semantic validation.
+- A bounded serial model/tool loop with input polling and cancellation.
+- Cross-run admission enforcement through a host port.
+- Continuing thread and isolated structured one-shot façades.
+- Provider-session, checkpoint, context, dispatch, admission, and event ports.
+- Typed outcomes, deterministic fakes, and conformance tests.
 
-It owns no database schema, workflow engine, provider implementation, tool
-registry, application policy, approval state, connector, memory system,
-transport, or user interface.
+It owns no application schema, workflow engine, provider implementation, tool
+registry/executor/recorder, application policy, effect identity, connector,
+memory system, delivery system, transport, or UI.
+
+The library states the durable facts its ports require and tests them through a
+conformance host. It does not dictate whether a host uses tables, files, an
+atomic document, or a workflow substrate. In-memory adapters are test doubles,
+not production durability.
 
 ## Consequences
 
-Positive:
+Benefits:
 
-- Agent-loop correctness can be tested once and reused.
-- Applications retain their existing persistence and product boundaries.
-- Jarvis can keep exactly four application tables.
-- Native sessions remain an optimization over rebuildable canonical context.
+- The difficult control loop and its seam tests can be reused.
+- Provider/tool behavior keeps one owner.
+- Applications choose their persistence layout and product policy.
+- Native sessions remain optimizations over canonical rebuildable context.
 
 Costs:
 
-- A third package introduces version and integration coordination.
-- Python reimplementation cannot assume Codapt2's behavior was preserved; new
-  black-box and race conformance tests are mandatory.
-- Strict boundaries may leave small application adapters repetitive.
+- Three packages require explicit revision qualification.
+- Every production host must honestly implement canonical settlement, durable
+  write recording, session-ref CAS, and rolling admission.
+- A small host adapter remains application-specific.
 
 ## Rejected alternatives
 
-- Extract Codapt2 code directly: imports its language, durability, and product
-  coupling.
-- Put orchestration in `provider-runtime`: collapses stateful application loops
-  into a library intentionally scoped to provider/session execution.
-- Put orchestration in `llm-tools`: mixes tool authority with agent lifecycle.
-- Keep a private loop in every application: duplicates subtle race and protocol
-  behavior that is hard to extract later.
+- Extract Codapt2 wholesale: imports unrelated runtime and product coupling.
+- Put orchestration in `provider-runtime`: conflates native sessions with host
+  work consumption and authority.
+- Put orchestration in `llm-tools`: conflates tool execution with agent
+  lifecycle and conversation settlement.
+- Claim no durable-state requirement: makes crash safety untestable and false.
+- Keep a private loop in every application: duplicates subtle race and replay
+  behavior that becomes harder to extract later.

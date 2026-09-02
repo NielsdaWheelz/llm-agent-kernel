@@ -1,76 +1,77 @@
-# ADR 0002: Use host-owned inputs, checkpoints, and race-safe drains
+# ADR 0002: Use host-owned claims, polling, settlement, and admission
 
 - Status: Accepted
 - Date: 2026-09-01
+- Superseded in part: 2026-09-02
 
 ## Context
 
-Input may arrive while a model turn or tool call is running. A naive loop can
-decide it is finished after new input has been persisted but before the new
-input has scheduled another worker, losing a wake-up. Codapt2 solves this with
-ordered context events, one drain owner, and an atomic consumed-watermark check
-at idle.
+Input can arrive while a model turn or tool call runs. A naive batch read misses
+mid-loop steering. A naive idle transition can lose a wake-up. More seriously,
+per-run budgets do not bound a system whose cleanup automatically starts a new
+run over the same poison input.
 
-A reusable package cannot require Codapt2's event tables, leases, or workflow
-engine. Jarvis already has canonical messages and a one-process ownership model.
+Codapt2's ordered queue and check-before-idle behavior are useful prior art. Its
+workflow/database implementation is not a reusable Python library boundary, and
+Jarvis v1 does not need its run-class negotiation.
+
+The first version of this ADR required `release` and several stop paths to arm a
+successor. That turns protocol exhaustion, cancellation, or a malformed input
+into an unlimited sequence of fresh budgets. It also read one input batch only
+outside the model/tool loop.
 
 ## Decision
 
-Model orchestration around host protocols:
+Use host protocols with these semantics:
 
-- Semantic input is application-owned and read through an opaque ordered
-  checkpoint.
-- At most one drain owns an application thread.
-- Each claim carries an opaque host `run_class` bound to the frozen plan. Reads
-  expose only a maximal same-class input prefix; differently classified input
-  forces an armed handoff rather than being consumed under the wrong plan.
-- Material observations and protocol feedback are offered to an event sink
-  before another model call. Sink failure is nonfatal and persistence is
-  optional; read observations may be recomputed after a crash, while effectful
-  outcomes use the host's existing action/effect boundary.
-- Finalization asks the host to atomically compare the consumed checkpoint and
-  commit the terminal outcome.
-- If new waking input exists, finalization continues when budget permits or arms
-  a deferred run before releasing ownership.
-- Cancellation/error cleanup likewise arms recovery before releasing a claim
-  that still owns unconsumed input.
+- `claim` returns no work/busy/deferred or one bounded non-empty input batch,
+  its opaque checkpoint, durable attempt number, and host-selected frozen plan.
+- The host owns priority, batching, and compatibility. The kernel has no
+  `run_class`.
+- `poll` runs before each provider turn, before dispatch, after a tool result,
+  and before settlement. It appends compatible ordered input once or preempts.
+- `settle` atomically and idempotently persists a host conclusion and consumes
+  through the checkpoint. It reports whether later input remains.
+- `release` is cleanup only and never arms a successor. Interrupted unconsumed
+  input is recovered by explicit startup/recovery scanning.
+- Deterministic no-progress exits settle a host-authored stopped conclusion and
+  consume the poison input.
+- A durable per-input attempt number bounds crash recovery.
+- A host-issued rolling admission token is required before provider I/O and
+  bounds provider turns, available token usage, no-progress attempts, and
+  concurrency across runs.
 
-The kernel specifies state transitions and conformance tests. It supplies no SQL
-tables, migrations, distributed lease, queue, or durability implementation.
-Durability guarantees are conditional on the host adapter. The package must not
-describe an in-memory conformance double as crash-safe.
+V1 keeps a valid conclusion if ordinary follow-up input races with
+finalization, then processes the follow-up next. It does not suppress and
+regenerate a paid answer. Exact stop/pause input can preempt before settlement.
 
-An isolated one-shot invocation does not use this checkpoint protocol. It
-accepts only a non-effectful plan, opens a fresh session, and returns a validated
-structured result for the caller to commit, which keeps recomputable helper work
-out of the durable-thread contract.
+No database transaction remains open across provider or connector I/O. A host
+signals work after a committed `settle(more_input)`, while canonical unconsumed
+input and recovery scanning close the database/process-trigger gap.
 
 ## Consequences
 
-Positive:
+Benefits:
 
-- Lost wake-ups and concurrent drains have one testable contract.
-- Hosts can use PostgreSQL, another store, or an intentionally process-local
-  implementation.
-- Jarvis can adapt its existing messages without new columns or tables.
+- Human steering can affect the next model/tool boundary.
+- Cancellation and poison input cannot silently replenish their budget forever.
+- Cross-run spend and concurrency become enforceable system properties.
+- A host can use its existing persistence without importing a workflow engine.
 
 Costs:
 
-- A production host must implement an atomic finalization boundary honestly.
-- Cross-crash replay depends on host canonical input/conclusion state and
-  `llm-tools` effect recording, not on the kernel alone.
-- A crash may repeat model reasoning or safe reads when the host intentionally
-  keeps intermediate observations turn-local.
-- Applications with inherently serialized ingress still implement a small
-  checkpoint adapter.
-- Applications with multiple authority classes must classify waking input and
-  atomically hand off between classes.
+- Hosts must durably count attempts and rolling usage.
+- Ordinary follow-up input may receive a prior valid answer before its own run;
+  exact answer suppression/rewrite is intentionally absent.
+- Process interruption can leave visible unconsumed work for recovery rather
+  than immediately scheduling an automatic successor.
 
 ## Rejected alternatives
 
-- Own a generic event database: violates the library boundary and application
-  schemas.
-- Assume ingress always schedules another run: leaves a real lost-wakeup race.
-- Import a workflow framework: disproportionate to the state machine.
-- Hold a database transaction or provider session open while awaiting approval:
-  fragile and operationally unbounded.
+- Unconditional rearm on cleanup: unbounded subscription/spend failure.
+- Read input once per run: prevents conversational steering.
+- Kernel run classes: duplicates host priority/compatibility and complicates the
+  crash-critical claim port.
+- Always suppress a final answer if input raced: discards paid valid work and
+  requires more durable provider-output state.
+- Own a generic event database or workflow engine: exceeds the library boundary.

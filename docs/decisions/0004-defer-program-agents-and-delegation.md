@@ -1,57 +1,56 @@
-# ADR 0004: Defer program agents and delegation
+# ADR 0004: Defer program agents, discovery, and delegation
 
 - Status: Accepted
 - Date: 2026-09-01
+- Amended: 2026-09-02
 
 ## Context
 
-Codapt2 gives the model one `run(code)` tool backed by deterministic Lua and a
-large host-function table. This can reduce round trips for a broad catalog.
-Codapt2 also lets agents create and notify persistent peers, but those peers have
-no task result, parentage, capability narrowing, join, deadline, or cancellation
-contract.
+Codapt2 gives a model a deterministic Lua program surface over a large host
+function table and supports persistent peer agents. Those are promising for
+large catalogs and long-running coordination. Jarvis v1 has a small fixed tool
+catalog and no concrete task requiring a program VM or general delegation.
 
-Jarvis v1 has a small fixed catalog, batched structured calls, subscription
-Codex sessions without an equivalent arbitrary host callback, and no concrete
-need for general delegation. The bitter-lesson baseline is to use model-native
-structured capabilities before adding a custom interpreter.
+The current `llm-tools` discovery matcher is lexical ranking, not semantic
+retrieval. Its existence does not justify making discovery part of the kernel.
 
 ## Decision
 
-V1 contains neither a model-authored program runtime nor a delegation graph.
-Semantic tool discovery remains an optional `llm-tools` exposure, not a kernel
-requirement.
+V1 contains no model-authored program runtime, kernel tool discovery, or
+delegation graph. It uses an explicit frozen `HostTable` and one serial
+`call_tool` per model step.
 
-Program execution may be evaluated later as a separate optional package or
-extra. It must beat structured tool calls on real tasks across quality, model
-calls, tokens, latency, invalid programs, crash recovery, and external-effect
-correctness. Any sandbox claim must distinguish language-capability isolation
-from OS isolation.
+A program runtime may later be evaluated as a separate optional package. It must
+beat structured calls on representative tasks across quality, provider turns,
+tokens, latency, invalid programs, crash recovery, and write correctness. Any
+sandbox claim must distinguish language-capability isolation from OS isolation.
 
-Delegation may be proposed after a real consumer requires it. A future task
-contract must include an ID, parent ID, role/objective, strictly narrowed
-capability plan, explicit budgets and deadline, structured result, terminal
-status, observe/join, cancellation, and downward cancellation propagation.
+Delegation may be proposed after a consumer requires it. A future task contract
+must define identity, parentage, role/objective, strictly narrowed plan, budgets,
+deadline, structured result, observe/join, terminal state, cancellation, and
+downward cancellation propagation.
+
+Discovery may be added at the host/`llm-tools` exposure boundary only after
+catalog size and measured selection quality justify it.
 
 ## Consequences
 
-Positive:
+Benefits:
 
-- Jarvis receives the reusable loop without a VM or task scheduler.
-- The core package has no native-process or sandbox dependency.
-- Future delegation cannot silently inherit the caller's complete authority.
+- V1 establishes the authority, recovery, and run-bounding seams without a VM or
+  task scheduler.
+- Future children cannot silently inherit the parent's full authority.
+- Tool selection behavior remains explicit and measurable.
 
 Costs:
 
-- Large-catalog agents may initially use more model round trips.
-- Applications cannot claim generic subagents from the first release.
-- A later program runtime, if justified, will require another package boundary.
+- Large catalogs may use more prompt tokens or provider turns.
+- Applications cannot claim general program agents or delegation in 0.1.
 
 ## Rejected alternatives
 
-- Port Codapt2 Lua immediately: unmeasured complexity for Jarvis's small catalog.
-- Embed Python or JavaScript instead: changes familiarity, not the correctness or
-  sandbox burden.
-- Copy Codapt2 peer agents: lacks the semantics required for safe delegation.
-- Build a generic task graph speculatively: no v1 consumer has earned it.
-
+- Port Codapt2 Lua immediately: unmeasured complexity for the first consumer.
+- Embed Python/JavaScript instead: changes familiarity, not replay or sandbox
+  correctness.
+- Describe lexical substring ranking as semantic discovery: factually wrong.
+- Copy Codapt2 peers: lacks the complete narrowed-task contract required here.

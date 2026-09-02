@@ -1,135 +1,199 @@
 # Acceptance criteria
 
-These criteria define the future implementation's release contract. The slice
-assignment table is authoritative; every criterion belongs to exactly one
-slice.
+These criteria are the future implementation's release contract. Every ID is
+assigned to exactly one implementation slice.
 
-## Boundary and package
+## Dependency and package boundary
 
-- **K001** — The package supports Python 3.12 or newer and imports as
-  `llm_agent_kernel`.
-- **K002** — Importing the package performs no I/O, starts no worker, opens no
-  provider session, and grants no tool authority.
-- **K003** — The package contains no application database schema, migration,
-  connector, transport, credential resolver, memory store, approval policy, or
-  application tool binding.
-- **K004** — Provider integration uses a qualified pinned git revision and the
-  public `provider-runtime` contract; no provider SDK type crosses the adapter
-  boundary.
-- **K005** — Tool and prompt integration uses a qualified pinned git revision
-  and public `llm-tools` contracts; the package contains no second catalog,
-  profile, executor, discovery engine, or XML-like prompt renderer.
+- **K001** — The package supports Python 3.12 or newer, imports as
+  `llm_agent_kernel`, and performs no I/O or authority grant on import.
+- **K002** — Runtime locks qualified immutable git revisions of
+  `provider-runtime` and `llm-tools`; ordinary CI never imports mutable sibling
+  worktrees.
+- **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
+  strict input validation, frozen-profile tightening proof, `HostTable`
+  publication/rendering, and async durable execution/recording.
+- **K004** — Pure validation performs no position occupation, budget
+  reservation, recorder access, or dispatch.
+- **K005** — The kernel imports no private dependency module and contains no
+  provider SDK adapter, second tool catalog/profile/executor/budget/recorder,
+  discovery engine, or prompt renderer.
+- **K006** — The package contains no application schema, migration, workflow,
+  queue, scheduler, connector, credential resolver, memory store, approval
+  policy, delivery implementation, effect ledger, or reconciliation policy.
+- **K007** — Public types and fakes do not claim crash durability; documentation
+  identifies the canonical host, session-ref, effect-recorder, and admission
+  facts a continuing effectful consumer must store.
 
-## Definitions and context
+## Exact provider surface
 
-- **K006** — Public types distinguish an agent definition, application thread,
-  run/drain, model step, provider session, and role.
-- **K007** — One agent definition freezes its role instructions, session mode,
-  maximum capability envelope, context projection, conversational or closed
-  structured output contract, and explicit limits. Each run plan is frozen and
-  must be a subset of that envelope. V1 thread runs require continuing mode;
-  one-shot runs require isolated mode and structured output.
-- **K008** — Context is represented as provider-neutral typed sections and can
-  be projected for a continuing session or a cold bootstrap without changing
-  canonical context selection.
-- **K009** — A cold bootstrap is sufficient to continue useful work after all
-  provider-session state is deleted.
-- **K010** — Source timestamps and one host-supplied `as_of` value survive
-  context construction without making wall-clock access ambient to later steps.
+- **K008** — V1 uses only public
+  `provider_runtime.agent_runtime.AgentRuntime` open/run/close APIs; it does not
+  use stateless root generation.
+- **K009** — The adapter passes the closed kernel step schema through
+  `JsonSchemaAgentOutput` and independently revalidates the parsed terminal
+  value inside the kernel.
+- **K010** — A session request uses subscription Codex with the qualified
+  transport, local-account credential reference, private empty absolute cwd,
+  read-only filesystem, no additional directories, disabled network, denied
+  approvals, empty copied environment, no MCP, disabled native Web, and
+  `builtin_tools="disabled"`.
+- **K011** — The Codex `allowed_tools=("*",)` sentinel appears only where the
+  pinned runtime requires it and is never interpreted as application authority.
+- **K012** — Any native tool-use or permission-request event fails the turn,
+  discards the session, dispatches no host tool, and settles no model-authored
+  conclusion.
+- **K013** — Streaming model text is never delivered; only a successful terminal
+  structured step can cross the host output boundary.
+- **K014** — Live continuing sessions are acquired/released and may be cached;
+  isolated sessions and retired/discarded sessions are always closed, including
+  cancellation and failure paths.
+- **K015** — Quota exhaustion, expected provider failure, cancellation, resume
+  incompatibility, and runtime invariant failure remain distinct. There is at
+  most one safe cold-bootstrap fallback before a successful terminal and no
+  fallback after host tool dispatch.
 
-## Step protocol and tools
+## Definitions, plans, sessions, and context
 
-- **K011** — The only standard model steps are closed `say`, `call_tools`, and
-  `finish` variants. Conversational definitions forbid terminal results;
-  structured definitions forbid user-facing text and require a schema-valid
-  terminal result.
-- **K012** — `call_tools` contains one or more canonical granted tool IDs with
-  closed arguments, no user-facing text, and no model-authored authority
-  classification.
-- **K013** — The entire step is decoded and validated before any output is
-  emitted or any tool is dispatched, including validation of a structured
-  terminal result against the frozen output contract.
-- **K014** — Missing, malformed, ungranted, or protocol-invalid output dispatches
-  no tool and returns bounded corrective feedback to the next model step.
-- **K015** — Independent calls may execute concurrently only within the frozen
-  capability plan and shared run budgets, and only when declared non-effectful
-  and host-classified automatic/non-stopping; observations retain deterministic
-  call order.
-- **K016** — Tool dispatch goes through an application-supplied dispatcher and
-  `llm-tools`; the kernel never invokes an application binding directly.
-- **K017** — The dispatcher can return executed, pending-approval, denied,
-  failed, or uncertain observations without the kernel deciding which applies.
-- **K018** — A pending-approval observation concludes the proposing input without
-  holding an interpreter, provider call, process, or database transaction open;
-  compatible newer input may continue under the drain and other classes are
-  handed off.
+- **K016** — Public values distinguish agent definition, application thread,
+  input claim, run, provider turn, model step, provider session, and role.
+- **K017** — A definition freezes role/stable context, session mode, output
+  contract, maximum frozen capability profile, exact provider configuration,
+  and finite `KernelLimits`.
+- **K018** — The deterministic fingerprint covers every session-scoped semantic
+  and containment value, including `PermissionPolicy` and native options;
+  changing any covered value rotates the session. Secret bytes and dynamic
+  input are excluded.
+- **K019** — Before provider or tool I/O, a qualified public predicate proves
+  that the host-selected frozen plan tightens the definition maximum and sets
+  `llm_tools.RunLimits.max_in_flight = 1`.
+- **K020** — The kernel has no run-class abstraction. The host claim returns one
+  non-empty bounded input batch and its already-selected plan; the host owns
+  priority, batching, and compatibility.
+- **K021** — Session refs are keyed by thread and definition fingerprint and
+  stored by generation CAS. The first expected generation is absent; every
+  successful store returns the next generation; stale CAS permits neither
+  dispatch nor settlement.
+- **K022** — Every successful provider terminal's session ref is stored before
+  semantic step action. Recovery discards a speculative ref before replaying
+  host input left canonically unconsumed.
+- **K023** — Context uses provider-neutral `llm-tools` sections. Continuation
+  sends each admitted host input once; cold bootstrap reconstructs useful work
+  from bounded canonical history, current input, retrieval, plan, and durable
+  action state after all provider-session state is deleted.
+- **K024** — Each newly admitted input batch carries source timestamps and one
+  host `as_of`; timezone/locale is included only when relevant. Ordinary tool
+  continuations do not receive a changing ambient clock.
 
-## Loop, coordination, and failure
+## Protocol and tool boundary
 
-- **K019** — Every run has explicit model-call, tool-call, elapsed-time, input,
-  output, observation, and concurrency limits; no unbounded default exists.
-- **K020** — Cancellation is checked before model calls, before tool dispatch,
-  while awaiting concurrent calls, and before finalization.
-- **K021** — At most one drain owns an application thread through the supplied
-  coordination port; a competing claim returns busy rather than running twice.
-- **K022** — Semantic input is consumed through an opaque ordered checkpoint and
-  host-defined run class; the kernel requires no particular ID type, class
-  representation, or database layout.
-- **K023** — Finalization compares the consumed checkpoint atomically through a
-  host port. Compatible new waking input causes continuation; incompatible or
-  over-budget input causes an atomically armed deferred run before claim
-  release, never a lost wake-up or cross-plan drain.
-- **K024** — Protocol feedback and tool observations are offered to the event
-  sink before reuse; sink failure is nonfatal, persistence is optional, and
-  correctness relies only on terminal-conclusion and effect boundaries.
-- **K025** — Provider-session resume failure discards the session reference and
-  attempts at most one cold bootstrap when the host permits it.
-- **K026** — A model turn is never blindly retried after a possibly effectful
-  tool dispatch; recovery is driven by the host dispatcher and effect ledger.
-- **K027** — Kernel defects, model/protocol failures, cancellations, budget
-  exhaustion, provider/adapter failures, and typed host-dispatch observations
-  remain distinguishable; ordinary dispatch observations are not mislabeled as
-  terminal run outcomes.
+- **K025** — The only model variants are closed `say`, `call_tool`, and `finish`.
+  A `call_tool` contains exactly one canonical tool ID and arguments and no
+  model-authored call/effect ID, preview, authority, approval, credential, or
+  delivery field.
+- **K026** — Conversational definitions allow `say` and resultless `finish`;
+  structured definitions forbid `say` and require a closed schema-valid
+  `finish.result`.
+- **K027** — Whole-step, output-contract, frozen-plan, and pure argument
+  validation complete before visible output, position occupation, budget
+  reservation, recorder mutation, or dispatch.
+- **K028** — Invalid output produces no partial effect and at most the configured
+  number of bounded protocol corrections; exhaustion settles a host-authored
+  stopped conclusion and cannot obtain fresh repair budget automatically.
+- **K029** — Exactly one tool executes serially per model step. There is no
+  parallel executor, multi-call outcome vector, not-initiated suffix, or second
+  kernel tool budget.
+- **K030** — `KernelLimits` own provider turns, repairs, wall time, reported
+  provider usage, and cumulative model-visible context. The frozen
+  `llm_tools.RunLimits` alone own tool calls, attempts, bytes, concurrency, and
+  tool elapsed/deadline limits.
+- **K031** — Before `Write` executor entry, the host durably creates or resolves
+  an action/effect record and uses its stable ID for both `InvocationPosition`
+  and `EffectId`; conflict or uncertain recorder state never blind-redispatches.
+- **K032** — `Pure`/`Read` may use attempt-scoped positions and a non-durable
+  recorder. Tests and docs expose that `Read + BilledOnce` can be billed again
+  after crash or discarded one-shot.
+- **K033** — Dispatch returns only completed `llm_tools.ToolResult` or durable
+  suspended `(host_ref, waiting_for)`; configuration, recorder, executor, and
+  position defects are typed exceptions rather than fabricated tool failures.
+- **K034** — Suspension settles the proposing input and releases all live
+  resources. A later host input supplies the opaque ref, tool ID, original
+  validated arguments, resolution state, and safe evidence without relying on
+  provider history or a kernel approval vocabulary.
+- **K035** — Bindings return bounded results or typed boundary guidance. The
+  kernel caps cumulative visible context, emits explicit omission markers for
+  recomputable reads, and never silently truncates effect, approval, or
+  reconciliation evidence.
+- **K036** — V1 emits no model-authored nonterminal progress prose; the host may
+  expose activity/typing state.
 
-## Assurance
+## Polling, settlement, and cross-run bounds
 
-- **K028** — Deterministic fakes cover every model, session, dispatcher,
-  checkpoint, finalization, event-sink, clock, and cancellation port.
-- **K029** — Conformance tests inject failures before and after claim, model
-  result, trace emission, effectful dispatch commit, and finalization.
-- **K030** — Race tests prove that input arriving during the final model call is
-  not lost, budget-exhausted handoff arms another run before claim release, and
-  cancellation/error cleanup also arms a run for any still-unconsumed input;
-  two drainers cannot both own one thread. Mixed-class tests prove a claim reads
-  only the maximal same-class prefix, a mismatched initial claim calls no
-  provider and arms the correct run, and a newer incompatible input forces an
-  armed defer even when budget remains.
-- **K031** — Protocol fuzz tests prove that invalid steps produce no partial
-  output or tool execution.
-- **K032** — Session-loss tests prove continuation, compatible resume, cold
-  bootstrap, the single-bootstrap-attempt limit, and safe discard of a
-  speculative reference when canonical input remains unconsumed. A stale
-  compare-and-set cannot dispatch or settle, and successful stores advance the
-  expected generation.
-- **K033** — Pending-approval tests prove suspension and later continuation from
-  a host-authored action-resolution input correlated by opaque host reference,
-  without replaying the original effect.
-- **K034** — Budget and cancellation tests prove bounded cleanup and exactly one
-  terminal kernel outcome per started run. Isolated one-shot tests prove a fresh
-  session, structured output, a non-effectful plan, no checkpoint or saved-
-  session-reference access, and one schema-valid result. Provider-internal
-  continuation state is non-canonical. Invalid mode/façade combinations fail
-  before I/O.
-- **K035** — An opt-in live qualification matrix covers the supported
-  `provider-runtime` route without running in ordinary CI or printing prompts,
-  credentials, or private tool payloads.
+- **K037** — At most one claim owns a thread. An empty claim is invalid, and
+  `no_work`, `busy`, `deferred`, or denied admission performs no provider I/O.
+- **K038** — The kernel polls before provider turns, before dispatch, after tool
+  completion, and before settlement. Compatible appended inputs are ordered,
+  use the frozen plan, and appear exactly once; incompatible input remains
+  unclaimed.
+- **K039** — Immediate stop/pause or host preemption prevents later provider/tool
+  boundaries where possible and propagates cancellation in flight. Cancellation
+  never claims to undo an already committed effect.
+- **K040** — `settle` idempotently and atomically persists the host conclusion
+  and consumes through the checkpoint. A valid answer is retained when an
+  ordinary follow-up races with finalization; that follow-up is signalled and
+  handled by a later run.
+- **K041** — `release` is idempotent cleanup and never arms a successor.
+  Correctness after interruption comes from canonical unconsumed input plus
+  explicit startup/recovery scanning.
+- **K042** — Protocol exhaustion, kernel-budget exhaustion, quota exhaustion,
+  declared stop, and repeated provider failure settle and consume a
+  host-authored stopped conclusion. None automatically starts a fresh-budget
+  run for the same logical input.
+- **K043** — Every thread run presents a host-issued admission token before
+  provider I/O. The rolling durable policy bounds provider turns, available
+  input/output tokens, consecutive no-progress attempts, and concurrent
+  cognitive work; usage is settled on every exit.
+- **K044** — Crash recovery increments the durable attempt number on the oldest
+  logical input. Exceeding its ceiling stops or parks the input before provider
+  I/O. Configuration defects park and trip a host circuit breaker rather than
+  entering an automatic retry loop.
+- **K045** — No database transaction or blocking row lock is held over provider
+  or connector I/O; a host signal after `settle(more_input)` is backed by
+  canonical recovery scanning rather than treated as an atomic database/worker
+  transaction.
+
+## One-shot, privacy, and assurance
+
+- **K046** — An isolated one-shot requires isolated mode, a structured output
+  contract, and a plan containing no `ToolEffect.Write`; it uses a fresh native
+  session, no claim/checkpoint/admission-retry/session-ref port, and returns only
+  a valid result or typed stop.
+- **K047** — One-shot sessions always close. Their results remain non-canonical
+  until the caller commits them, and provider-internal continuation is never
+  saved.
+- **K048** — Default traces contain IDs, revisions, timings, counts, usage, and
+  outcomes—not prompts, user text, memory, arguments/results, session refs,
+  credentials, or provider payloads. Sink failure is nonfatal.
+- **K049** — Documentation states that provider-native transcripts are
+  unredacted third-party data at rest and discarding a local ref does not promise
+  provider deletion.
+- **K050** — Deterministic tests inject failures at claim, admission, provider
+  terminal, session CAS, validation, recorder/effect commit, suspension,
+  settlement, release, and usage settlement boundaries.
+- **K051** — Multi-run race tests cover poison input, no automatic rearm,
+  attempt-ceiling recovery, rolling admission, mid-loop steering, stop
+  preemption, ordinary follow-up finalization, suspension/resolution, and
+  startup scanning.
+- **K052** — Opt-in live qualification exercises the exact pinned AgentRuntime
+  request, event, resume, cancellation, quota, and containment behavior without
+  running in ordinary CI or recording private payloads.
 
 ## Slice assignment
 
 | Slice | Acceptance IDs |
 | --- | --- |
-| 0 — contract and package | K001–K007, K028 |
-| 1 — context and provider sessions | K008–K010, K025 |
-| 2 — strict step and tool loop | K011–K020, K024, K026–K027, K031, K034 |
-| 3 — drain and finalization | K021–K023, K029–K030, K032–K033 |
-| 4 — qualification and release | K035 |
+| 0 — dependency truth and package contract | K001–K007 |
+| 1 — Codex agent sessions and context | K008–K024 |
+| 2 — strict serial protocol and tool boundary | K025–K036 |
+| 3 — polling, settlement, and admission | K037–K045 |
+| 4 — one-shot, assurance, and release | K046–K052 |

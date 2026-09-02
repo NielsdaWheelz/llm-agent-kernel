@@ -2,305 +2,297 @@
 
 ## System boundary
 
-`llm-agent-kernel` is orchestration glue between an application, a model
-provider, and a capability executor. It owns the control flow but none of the
-domain authority.
+`llm-agent-kernel` coordinates four independently owned systems:
 
 ```text
-┌──────────────────────── application ─────────────────────────┐
-│ canonical thread/history policy  approvals  memory  delivery │
-│        │                   │                                  │
-│        ├── persistence ports ───────┐                         │
-│        └── context source           │                         │
-└─────────────────────────────────────┼─────────────────────────┘
-                                      v
+┌──────────────────────────── host application ────────────────────────────┐
+│ canonical input/history  admission  policy  action/effect state  delivery│
+│       │                    │         │                │                   │
+│       └──── context/checkpoint/admission/dispatch/session-ref ports ─────┤
+└──────────────────────────────────────┬────────────────────────────────────┘
+                                       v
                          ┌────────────────────────┐
                          │   llm-agent-kernel     │
-                         │ bounded event drain    │
-                         │ context projections    │
-                         │ strict step protocol   │
+                         │ containment + context  │
+                         │ strict serial loop     │
+                         │ polling + settlement   │
                          └──────────┬─────────────┘
                                     │
-                    ┌───────────────┴───────────────┐
-                    v                               v
-          ┌──────────────────┐            ┌──────────────────┐
-          │ provider-runtime │            │    llm-tools     │
-          │ calls + sessions │            │ plans + executor │
-          └──────────────────┘            └────────┬─────────┘
-                                                   v
-                                          application bindings
+                    ┌───────────────┴────────────────┐
+                    v                                v
+       ┌────────────────────────┐       ┌────────────────────────┐
+       │ provider-runtime       │       │ llm-tools              │
+       │ AgentRuntime sessions  │       │ plan + execute + record│
+       └────────────────────────┘       └────────────┬───────────┘
+                                                     v
+                                             host tool bindings
 ```
 
-Dependencies point downward only. Jarvis may depend on all three packages;
-neither dependency knows about the kernel, and the kernel does not know about
-Jarvis.
+The kernel owns control flow, not application authority or data. Native
+provider containment and the host-selected frozen tool plan form the effective
+authority together. Neither prompt text nor the model's requested operation can
+widen them.
 
-The ownership split is fixed by [ADR 0001](decisions/0001-library-boundary.md)
-and [ADR 0003](decisions/0003-provider-and-tool-ownership.md).
+The ownership split is fixed by [ADR 0001](decisions/0001-library-boundary.md),
+[ADR 0003](decisions/0003-provider-and-tool-ownership.md), and
+[ADR 0005](decisions/0005-codex-agent-lane-and-serial-steps.md).
 
-## Core components
+## Runtime modules
 
-### `model.py`
+The names below are implementation targets, not current source files.
+
+### `definitions.py`
 
 Defines immutable provider-neutral values:
 
-- `AgentDefinition`, immutable capability envelope, `Role`, `RunLimits`,
-  `SessionMode`, and `ContextPolicy`.
-- Conversational and closed structured `OutputContract` values.
-- `SayStep`, `CallToolsStep`, and `FinishStep`.
-- Tool dispatch outcomes and public run outcomes.
-- Typed waking input, including host-authored `ActionResolutionInput` correlated
-  by an opaque durable host reference rather than a turn-local call ID.
-- Opaque thread, checkpoint, event, invocation, and session-reference types.
+- `AgentDefinition`, `SessionMode`, `OutputContract`, and `KernelLimits`.
+- Exact session-scoped provider configuration and deterministic fingerprint.
+- Frozen maximum profile and host-selected frozen run plan.
+- `InputClaim`, host inputs, checkpoints, conclusions, and run outcomes.
+- Closed `SayStep`, `CallToolStep`, and `FinishStep` models.
+- Completed and suspended dispatch results.
 
-These values contain no ORM, connector, SDK response, or UI types.
+The fingerprint includes every native option that changes session meaning or
+containment: backend, transport, credential-profile identity, model, reasoning,
+instructions, output schema, policy, cwd, directories, MCP configuration, and
+native options. Secret bytes and dynamic input are excluded.
 
-### `protocol.py`
+### `provider.py`
 
-Owns the closed step grammar and validation choreography. Structural validation
-runs first; every proposed call is then resolved and validated against the
-already-frozen per-run `llm-tools` plan, which must be a subset of the definition
-envelope. The module returns either one fully valid step or one bounded
-corrective diagnostic. It never dispatches incrementally.
+Adapts the actual `provider_runtime.agent_runtime.AgentRuntime` resource
+lifecycle:
 
-Provider-specific structured-output decoding belongs in the provider adapter,
-but it must produce the same semantic `Step` and cannot weaken validation.
+```text
+open_session(AgentSessionRequest)
+run_turn(AgentSession, TurnRequest, cancel=...)
+close_session(AgentSession)
+```
+
+The adapter owns live-session leases and maps typed runtime terminals. It
+publishes the kernel's closed JSON schema through `JsonSchemaAgentOutput` and
+constructs the exact containment request:
+
+- subscription-backed Codex route;
+- private empty absolute cwd with read-only filesystem policy;
+- no additional directories, copied environment, network, MCP, or approval;
+- native built-ins and Web disabled;
+- the Codex `allowed_tools=("*",)` SDK sentinel only where required by the
+  pinned runtime.
+
+The sentinel is not application authority. Any native `AgentToolUse` or
+`AgentPermissionRequest` event discards the session and fails the run before a
+host tool or model-authored conclusion can cross the boundary. Streaming text
+is not delivered; only terminal structured output enters the kernel protocol.
+
+### `sessions.py`
+
+Coordinates disposable continuing sessions through two separate resources:
+
+- A live-session lease owned by the provider adapter and optionally cached by
+  the host for latency.
+- A serialized `AgentSessionRef` stored behind a generation-CAS host port.
+
+Every successful provider turn advances the session reference before the
+kernel acts on the step. A stale CAS proves another owner or broken adapter and
+therefore permits no dispatch or settlement. If later canonical settlement is
+interrupted, the input remains unconsumed; recovery discards the speculative
+reference before replay.
+
+A missing, invalid, incompatible, or unresumable reference permits one cold
+bootstrap before any successful terminal from the current attempt. Provider
+session state is never evidence that host input was consumed.
 
 ### `context.py`
 
-Builds typed semantic sections from host material. It has two projections:
+Builds `llm-tools` prompt sections from host-selected material:
 
-- **Continuation:** as-yet unseen input, fresh retrieved material, current
-  capability context, and new current-run observations for an existing
-  compatible session. An accepted response makes that input seen, so later tool
-  or protocol continuations do not repeat it.
-- **Cold bootstrap:** stable role/instructions and bounded canonical history,
-  followed by the same current-turn material.
+- stable role and application context;
+- bounded canonical completed history;
+- current claimed or newly polled host input;
+- host-selected retrieval;
+- the exact frozen `HostTable` plan;
+- relevant locale/timezone and one `as_of` per admitted input batch;
+- bounded tool observations and explicit omission markers.
 
-Both use `llm-tools` prompt-section and rendering facilities. Source IDs,
-timestamps, and omission markers survive selection. The module contains no XML
-implementation and does not treat presentation markup as a security boundary.
+Continuation sends only material not already accepted by that live session.
+Cold bootstrap rebuilds useful context from canonical state and may repeat safe
+reads. It obtains durable effect arguments and outcomes from host action state,
+never solely from provider history.
+
+XML-like rendering preserves structure and provenance but does not neutralize
+prompt injection. Untrusted human, connector, memory, and Web content remains
+untrusted data.
+
+### `protocol.py`
+
+Owns the closed model grammar:
+
+```text
+say(text)
+call_tool(tool_id, arguments)
+finish(optional reason, output-contract result)
+```
+
+It revalidates the complete runtime-parsed value, applies the output contract,
+resolves the exact frozen-plan binding, and invokes the qualified pure
+`llm-tools` argument validator. Validation does not occupy a position, reserve
+tool budget, touch a recorder, or dispatch.
+
+There is no model-authored preview, call ID, effect ID, authority label,
+approval instruction, or delivery instruction. One malformed value produces no
+partial text or call. A bounded correction can consume another provider turn.
 
 ### `loop.py`
 
-Owns the bounded run/drain state machine described in
-[SPEC section 8](../SPEC.md#8-drain-algorithm). Its important invariant is:
+Runs one claimed batch under `KernelLimits`. It:
 
-> No model-proposed text or effect crosses a host boundary until the entire
-> model step is valid.
+1. Polls for compatible input or preemption.
+2. Builds one bootstrap or the unsent continuation delta.
+3. Executes one structured provider turn.
+4. Stores the returned session ref by generation CAS.
+5. Validates exactly one complete step.
+6. Settles `say`/`finish`, or dispatches one `call_tool` serially.
+7. Feeds a bounded completed observation into the next provider turn, or
+   settles a durable suspension and returns.
 
-It ensures observations are normalized before another model step, stopping
-outcomes do not invite blind retries, and all loops consume finite budgets.
-Intermediate observations may remain turn-local; effect durability is enforced
-at the tool boundary.
+The kernel polls before provider turns, before dispatch, after tool completion,
+and before settlement. Compatible input is appended exactly once under the
+already-frozen plan. Incompatible input remains unclaimed. A stop or
+higher-priority host control may preempt; ordinary follow-up input does not
+discard a paid valid answer that has already reached finalization.
 
-The loop has two narrow façades: a thread drain with checkpoint/session ports,
-and an isolated one-shot invocation with neither. Both share validation,
-dispatch, correction, budgets, and cancellation. One-shot structured roles
-accept only non-effectful plans and return a schema-valid `finish.result` for the
-application to commit; the kernel does not pretend that result was durable.
-Thread drains require continuing definitions in v1; isolated definitions use
-the one-shot façade.
+V1 has no parallel calls and no nonterminal model-authored narration. The host
+may expose typing/activity state.
 
 ### `coordination.py`
 
-Defines the input-checkpoint protocol and normalized event-sink hooks. The
-application supplies exclusive claim and atomic terminal finalization behavior
-using its existing durability mechanism.
+Defines three host protocols.
 
-Each thread claim is bound to an opaque host `run_class` and its frozen plan.
-The checkpoint adapter returns only the maximal ordered input prefix eligible
-for that class. If the next input belongs to another class, finalization arms
-the appropriate run and defers even when the current run has budget. This
-prevents a narrow proactive run and a broad interactive run from consuming each
-other's work.
+`InputCheckpointPort` claims a non-empty bounded batch, polls it, atomically
+settles its conclusion plus consumed checkpoint, and releases interrupted work.
+The host owns selection, priority, compatibility, and plan choice. The kernel
+has no `run_class`.
 
-The idle transition is a compare-and-set over an opaque consumed watermark:
+`AdmissionPort` issues a token before provider I/O and settles available usage
+on every exit. The durable rolling policy bounds turns, reported tokens,
+consecutive no-progress attempts, and concurrent cognitive work. Subscription
+AgentRuntime is not assigned fictional per-token dollar cost; a future priceable
+lane may add a cost dimension.
+
+`EventSink` receives bounded metadata. It is observability, not canonical input,
+delivery, or an effect recorder, and its failure is nonfatal.
+
+### `tools.py`
+
+Bridges a validated proposal to the host dispatcher and `llm-tools`. It never
+implements a second executor or tool budget.
+
+`llm_tools.RunLimits` alone owns tool-call, attempt, byte, concurrency, and tool
+elapsed limits. The frozen plan sets `max_in_flight = 1`. `KernelLimits` owns
+provider turns, protocol repairs, wall time, reported provider usage, and total
+model-visible context.
+
+For `Write`, the host creates or resolves a durable action/effect row before
+executor entry. Its stable ID is both the `InvocationPosition` and `EffectId`.
+For `Pure` and `Read`, the host may use an attempt-scoped position and
+non-durable recorder. A `Read + BilledOnce` operation can therefore rebill after
+a crash; v1 accepts that cost instead of adding a generic durable read cache.
+
+Dispatch returns:
 
 ```text
-model concludes input through W
-          |
-          v
-atomically persist conclusion + consume through W
-          |
-          v
-is there waking input after W?
-     yes /                 \ no
- same-class + budget?       commit idle
- continue / arm defer
+completed(llm_tools ToolResult)
+suspended(host_ref, waiting_for=user|system)
 ```
 
-An input arriving before the test forces `continue` when budget remains or an
-atomically armed deferred run before ownership is released. An input arriving
-after idle commits observes an idle thread and starts a new run. There is no
-interval in which waking input is both unclaimed and believed consumed.
+A suspension means host state is durable and the run can release all live
+resources. A later host input supplies the reference, tool ID, original
+validated arguments, resolution, and safe evidence. The kernel owns no approval
+or action vocabulary. Terminal uncertainty is a host resolution, not a generic
+tool-loop retry signal.
 
-### `adapters/`
-
-The initial adapters are intentionally thin:
-
-- `provider_runtime.py` opens/resumes calls and translates completed responses
-  and usage without making provider state canonical.
-- `llm_tools.py` validates against a frozen plan and dispatches through the
-  dependency's executor/effect boundary.
-
-Application packages implement context, persistence, and policy adapters.
-Reusable SQL repositories, workflow adapters, or provider-specific helpers may
-be separate optional packages later; they are not v1 kernel responsibilities.
-
-## State machine
+## State transitions
 
 ```text
 START
   |
-  +-- claim denied ------------------------------> BUSY
+  +-- no work / busy / denied admission ----------------------> RETURN
   |
   v
-LOAD_INPUT --> BUILD_CONTEXT --> MODEL_CALL --> VALIDATE
-                                             invalid |
-                                      RECORD_FEEDBACK
-                                             |
-                                             +--> BUILD_CONTEXT
-                                                (within budget)
+CLAIM --> ADMIT --> PROVE PLAN --> OPEN/RESUME --> POLL --> MODEL TURN
+                                                        typed failure |
+                                              bounded fallback or STOP
+                                                               |
+                                         CAS SESSION REF --> VALIDATE
+                                                           invalid |
+                                               bounded correction
+                                                           |
+                                                           +--> POLL
 
-VALIDATE -- call_tools --> DISPATCH --> OBSERVE_OUTCOMES
-                                |             |
-           pending_approval/uncertain         +--> BUILD_CONTEXT
-                                v
-                       SETTLE_CHECKPOINT
-                         /            \
-            newer input                no newer input
-          continue/defer                  WAITING
+VALIDATE -- call_tool --> POLL --> SERIAL DISPATCH
+                                      /       \
+                               completed    suspended
+                                   |            |
+                              observation     SETTLE --> RETURN
+                                   |
+                                   +------------------> POLL
 
-VALIDATE -- say/finish --> SETTLE_CHECKPOINT
-                                  |
-                      newer input | no newer input
-                                  v
-                            LOAD_INPUT     IDLE
+VALIDATE -- say/finish --> POLL FOR PREEMPTION --> SETTLE --> RETURN
 
-Any boundary --> CANCELLED / BUDGET_EXHAUSTED / typed failure
+deterministic exhaustion/quota/stop --> host-authored stopped conclusion
+process interruption/invariant defect --> release or park; never auto-rearm
 ```
 
-The compact diagram omits one required ordering edge: after a valid provider
-response, the generation-checked session reference advances before canonical
-checkpoint settlement. If settlement is interrupted, the input is still
-unconsumed and recovery discards that speculative reference. Effect-free work
-may then replay; possible effects must reconcile through host state instead.
-This prevents both resuming behind a committed conclusion and replaying
-unresolved input into a session that already contains its response.
+No database transaction remains open across provider or connector I/O.
 
-The drain claim is idempotently released in a `finally` path. No SQL transaction or
-blocking database row lock is held across a model or connector network call;
-exclusive ownership is a logical claim whose implementation belongs to the
-host. Idempotent cleanup release arms a recovery run before relinquishing any
-claim that still has unconsumed waking input.
+## Work bounded across runs
 
-## Persistence ports
+A per-run ceiling is insufficient if cleanup can create an unlimited sequence
+of fresh runs. [ADR 0006](decisions/0006-bound-work-across-runs.md) therefore
+requires:
 
-### Kernel event sink
+- no unconditional successor arming from `release`;
+- deterministic poison stops to settle and consume the claimed input;
+- durable no-progress attempt counting on crash recovery;
+- rolling admission before provider I/O;
+- explicit startup/recovery scanning of canonical unconsumed input.
 
-The event sink receives normalized lifecycle, protocol, provider, dispatch,
-budget, and cancellation events for metrics and tracing. The host may persist a
-redacted subset, but the sink is not the reconstruction source and requires no
-table. Turn-local protocol feedback and read observations may disappear on a
-crash and be recomputed. The kernel attempts emission before reuse, but a sink
-failure is nonfatal. Durable effect state lives behind the dispatcher.
+When `settle` reports later input, the host signals a new run after commit.
+Correctness rests on canonical state and recovery scanning, not a fictitious
+transaction spanning a database and a process trigger.
 
-### Input checkpoint
+## Durable-state truth
 
-The checkpoint is an opaque host value with only an ordering contract. The
-kernel never assumes an integer, timestamp, database sequence, or provider
-message ID. The host binds an equally opaque `run_class` to a frozen plan and
-input-eligibility rule. `settle` combines idempotent host terminal-conclusion
-persistence, advancement through the observed checkpoint, and an atomic choice
-among same-class continuation, idle release, or an armed deferred run. Pending
-approval is a terminal-conclusion kind, not a lock on the whole thread.
+The kernel owns no database schema, but its contracts do require real durable
+facts in a continuing effectful host:
 
-### Provider session reference
+| Fact | Owner | Why |
+| --- | --- | --- |
+| Input, conclusion, consumed checkpoint, delivery | Host canonical store | Conversation correctness and restart delivery |
+| Provider session ref + generation | Host session-ref store | Safe continuation optimization and CAS ownership |
+| Action/effect position, input, recorder result | Host + `llm-tools` recorder | Write replay and reconciliation |
+| No-progress attempts and rolling usage | Host admission state | Cross-run boundedness |
 
-Session references are stored by `(thread_id, definition_fingerprint)` with a
-generation for compare-and-set. They may live in a file, database, or application
-runtime store. They are disposable and intentionally excluded from canonical
-restore guarantees.
+A host may map several facts into existing tables or one atomic document. The
+library does not dictate layout, but conformance must prove the semantics. An
+in-memory recorder is a test double, never a crash-safety claim.
 
-A fingerprint mismatch or safe resume failure discards the reference and uses a
-cold bootstrap. Provider state is never used to infer that application input was
-consumed. Every successful compare-and-set returns the next expected generation;
-a stale result stops before dispatch or settlement. Crash recovery replays only
-when durable host state proves that no effectful dispatch began; otherwise the
-host action/effect record drives reconciliation.
+## Observation size and recovery
 
-## Authority flow
+Bindings return bounded previews, pagination/source references, and typed
+boundary guidance. The kernel additionally caps cumulative model-visible
+context. It may replace older recomputable reads with explicit omission markers
+and stable source references. It may not silently truncate effect results,
+approval material, or reconciliation evidence.
 
-The kernel sees only the capability plan the application selected before the
-drain. A role cannot expand it. A model cannot claim permission. The kernel asks
-`llm-tools` to validate all proposed calls and then passes them to the host
-dispatcher.
-
-The host dispatcher may:
-
-- Execute an automatic call through the normal tool/effect boundary.
-- Persist an approval proposal and return `pending_approval` without executing
-  it.
-- Reconcile an ambiguous effect and return `executed` or `uncertain`.
-- Reject a call according to application policy and return a declared failure.
-
-The kernel handles and emits the outcome it is given. A pending-approval outcome
-settles the proposing input and releases every live resource unless newer input
-is already ready to drain. A later host-authored action-resolution input
-correlates by the dispatcher's opaque host reference, not the turn-local call
-ID. The kernel does not contain an approval matrix, build previews, handle
-buttons, or mutate an application action ledger.
-
-## Failure and recovery
-
-Failure handling follows four rules:
-
-1. **Canonical before derived.** Waking input, terminal conclusions, and effect
-   state survive the provider session and traces.
-2. **Validate before authority.** A malformed multi-call step performs nothing.
-3. **Effects before claims.** A dispatcher reports an effect as executed only
-   after its `llm-tools` recording contract is satisfied; read observations may
-   remain turn-local and be recomputed after a crash.
-4. **Do not guess effects.** Pending and uncertain work concludes the proposing
-   input for host resolution instead of inviting a blind retry; unrelated newer
-   input may still drain.
-
-Provider transport retry is delegated to `provider-runtime`. Tool retry and
-reconciliation are delegated to `llm-tools` plus the application binding. The
-kernel itself retries only a bounded protocol correction and, before any valid
-response, one safe continuation-to-bootstrap fallback.
+V1 intentionally has no generic observed-value table. A host can add one after
+real workloads prove that source reread and bounded results are inadequate.
 
 ## Deferred designs
 
-Codapt2 demonstrates that a deterministic program step can reduce model/tool
-round trips, and that persistent peer agents can coordinate through event
-mailboxes. Neither is necessary to establish the v1 control plane.
-
-Program agents would introduce a language runtime, resource accounting,
-syscall/effect replay semantics, and a hostile-code isolation claim. Delegation
-would require task identity, parentage, capability narrowing, budgets,
-structured results, join/cancel behavior, and cancellation propagation. They
-remain separate evaluable additions under
-[ADR 0004](decisions/0004-defer-program-agents-and-delegation.md), not empty hooks
-inside the core.
-
-## Design tests
-
-The package test suite should use deterministic fake ports to exercise the state
-machine, then run adapter conformance against real dependency interfaces. The
-highest-value fault injections are:
-
-- Crash before and after every durable boundary.
-- Concurrent run claims and waking input during idle settlement.
-- Budget-exhausted input handoff that arms the next run before claim release.
-- Invalid second call in an otherwise valid multi-call step.
-- Provider-session loss, stale session compare-and-set, and cold bootstrap.
-- Crash immediately before and after session-reference advancement and terminal
-  settlement.
-- Pending approval, uncertain effect, cancellation, and each budget edge.
-- Context truncation with source/omission preservation.
-
-These tests encode the event-drain rationale in
-[ADR 0002](decisions/0002-event-drain-kernel.md) without requiring any particular
-database or workflow engine.
+Program agents and general delegation remain deferred under
+[ADR 0004](decisions/0004-defer-program-agents-and-delegation.md). Also deferred:
+parallel steps, semantic discovery in the kernel, provider-native application
+tools, MCP application tools, model-authored progress, generic durable read
+observations, stateless provider generation, and kernel-owned workflow/schema
+infrastructure.

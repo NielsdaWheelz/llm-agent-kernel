@@ -1,60 +1,68 @@
-# ADR 0003: Preserve provider-runtime and llm-tools ownership
+# ADR 0003: Preserve real provider-runtime and llm-tools ownership
 
 - Status: Accepted
 - Date: 2026-09-01
+- Amended: 2026-09-02
 
 ## Context
 
-Codapt2 contains its own provider adapter, host-function registry, schema
-boundary, prompt renderer, semantic discovery, and durable operation machinery.
-The Python ecosystem in scope already has focused libraries for those concerns.
-Duplicating them would create divergent security and replay behavior.
+The original design described dependency behavior that the pinned public APIs
+did not provide. `AgentSessionRequest` takes `PermissionPolicy` and MCP servers,
+not a host-tool list. `llm-tools` distinguishes `ToolEffect` from
+`ReplayPolicy`; its executor validates during occupied, budgeted dispatch, while
+the kernel needs pure pre-dispatch validation. `RunLimits` in `llm-tools` is a
+tool budget, not a kernel model-loop budget.
+
+Inventing lookalike types inside the kernel would create a false security
+boundary and divergent replay behavior.
 
 ## Decision
 
-Use public `provider-runtime` contracts for:
+Use public `provider-runtime` contracts for native Codex session creation,
+resume, turns, events, interruption, references, close, containment policy,
+native options, structured-output lowering, quota, and normalized usage.
 
-- Provider calls and normalized model outcomes.
-- Native Codex/Claude session creation, resume, cancellation, containment, and
-  session references.
-- Provider-specific structured-output lowering and normalized events.
+Use public `llm-tools` contracts for prompt sections, declarations, catalogs,
+bindings, frozen profiles/plans, `HostTable`, schemas, pure argument validation,
+`ToolEffect`, `ReplayPolicy`, tool budgets, positions, effect IDs, recorder
+semantics, execution, and results.
 
-Use public `llm-tools` contracts for:
+Before implementation, add the four missing public `llm-tools` seams enumerated
+in SPEC section 2. Do not import private modules or reimplement them locally.
 
-- Typed prompt sections and rendering.
-- Tool declarations, bindings, catalogs, frozen profiles, and exposure plans.
-- Input/output validation, budgets, execution, invocation positions, effect
-  identities, recorder contracts, and optional discovery.
+The kernel owns semantic step/output validation and enforces proof that a run
+plan tightens a definition maximum. The host owns policy, plan selection,
+effect-ID minting, the durable recorder implementation, external
+reconciliation, and product state.
 
-The kernel coordinates these contracts. It does not import provider SDKs,
-execute application bindings directly, decide approval policy, resolve
-credentials, or construct a second registry.
-
-Applications supply a dispatcher because authority and asynchronous approval
-belong to the product. The dispatcher may return a pending-approval observation;
-the kernel concludes that proposing input and later consumes a host-authored
-action-resolution input correlated by the dispatcher's opaque reference.
+The host dispatcher returns a completed `llm_tools.ToolResult` or a durable
+suspension. It does not compress approval, denial, failure, and uncertainty into
+a kernel-owned application state machine. A later host resolution contains the
+original validated call and safe evidence.
 
 ## Consequences
 
-Positive:
+Benefits:
 
-- Security-critical behavior retains one owner.
-- Provider and tool evolution can be qualified independently.
-- The kernel stays small enough for other applications.
+- Security and replay behavior have one truthful owner.
+- Kernel and tool budgets cannot silently double-charge the same operation.
+- Dependency drift is detected by contract canaries and qualification.
 
 Costs:
 
+- `llm-tools` must be upgraded before kernel implementation.
 - Compatibility spans three packages and requires an integration matrix.
-- Some types require narrow adapters rather than direct re-export.
-- Applications remain responsible for durable tool/action storage.
+- Applications remain responsible for durable action/effect storage and
+  reconciliation.
 
 ## Rejected alternatives
 
-- Port Codapt2's registry: weaker than and duplicative of `llm-tools`.
-- Add provider SDK adapters: duplicates `provider-runtime` lifecycle and
-  containment.
+- Validate by calling the executor: mutates position, recorder, and budget before
+  whole-step validation finishes.
+- Treat `Pure`/`Read` as “non-effectful”: erases the independent replay-policy
+  dimension and billed-read cost.
+- Build capability containment inside the kernel: duplicates the plan owner.
 - Put application approval states in the kernel: turns product authority into a
-  misleading generic policy.
-- Treat prompt markup as a security boundary: formatting cannot neutralize
+  misleading generic vocabulary.
+- Treat prompt markup as a security boundary: structure cannot neutralize
   semantic prompt injection.
