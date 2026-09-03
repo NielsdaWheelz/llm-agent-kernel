@@ -15,6 +15,7 @@ from llm_tools import (
     PositionConflictDefect,
     PromptSections,
     RecoveryRequired,
+    RunLimits,
 )
 from provider_runtime.agent_runtime import (
     AgentFailure,
@@ -73,6 +74,7 @@ from .coordination import (
     SessionRefStateDefect,
     SettleIdle,
     SettleMoreInput,
+    ToolBudgetFactoryPort,
     ToolDispatchDefect,
     ToolDispatchPort,
 )
@@ -232,10 +234,11 @@ async def _claim_and_admit(
     definition: AgentDefinition,
     checkpoints: InputCheckpointPort,
     admission: AdmissionPort,
+    budget_factory: ToolBudgetFactoryPort,
     cancellation: CancellationToken,
     state: _RunState,
     event: Callable[..., None],
-) -> tuple[InputClaim, AdmissionToken] | ThreadOutcome:
+) -> tuple[InputClaim, AdmissionToken, BudgetState] | ThreadOutcome:
     claim_result = await checkpoints.claim(thread_id, owner_token)
     if not isinstance(claim_result, ClaimNoWork | ClaimBusy | ClaimDeferred | ClaimAcquired):
         raise KernelConfigurationDefect("checkpoint port returned an unknown claim result")
@@ -296,6 +299,16 @@ async def _claim_and_admit(
     if claim.attempt_number > definition.limits.max_no_progress_attempts:
         return await early_stop(ThreadStopKind.provider_error, StopReason.provider_error)
 
+    try:
+        budgets = _create_tool_budget(budget_factory, claim.plan)
+    except (KernelConfigurationDefect, TypeError, ValueError):
+        await _park_claim(checkpoints, claim, "invalid frozen tool budget")
+        event(EventKind.outcome, outcome_type="configuration_error")
+        return ThreadStopped(state.metrics(consumed=False), ThreadStopKind.configuration_error)
+    except BaseException:
+        await _release_claim(checkpoints, claim, "tool budget construction interrupted")
+        raise
+
     request = AdmissionRequest(
         run_id=run_id,
         thread_id=thread_id,
@@ -335,7 +348,7 @@ async def _claim_and_admit(
             await admission.settle(token, AdmissionUsage(0, ProviderUsage(), state.elapsed()))
         event(EventKind.outcome, outcome_type="configuration_error")
         return ThreadStopped(state.metrics(consumed=False), ThreadStopKind.configuration_error)
-    return claim, token
+    return claim, token, budgets
 
 
 async def run_thread(
@@ -349,7 +362,7 @@ async def run_thread(
     sessions: SessionCoordinator,
     context_source: ContextSourcePort,
     dispatcher: ToolDispatchPort,
-    budgets: BudgetState,
+    budget_factory: ToolBudgetFactoryPort,
     cancellation: CancellationToken | None = None,
     consume_on_cancel: bool = True,
     event_sink: EventSink | None = None,
@@ -386,13 +399,14 @@ async def run_thread(
         definition=definition,
         checkpoints=checkpoints,
         admission=admission,
+        budget_factory=budget_factory,
         cancellation=cancellation,
         state=state,
         event=event,
     )
     if not isinstance(start, tuple):
         return start
-    claim, token = start
+    claim, token, budgets = start
     current_checkpoint = claim.through_checkpoint
     admitted_inputs = list(claim.inputs)
     session: ContinuingSessionState | None = None
@@ -702,7 +716,7 @@ async def run_thread(
                     return await cancelled()
                 if not pending_content:
                     raise KernelConfigurationDefect("provider turn has no new canonical material")
-                remaining = definition.limits.max_wall_seconds - state.elapsed()
+                remaining = definition.limits.max_cooperative_seconds - state.elapsed()
                 if remaining <= 0:
                     return await stop(
                         ThreadStopKind.budget_exhausted,
@@ -959,7 +973,7 @@ async def run_one_shot(
     admission: AdmissionPort,
     provider: ProviderSessionPort,
     dispatcher: ToolDispatchPort,
-    budgets: BudgetState,
+    budget_factory: ToolBudgetFactoryPort,
     parent_admission: AdmissionToken | None = None,
     cancellation: CancellationToken | None = None,
     event_sink: EventSink | None = None,
@@ -974,6 +988,7 @@ async def run_one_shot(
         raise ValueError("one-shot requires a structured output contract")
     require_host_plan(plan, definition.maximum_profile)
     require_read_only_plan(plan)
+    budgets = _create_tool_budget(budget_factory, plan)
     cancellation = cancellation or CancellationToken()
     state = _RunState(run_id, clock)
 
@@ -1069,7 +1084,7 @@ async def run_one_shot(
                     return stopped(ThreadStopKind.cancelled)
                 if state.provider_turns >= definition.limits.max_provider_turns:
                     return stopped(ThreadStopKind.budget_exhausted)
-                remaining = definition.limits.max_wall_seconds - state.elapsed()
+                remaining = definition.limits.max_cooperative_seconds - state.elapsed()
                 if remaining <= 0:
                     return stopped(ThreadStopKind.budget_exhausted)
                 state.provider_turns += 1
@@ -1258,7 +1273,7 @@ def _add_delta(total: int | None, current: int | None, previous: int | None) -> 
 def _kernel_budget_exhausted(definition: AgentDefinition, state: _RunState) -> bool:
     limits = definition.limits
     return (
-        state.elapsed() >= limits.max_wall_seconds
+        state.elapsed() >= limits.max_cooperative_seconds
         or (
             state.input_tokens is not None and state.input_tokens > limits.max_provider_input_tokens
         )
@@ -1267,6 +1282,20 @@ def _kernel_budget_exhausted(definition: AgentDefinition, state: _RunState) -> b
             and state.output_tokens > limits.max_provider_output_tokens
         )
     )
+
+
+def _create_tool_budget(
+    factory: ToolBudgetFactoryPort,
+    plan: FrozenToolPlan,
+) -> BudgetState:
+    try:
+        budgets = factory.create(plan)
+        limits = budgets.limits
+    except (AttributeError, TypeError, ValueError) as error:
+        raise KernelConfigurationDefect("tool budget factory returned invalid state") from error
+    if not isinstance(limits, RunLimits) or limits != plan.profile.run_limits:
+        raise KernelConfigurationDefect("tool budget limits do not match the frozen run plan")
+    return budgets
 
 
 def _failed_terminal_stop(terminal: AgentTerminal) -> tuple[ThreadStopKind, StopReason]:

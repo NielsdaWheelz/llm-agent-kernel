@@ -23,6 +23,20 @@ and implements generation CAS. A successful provider terminal is stored before
 validation, display, dispatch, or settlement. Recovery discards a speculative
 reference before cold-bootstrap replay.
 
+Every `AgentDefinition` supplies a non-empty owner-controlled
+`session_compatibility_revision`. The host rotates it whenever an application,
+kernel, or provider-runtime semantic change makes saved sessions unsuitable for
+reuse even though other definition fields remain unchanged. Because it is part
+of the fingerprint and session-store key, rotation cold-bootstraps without
+deleting the older reference namespace.
+
+The host supplies `ToolBudgetFactoryPort`, not a budget created before claim.
+After `claim` reveals the selected plan and the kernel proves the exact frozen
+plan/catalog relationship, the factory creates that run's `BudgetState` from
+the supplied plan. Its `limits` must exactly equal
+`plan.profile.run_limits`. A mismatch parks thread input or rejects a one-shot
+before rendering, admission, provider I/O, or tool I/O.
+
 The admission journal reserves the run's configured maximum turns and token
 allowances plus one live root slot before provider I/O. Clean settlement records
 available actual usage and refunds unused capacity. Startup recovery releases
@@ -46,6 +60,23 @@ resolution state, and safe evidence.
 No database transaction or blocking row lock may span provider or external tool
 I/O.
 
+`KernelLimits.max_cooperative_seconds` is not an end-to-end request SLA. The
+kernel checks elapsed time at safe boundaries and supplies the remaining value
+as the provider-turn deadline. Checkpoint, context, session-reference,
+admission, dispatch, settlement, release, park, and cleanup calls are
+cooperative and may finish after it. Tool execution remains independently
+bounded by the validated plan's `RunLimits.max_elapsed_seconds`; hosts must not
+add a blunt outer timeout around a `Write` that bypasses durable recorder and
+reconciliation handling.
+
+`KernelLimits.max_new_context_bytes` counts only UTF-8 bytes the kernel newly
+renders and submits during that invocation. Provider system/developer content,
+output-schema transport overhead, history retained by the native session, and
+provider compaction are outside it. Hosts must size provider-native context
+separately and continue supplying bounded canonical context and tool results;
+the kernel will not silently truncate required effect or reconciliation
+evidence.
+
 ## Qualification
 
 Ordinary CI is deterministic and network-disabled. It proves exact request
@@ -55,11 +86,13 @@ context, polling/finalization races, admission recovery, and isolated cleanup.
 
 Before a release, the first real consumer must additionally qualify its durable
 checkpoint, action/recorder, admission, and delivery implementations under
-process termination at each boundary. Jarvis must run its paid Codex account
-qualification for the exact provider-runtime pin and record only sanitized
-route, revision, status, usage, timing, and trace identifiers. Provider-native
-transcripts remain unredacted third-party data at rest; deleting a local
-reference does not promise provider deletion.
+process termination at each boundary. It must also pin its compatibility-
+revision policy and qualify plan-aware budget construction against every
+selectable plan. Jarvis must run its paid Codex account qualification for the
+exact provider-runtime pin and record only sanitized route, revision, status,
+usage, timing, and trace identifiers. Provider-native transcripts remain
+unredacted third-party data at rest; deleting a local reference does not promise
+provider deletion.
 
 The library release commands are:
 

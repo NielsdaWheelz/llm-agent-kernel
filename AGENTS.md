@@ -45,6 +45,9 @@ This repository specifies and contains `llm-agent-kernel`, imported as
   `run_turn` projection. Fail-stop and discard the session on any
   provider-native tool or permission event.
 - The complete native session policy is part of the definition fingerprint.
+- Every definition has a non-empty owner-controlled session-compatibility
+  revision in that fingerprint so semantic changes can deliberately rotate
+  saved sessions.
 - Effective authority is the intersection of provider containment and the
   host-selected frozen plan. Before rendering or I/O, prove the exact
   plan/catalog view is internally consistent and tightens the definition
@@ -54,6 +57,14 @@ This repository specifies and contains `llm-agent-kernel`, imported as
   behavior changes unless revisioned policy inputs already capture the change.
 - `KernelLimits` and `llm_tools.RunLimits` are distinct. Never double-account a
   tool call, attempt, byte, deadline, or replay.
+- Construct the tool `BudgetState` from the claimed, validated plan and require
+  its limits to equal that plan before provider or tool I/O.
+- The kernel elapsed limit is cooperative at safe boundaries and is a hard
+  provider-turn deadline, not a hard timeout over host ports, tools, settlement,
+  or cleanup. Tool deadlines remain frozen `llm-tools` limits.
+- Context bytes count only material the kernel newly renders and submits during
+  the current invocation, not provider configuration, schema overhead, retained
+  native history, or provider compaction.
 - `Write` requires a host-created durable action/effect record whose stable ID
   is both `InvocationPosition` and `EffectId`.
 - Suspension is a durable host boundary. The later resolution supplies original

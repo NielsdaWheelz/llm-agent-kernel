@@ -64,16 +64,20 @@ assigned to exactly one implementation slice.
   input claim, run, provider turn, model step, provider session, and role.
 - **K017** — A definition freezes role/stable context, session mode, output
   contract, maximum frozen capability profile, exact provider configuration,
-  and finite `KernelLimits`.
+  required non-empty owner-controlled session-compatibility revision, and finite
+  `KernelLimits`.
 - **K018** — The deterministic fingerprint covers every session-scoped semantic
-  and containment value, including `PermissionPolicy` and native options;
-  changing any covered value rotates the session. Secret bytes and dynamic
-  input are excluded.
+  and containment value, including `PermissionPolicy`, native options, and the
+  owner-controlled session-compatibility revision; changing any covered value
+  rotates the session. Secret bytes and dynamic input are excluded.
 - **K019** — Before rendering or provider/tool I/O, a qualified public predicate
   proves that the host-selected frozen plan is internally consistent with its
   exact catalog view, tightens the definition maximum in full, and sets
   `llm_tools.RunLimits.max_in_flight = 1`. Tests reject cross-catalog effect,
   schema, handler-implementation, replay-policy, and revision substitution.
+  Only after that proof, a plan-aware factory constructs a fresh `BudgetState`;
+  its limits must exactly equal the selected plan before rendering, admission,
+  provider I/O, or tool I/O.
 - **K020** — The kernel has no run-class abstraction. The host claim returns one
   non-empty bounded input batch and its already-selected plan; the host owns
   priority, batching, and compatibility.
@@ -87,7 +91,11 @@ assigned to exactly one implementation slice.
 - **K023** — Context uses provider-neutral `llm-tools` sections. Continuation
   sends each admitted host input once; cold bootstrap reconstructs useful work
   from bounded canonical history, current input, retrieval, plan, and durable
-  action state after all provider-session state is deleted.
+  action state after all provider-session state is deleted. The byte counter
+  covers only kernel-rendered model-visible material newly submitted during the
+  current invocation under `KernelLimits.max_new_context_bytes`; provider
+  configuration/schema overhead, retained native history, and provider
+  compaction are excluded.
 - **K024** — Each newly admitted input batch carries source timestamps and one
   host `as_of`; timezone/locale is included only when relevant. Ordinary tool
   continuations do not receive a changing ambient clock.
@@ -110,10 +118,14 @@ assigned to exactly one implementation slice.
 - **K029** — Exactly one tool executes serially per model step. There is no
   parallel executor, multi-call outcome vector, not-initiated suffix, or second
   kernel tool budget.
-- **K030** — `KernelLimits` own provider turns, repairs, wall time, reported
-  provider usage, and cumulative model-visible context. The frozen
+- **K030** — `KernelLimits` own provider turns, repairs, reported provider usage,
+  `KernelLimits.max_cooperative_seconds`, and cumulative newly rendered
+  model-visible context bytes. The elapsed limit is checked at safe boundaries
+  and passed as each provider-turn deadline; it is not a hard timeout over host
+  ports, settlement, cleanup, or tool execution. The frozen
   `llm_tools.RunLimits` alone own tool calls, attempts, bytes, concurrency, and
-  tool elapsed/deadline limits.
+  tool elapsed/deadline limits. The kernel never wraps a `Write` in an outer
+  timeout that bypasses recorder/reconciliation safety.
 - **K031** — Before `Write` executor entry, the host durably creates or resolves
   an action/effect record and uses its stable ID for both `InvocationPosition`
   and `EffectId`. The dispatch exposes immutable claim ID, through-checkpoint,
@@ -130,9 +142,10 @@ assigned to exactly one implementation slice.
   validated arguments, resolution state, and safe evidence without relying on
   provider history or a kernel approval vocabulary.
 - **K035** — Bindings return bounded results or typed boundary guidance. The
-  kernel caps cumulative visible context, emits explicit omission markers for
-  recomputable reads, and never silently truncates effect, approval, or
-  reconciliation evidence.
+  kernel caps cumulative kernel-rendered visible material newly submitted in
+  the current invocation, emits explicit omission markers for recomputable
+  reads, and never silently truncates effect, approval, or reconciliation
+  evidence.
 - **K036** — V1 emits no model-authored nonterminal progress prose; the host may
   expose activity/typing state.
 
@@ -179,8 +192,9 @@ assigned to exactly one implementation slice.
   contract, and a plan containing no `ToolEffect.Write`; it uses a fresh native
   session, a host-issued admission reservation, no
   claim/checkpoint/admission-retry/session-ref port, and returns only a valid
-  result or typed stop. Admission denial calls no provider and returns to its
-  caller without retry.
+  result or typed stop. It constructs and verifies the plan-specific tool budget
+  through the same factory as a thread run. Admission denial calls no provider
+  and returns to its caller without retry.
 - **K047** — One-shot sessions always close. Their results remain non-canonical
   until the caller commits them, and provider-internal continuation is never
   saved.
@@ -191,8 +205,9 @@ assigned to exactly one implementation slice.
   unredacted third-party data at rest and discarding a local ref does not promise
   provider deletion.
 - **K050** — Deterministic tests inject failures at claim, admission reservation,
-  provider terminal, session CAS, validation, recorder/effect commit,
-  suspension, settlement, release, and usage settlement/refund boundaries.
+  plan-specific budget construction, provider terminal, session CAS,
+  validation, recorder/effect commit, suspension, settlement, release, and
+  usage settlement/refund boundaries.
 - **K051** — Multi-run race tests cover poison input, no automatic rearm,
   attempt-ceiling recovery, rolling admission, mid-loop steering, stop
   preemption, ordinary follow-up finalization, suspension/resolution, and

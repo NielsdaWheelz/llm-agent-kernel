@@ -202,6 +202,7 @@ def _definition(
                 CredentialRef("local_account", "test"),
                 "gpt-5",
             ),
+            "kernel-test-v1",
             limits or KernelLimits(),
         ),
         plan,
@@ -342,8 +343,18 @@ class _Budgets:
         raise AssertionError("scripted dispatch does not mutate tool budgets")
 
 
-def _budget(plan: Any) -> BudgetState:
-    return cast(BudgetState, _Budgets(plan.profile.run_limits))
+class _BudgetFactory:
+    def __init__(self, limits: RunLimits | None = None) -> None:
+        self.limits = limits
+        self.plans: list[Any] = []
+
+    def create(self, plan: Any) -> BudgetState:
+        self.plans.append(plan)
+        return cast(BudgetState, _Budgets(self.limits or plan.profile.run_limits))
+
+
+def _budget_factory(limits: RunLimits | None = None) -> _BudgetFactory:
+    return _BudgetFactory(limits)
 
 
 class _FailingSettlement(InMemoryInputCheckpointPort):
@@ -417,6 +428,8 @@ async def _thread(
     cancellation: CancellationToken | None = None,
     diagnostics: DiagnosticTranscript | None = None,
     event_sink: RecordingEventSink | None = None,
+    budget_factory: Any | None = None,
+    context_source: StaticContextSource | None = None,
 ):
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
     refs = references or InMemorySessionRefPort()
@@ -429,9 +442,9 @@ async def _thread(
             checkpoints=checkpoints,
             admission=admission or InMemoryAdmissionPort(),
             sessions=SessionCoordinator(provider, refs),
-            context_source=StaticContextSource(_sections("canonical")),
+            context_source=context_source or StaticContextSource(_sections("canonical")),
             dispatcher=dispatch or ScriptedToolDispatchPort(()),
-            budgets=_budget(claim.plan),
+            budget_factory=budget_factory or _budget_factory(),
             cancellation=cancellation,
             diagnostics=diagnostics,
             event_sink=event_sink,
@@ -453,10 +466,19 @@ async def test_no_work_and_deferred_admission_call_no_provider(tmp_path: Path) -
     definition, plan, _ = _definition()
     runtime = _Runtime([])
     no_work = InMemoryInputCheckpointPort((ClaimNoWork(),))
+    factory = _BudgetFactory()
 
-    outcome, _ = await _thread(tmp_path, definition, _claim(plan), runtime, no_work)
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        _claim(plan),
+        runtime,
+        no_work,
+        budget_factory=factory,
+    )
 
     assert outcome.type == "no_work"
+    assert factory.plans == []
     assert runtime.opens == []
 
     deferred = InMemoryAdmissionPort(max_live_slots=1)
@@ -668,6 +690,8 @@ async def test_frozen_plan_is_rejected_before_rendering_admission_or_provider(
     checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
     admission = InMemoryAdmissionPort()
     runtime = _Runtime([])
+    factory = _BudgetFactory()
+    context_source = StaticContextSource(_sections("must not render"))
 
     outcome, _ = await _thread(
         tmp_path,
@@ -676,9 +700,71 @@ async def test_frozen_plan_is_rejected_before_rendering_admission_or_provider(
         runtime,
         checkpoints,
         admission=admission,
+        budget_factory=factory,
+        context_source=context_source,
     )
 
     assert outcome.type is ThreadStopKind.configuration_error
+    assert factory.plans == []
+    assert context_source.bootstrap_calls == []
+    assert context_source.continuation_calls == []
+    assert admission.charged_turns == 0
+    assert runtime.opens == []
+
+
+async def test_claimed_plan_constructs_and_verifies_its_own_tool_budget_before_io(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition()
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    admission = InMemoryAdmissionPort()
+    runtime = _Runtime([(_terminal({"type": "say", "text": "done"}),)])
+    factory = _BudgetFactory()
+
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        runtime,
+        checkpoints,
+        admission=admission,
+        budget_factory=factory,
+    )
+
+    assert outcome.type == "completed"
+    assert factory.plans == [plan]
+    assert runtime.opens
+
+
+async def test_mismatched_claimed_plan_budget_parks_before_rendering_or_io(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition()
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    admission = InMemoryAdmissionPort()
+    runtime = _Runtime([])
+    context_source = StaticContextSource(_sections("must not render"))
+    wrong_limits = RunLimits(7, 8, 32_768, 32_768, 1, 30.0)
+    factory = _BudgetFactory(wrong_limits)
+
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        runtime,
+        checkpoints,
+        admission=admission,
+        budget_factory=factory,
+        context_source=context_source,
+    )
+
+    assert outcome.type is ThreadStopKind.configuration_error
+    assert factory.plans == [plan]
+    assert len(checkpoints.park_reasons) == 1
+    assert context_source.bootstrap_calls == []
+    assert context_source.continuation_calls == []
     assert admission.charged_turns == 0
     assert runtime.opens == []
 
@@ -1216,7 +1302,7 @@ async def test_attempt_ceiling_stops_before_admission_or_provider(tmp_path: Path
     assert admission.charged_turns == 0
 
 
-async def test_wall_limit_stops_before_a_provider_turn(tmp_path: Path) -> None:
+async def test_cooperative_limit_stops_before_a_provider_turn(tmp_path: Path) -> None:
     class Clock:
         calls = 0
 
@@ -1224,7 +1310,7 @@ async def test_wall_limit_stops_before_a_provider_turn(tmp_path: Path) -> None:
             self.calls += 1
             return 0.0 if self.calls == 1 else 2.0
 
-    definition, plan, _ = _definition(limits=KernelLimits(max_wall_seconds=1.0))
+    definition, plan, _ = _definition(limits=KernelLimits(max_cooperative_seconds=1.0))
     claim = _claim(plan)
     checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
     runtime = _Runtime([])
@@ -1241,7 +1327,7 @@ async def test_wall_limit_stops_before_a_provider_turn(tmp_path: Path) -> None:
             sessions=SessionCoordinator(provider, refs),
             context_source=StaticContextSource(_sections("canonical")),
             dispatcher=ScriptedToolDispatchPort(()),
-            budgets=_budget(plan),
+            budget_factory=_budget_factory(),
             clock=Clock(),
         )
     finally:
@@ -1250,6 +1336,67 @@ async def test_wall_limit_stops_before_a_provider_turn(tmp_path: Path) -> None:
     assert outcome.type is ThreadStopKind.budget_exhausted
     assert outcome.metrics.provider_turns == 0
     assert runtime.turns == []
+
+
+async def test_cooperative_limit_does_not_wrap_write_dispatch(
+    tmp_path: Path,
+) -> None:
+    class Clock:
+        now = 0.0
+
+        def __call__(self) -> float:
+            return self.now
+
+    class AdvancingDispatch(ScriptedToolDispatchPort):
+        async def dispatch(self, **kwargs: Any):
+            result = await super().dispatch(**kwargs)
+            clock.now = 2.0
+            return result
+
+    clock = Clock()
+    definition, plan, _ = _definition(
+        effect=ToolEffect.Write,
+        limits=KernelLimits(max_cooperative_seconds=1.0),
+    )
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    runtime = _Runtime(
+        [
+            (
+                _terminal(
+                    {
+                        "type": "call_tool",
+                        "tool_id": "test.observe",
+                        "arguments": {"value": "write once"},
+                    }
+                ),
+            )
+        ]
+    )
+    dispatch = AdvancingDispatch(
+        (DispatchCompleted({"type": "Success", "value": {"value": "written"}}),)
+    )
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    try:
+        outcome = await run_thread(
+            run_id=RunId("cooperative-write"),
+            thread_id=ThreadId("thread-1"),
+            owner_token=OwnerToken("owner-1"),
+            definition=definition,
+            checkpoints=checkpoints,
+            admission=InMemoryAdmissionPort(),
+            sessions=SessionCoordinator(provider, InMemorySessionRefPort()),
+            context_source=StaticContextSource(_sections("canonical")),
+            dispatcher=dispatch,
+            budget_factory=_budget_factory(),
+            clock=clock,
+        )
+    finally:
+        await provider.shutdown()
+
+    assert outcome.type is ThreadStopKind.budget_exhausted
+    assert len(dispatch.calls) == 1
+    assert checkpoints.settlements[0].conclusion == StoppedConclusion(StopReason.budget_exhausted)
 
 
 async def test_turn_limit_consumes_after_the_reserved_turn(tmp_path: Path) -> None:
@@ -1342,7 +1489,7 @@ async def test_isolated_structured_run_is_fresh_closed_and_uses_no_saved_state(
         admission=admission,
         provider=provider,
         dispatcher=ScriptedToolDispatchPort(()),
-        budgets=_budget(plan),
+        budget_factory=_budget_factory(),
     )
 
     assert outcome.type == "completed"
@@ -1369,7 +1516,7 @@ async def test_isolated_provider_failure_closes_and_returns_typed_stop(tmp_path:
         admission=InMemoryAdmissionPort(),
         provider=provider,
         dispatcher=ScriptedToolDispatchPort(()),
-        budgets=_budget(plan),
+        budget_factory=_budget_factory(),
     )
 
     assert outcome.type is ThreadStopKind.provider_error
@@ -1387,6 +1534,7 @@ async def test_isolated_write_plan_is_rejected_before_admission_or_provider(
     runtime = _Runtime([])
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
     admission = InMemoryAdmissionPort()
+    factory = _BudgetFactory()
 
     with pytest.raises(ValueError, match="Write"):
         await run_one_shot(
@@ -1399,11 +1547,40 @@ async def test_isolated_write_plan_is_rejected_before_admission_or_provider(
             admission=admission,
             provider=provider,
             dispatcher=ScriptedToolDispatchPort(()),
-            budgets=_budget(plan),
+            budget_factory=factory,
         )
 
+    assert factory.plans == []
     assert runtime.opens == []
     assert admission.charged_turns == 0
+
+
+async def test_isolated_budget_mismatch_is_rejected_before_admission_or_provider(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(mode=SessionMode.isolated, structured=True)
+    runtime = _Runtime([])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    admission = InMemoryAdmissionPort()
+    factory = _BudgetFactory(RunLimits(7, 8, 32_768, 32_768, 1, 30.0))
+
+    with pytest.raises(KernelConfigurationDefect, match="budget limits"):
+        await run_one_shot(
+            run_id=RunId("isolated-budget-mismatch"),
+            definition=definition,
+            inputs=(_input(),),
+            as_of=datetime.now(UTC),
+            plan=plan,
+            source_sections=_sections("must not render"),
+            admission=admission,
+            provider=provider,
+            dispatcher=ScriptedToolDispatchPort(()),
+            budget_factory=factory,
+        )
+
+    assert factory.plans == [plan]
+    assert admission.charged_turns == 0
+    assert runtime.opens == []
 
 
 async def test_isolated_admission_rejection_returns_without_provider_io(tmp_path: Path) -> None:
@@ -1422,7 +1599,7 @@ async def test_isolated_admission_rejection_returns_without_provider_io(tmp_path
         admission=admission,
         provider=provider,
         dispatcher=ScriptedToolDispatchPort(()),
-        budgets=_budget(plan),
+        budget_factory=_budget_factory(),
     )
 
     assert outcome.type is ThreadStopKind.budget_exhausted
@@ -1466,7 +1643,7 @@ async def test_isolated_cancellation_before_dispatch_closes_without_tool_action(
         admission=InMemoryAdmissionPort(),
         provider=provider,
         dispatcher=dispatch,
-        budgets=_budget(plan),
+        budget_factory=_budget_factory(),
         cancellation=cancellation,
     )
 
@@ -1502,7 +1679,7 @@ async def test_child_one_shot_rejects_a_forged_independent_slot_before_provider(
         admission=admission,
         provider=provider,
         dispatcher=ScriptedToolDispatchPort(()),
-        budgets=_budget(plan),
+        budget_factory=_budget_factory(),
         parent_admission=parent,
     )
 
@@ -1556,7 +1733,7 @@ async def test_isolated_pre_cancel_emits_metadata_without_opening_provider(
         admission=InMemoryAdmissionPort(),
         provider=provider,
         dispatcher=ScriptedToolDispatchPort(()),
-        budgets=_budget(plan),
+        budget_factory=_budget_factory(),
         cancellation=cancellation,
         event_sink=events,
     )
@@ -1584,7 +1761,7 @@ async def test_bounded_event_rejection_never_changes_one_shot_work(tmp_path: Pat
         admission=InMemoryAdmissionPort(),
         provider=provider,
         dispatcher=ScriptedToolDispatchPort(()),
-        budgets=_budget(plan),
+        budget_factory=_budget_factory(),
         event_sink=events,
     )
 

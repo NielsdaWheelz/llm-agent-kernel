@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -27,7 +28,7 @@ from llm_tools import (
     ToolPlan,
     ToolSpec,
 )
-from provider_runtime.agent_runtime import CredentialRef
+from provider_runtime.agent_runtime import CredentialRef, TextContent
 from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel.context import (
@@ -47,6 +48,7 @@ from llm_agent_kernel.definitions import (
     KernelLimits,
     ProviderConfiguration,
     SessionMode,
+    StructuredOutput,
 )
 
 
@@ -70,7 +72,7 @@ def _section(kind: str, text: str) -> PromptSection:
     return PromptSection(PromptSectionKind(kind), (), PromptText(text))
 
 
-def _definition(*, effect: ToolEffect = ToolEffect.Read, max_context_bytes: int = 20_000):
+def _definition(*, effect: ToolEffect = ToolEffect.Read, max_new_context_bytes: int = 20_000):
     spec = ToolSpec(
         id=ToolId("test.observe"),
         summary="Observe text",
@@ -107,7 +109,8 @@ def _definition(*, effect: ToolEffect = ToolEffect.Read, max_context_bytes: int 
             auth=CredentialRef("local_account", "owner"),
             model="gpt-5",
         ),
-        limits=KernelLimits(max_context_bytes=max_context_bytes),
+        session_compatibility_revision="context-test-v1",
+        limits=KernelLimits(max_new_context_bytes=max_new_context_bytes),
     )
     return definition, plan, binding
 
@@ -203,9 +206,11 @@ def test_appended_input_requires_one_aware_as_of_and_preserves_identity() -> Non
 
 
 def test_old_recomputable_read_is_replaced_by_explicit_reference_preserving_marker() -> None:
-    broad, plan, binding = _definition(max_context_bytes=20_000)
+    broad, plan, binding = _definition(max_new_context_bytes=20_000)
     base = continuation_context(broad, plan, PromptSections((_section("state", "required"),)))
-    narrow, narrow_plan, narrow_binding = _definition(max_context_bytes=base.visible_bytes + 500)
+    narrow, narrow_plan, narrow_binding = _definition(
+        max_new_context_bytes=base.visible_bytes + 500
+    )
     observation = ToolObservation(
         narrow_binding,
         {"type": "Success", "value": {"text": "x" * 2_000}},
@@ -224,7 +229,7 @@ def test_old_recomputable_read_is_replaced_by_explicit_reference_preserving_mark
     assert 'kind="omitted_read_observations"' in projection.rendered
     assert "source-42" in projection.rendered
     assert "x" * 100 not in projection.rendered
-    assert projection.cumulative_visible_bytes <= narrow.limits.max_context_bytes
+    assert projection.cumulative_visible_bytes <= narrow.limits.max_new_context_bytes
     assert binding.spec.id == narrow_binding.spec.id
 
 
@@ -243,7 +248,7 @@ def test_read_without_a_stable_source_reference_is_not_omittable() -> None:
 def test_write_and_required_context_are_never_silently_truncated() -> None:
     definition, plan, binding = _definition(
         effect=ToolEffect.Write,
-        max_context_bytes=400,
+        max_new_context_bytes=400,
     )
     with pytest.raises(ValueError, match="only a Read"):
         ToolObservation(
@@ -268,7 +273,7 @@ def test_write_and_required_context_are_never_silently_truncated() -> None:
 
 
 def test_cumulative_bound_accounts_for_material_sent_on_prior_turns() -> None:
-    definition, plan, _binding = _definition(max_context_bytes=1_000)
+    definition, plan, _binding = _definition(max_new_context_bytes=1_000)
 
     with pytest.raises(ContextLimitExceeded):
         continuation_context(
@@ -277,3 +282,38 @@ def test_cumulative_bound_accounts_for_material_sent_on_prior_turns() -> None:
             PromptSections((_section("state", "required"),)),
             prior_visible_bytes=999,
         )
+
+
+def test_new_context_counter_excludes_provider_material_and_output_schema() -> None:
+    definition, plan, _binding = _definition(max_new_context_bytes=20_000)
+    baseline = bootstrap_context(
+        definition,
+        (_input(),),
+        datetime(2026, 9, 2, 12, 1, tzinfo=UTC),
+        plan,
+        PromptSections((_section("history", "Canonical history."),)),
+    )
+    provider_overhead = "outside-the-kernel-counter-" * 1_000
+    scoped = replace(
+        definition,
+        provider=replace(
+            definition.provider,
+            system=(TextContent(provider_overhead),),
+            developer=(TextContent(provider_overhead),),
+        ),
+        output_contract=StructuredOutput("context_result", Success),
+        limits=replace(definition.limits, max_new_context_bytes=baseline.visible_bytes),
+    )
+
+    projection = bootstrap_context(
+        scoped,
+        (_input(),),
+        datetime(2026, 9, 2, 12, 1, tzinfo=UTC),
+        plan,
+        PromptSections((_section("history", "Canonical history."),)),
+    )
+
+    assert projection.rendered == baseline.rendered
+    assert projection.visible_bytes == baseline.visible_bytes
+    assert projection.cumulative_visible_bytes == scoped.limits.max_new_context_bytes
+    assert len(provider_overhead.encode()) > scoped.limits.max_new_context_bytes

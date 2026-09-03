@@ -44,7 +44,10 @@ git diff --check
 
 The primary entry points are `run_thread(...)` and `run_one_shot(...)`.
 Applications construct an immutable `AgentDefinition`, provide one qualified
-frozen `llm-tools` plan and budget, and implement the typed ports. A continuing
+maximum profile, set an owner-controlled session-compatibility revision, and
+implement the typed ports. After the host claim selects a frozen plan, the
+kernel asks `ToolBudgetFactoryPort` to construct that plan's budget and rejects
+any limits mismatch before provider or tool I/O. A continuing
 run composes `CodexProvider` with `SessionCoordinator`; production provider work
 therefore consumes `AgentRuntime.stream_turn` and never the event-discarding
 `run_turn` projection.
@@ -79,6 +82,7 @@ The kernel owns:
 - Exactly one serial host tool call per model step.
 - Mid-loop input polling, preemption, cancellation, and settlement choreography.
 - Per-run limits and conservative host-issued cross-run admission reservations.
+- Plan-aware construction of the independently owned `llm-tools` tool budget.
 - Session-reference, input-checkpoint, provider, context, dispatch, and event
   ports.
 - Isolated structured one-shot runs containing no `Write` tool.
@@ -117,13 +121,27 @@ durable. A production continuing host must durably store:
 The host also owns startup scans over canonical unconsumed input and orphaned
 admission records. Kernel cleanup never schedules a successor.
 
+`KernelLimits.max_cooperative_seconds` is checked at safe boundaries and passed
+as the remaining provider-turn deadline. It is not a hard timeout around host
+ports, tool execution, settlement, or cleanup; the frozen plan's
+`llm_tools.RunLimits.max_elapsed_seconds` independently bounds tool execution.
+In particular, the kernel never wraps a `Write` in a blunt outer timeout that
+could obscure recorder uncertainty or reconciliation.
+
+`KernelLimits.max_new_context_bytes` counts the UTF-8 bytes of model-visible
+material newly rendered and submitted by the kernel during the current
+invocation. Provider system/developer material, JSON-schema transport overhead,
+history already retained by a native session, and provider compaction are
+outside that counter. Required effect, approval, and reconciliation evidence is
+still never silently truncated.
+
 ## Execution at a glance
 
 ```text
 durable host input
         |
         v
-claim batch + reserve rolling admission + prove exact plan/catalog tightening
+claim batch + prove plan + construct exact plan budget + reserve admission
         |
         v
 open/resume contained Codex agent session

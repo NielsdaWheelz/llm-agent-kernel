@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -43,6 +44,7 @@ from llm_agent_kernel.definitions import (
     SessionMode,
     ThreadId,
 )
+from llm_agent_kernel.fakes import InMemorySessionRefPort
 from llm_agent_kernel.provider import CodexProvider, ProviderSessionLease
 from llm_agent_kernel.sessions import (
     ColdBootstrapUnavailable,
@@ -94,6 +96,7 @@ def _definition() -> AgentDefinition:
             auth=CredentialRef(kind="local_account", profile_key="main"),
             model="gpt-5",
         ),
+        session_compatibility_revision="session-test-v1",
     )
 
 
@@ -274,6 +277,29 @@ async def test_successful_terminals_advance_ref_by_generation_cas() -> None:
         "ref.cas:1",
     ]
     assert state.fallback_available is False
+
+
+async def test_session_compatibility_revision_rotates_saved_session_key() -> None:
+    journal: list[str] = []
+    refs = InMemorySessionRefPort()
+    definition = _definition()
+    await refs.compare_and_set(
+        ThreadId("thread"),
+        definition.fingerprint,
+        None,
+        _ref("old-session"),
+    )
+    provider = _Provider(journal)
+    coordinator = SessionCoordinator(
+        cast(CodexProvider, provider),
+        refs,
+    )
+
+    rotated = replace(definition, session_compatibility_revision="session-test-v2")
+    state = await coordinator.acquire_continuing(ThreadId("thread"), rotated)
+
+    assert state.cold_bootstrap is True
+    assert journal == ["provider.acquire:new"]
 
 
 async def test_coordinator_exposes_provider_turn_and_usage() -> None:

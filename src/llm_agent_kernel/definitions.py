@@ -106,10 +106,10 @@ class KernelLimits:
     max_provider_turns: int = 8
     max_protocol_repairs: int = 2
     max_no_progress_attempts: int = 3
-    max_wall_seconds: float = 600.0
+    max_cooperative_seconds: float = 600.0
     max_provider_input_tokens: int = 100_000
     max_provider_output_tokens: int = 20_000
-    max_context_bytes: int = 1_000_000
+    max_new_context_bytes: int = 1_000_000
 
     def __post_init__(self) -> None:
         positive_integers = (
@@ -117,7 +117,7 @@ class KernelLimits:
             self.max_no_progress_attempts,
             self.max_provider_input_tokens,
             self.max_provider_output_tokens,
-            self.max_context_bytes,
+            self.max_new_context_bytes,
         )
         if any(type(value) is not int for value in positive_integers):
             raise TypeError("kernel count, token, and byte limits must be integers")
@@ -127,10 +127,10 @@ class KernelLimits:
             raise TypeError("protocol repair limit must be an integer")
         if self.max_protocol_repairs < 0:
             raise ValueError("protocol repair limit must not be negative")
-        if type(self.max_wall_seconds) not in (int, float):
-            raise TypeError("kernel wall limit must be numeric")
-        if not math.isfinite(self.max_wall_seconds) or self.max_wall_seconds <= 0:
-            raise ValueError("kernel wall limit must be positive and finite")
+        if type(self.max_cooperative_seconds) not in (int, float):
+            raise TypeError("kernel cooperative limit must be numeric")
+        if not math.isfinite(self.max_cooperative_seconds) or self.max_cooperative_seconds <= 0:
+            raise ValueError("kernel cooperative limit must be positive and finite")
 
 
 CONTAINMENT_POLICY = PermissionPolicy(
@@ -201,6 +201,7 @@ class AgentDefinition:
     output_contract: OutputContract
     maximum_profile: FrozenCapabilityProfile
     provider: ProviderConfiguration
+    session_compatibility_revision: str
     limits: KernelLimits = KernelLimits()
     fingerprint: str = field(init=False)
 
@@ -221,6 +222,11 @@ class AgentDefinition:
             raise ValueError("maximum profile is internally inconsistent")
         if not isinstance(self.provider, ProviderConfiguration):
             raise TypeError("definition provider configuration is invalid")
+        if (
+            type(self.session_compatibility_revision) is not str
+            or not self.session_compatibility_revision.strip()
+        ):
+            raise ValueError("session compatibility revision must not be empty")
         if not isinstance(self.limits, KernelLimits):
             raise TypeError("definition limits must be KernelLimits")
         object.__setattr__(self, "fingerprint", _definition_fingerprint(self))
@@ -605,13 +611,13 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
     value = {
         "definition_id": str(definition.definition_id),
         "limits": {
-            "max_context_bytes": definition.limits.max_context_bytes,
+            "max_new_context_bytes": definition.limits.max_new_context_bytes,
             "max_protocol_repairs": definition.limits.max_protocol_repairs,
             "max_no_progress_attempts": definition.limits.max_no_progress_attempts,
             "max_provider_input_tokens": definition.limits.max_provider_input_tokens,
             "max_provider_output_tokens": definition.limits.max_provider_output_tokens,
             "max_provider_turns": definition.limits.max_provider_turns,
-            "max_wall_seconds": definition.limits.max_wall_seconds,
+            "max_cooperative_seconds": definition.limits.max_cooperative_seconds,
         },
         "maximum_profile_revision": definition.maximum_profile.profile_revision,
         "output_contract": output,
@@ -658,6 +664,7 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
             "id": definition.role.role_id,
             "instructions": render_prompt(definition.role.instructions),
         },
+        "session_compatibility_revision": definition.session_compatibility_revision,
         "session_mode": definition.session_mode.value,
         "stable_context": render_prompt(definition.stable_context),
     }

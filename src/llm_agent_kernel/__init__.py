@@ -48,6 +48,7 @@ from .coordination import (
     StaleSessionRef,
     StoredSessionRef,
     StoreSessionRefResult,
+    ToolBudgetFactoryPort,
     ToolDispatchDefect,
     ToolDispatchPort,
 )
@@ -287,6 +288,7 @@ __all__ = [
     "ThreadStopKind",
     "ThreadStopped",
     "ThreadSuspended",
+    "ToolBudgetFactoryPort",
     "ToolDispatchLineage",
     "ToolDispatchDefect",
     "ToolDispatchPort",

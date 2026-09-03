@@ -99,6 +99,8 @@ uncertain position, or decide product authority.
 ### 3.3 The kernel owns
 
 - Immutable agent definitions and deterministic fingerprints.
+- Plan-aware construction and exact-limit verification of the dependency-owned
+  tool budget.
 - Provider containment requirements and the proof that a run plan tightens the
   definition's maximum profile.
 - The closed structured model-step schema and semantic output-contract
@@ -140,6 +142,7 @@ An `AgentDefinition` is immutable configuration containing:
 - `OutputContract`: `conversational` or one closed structured result type.
 - A maximum frozen `llm-tools` capability profile.
 - Exact session-scoped provider configuration.
+- A required, non-empty, owner-controlled `session_compatibility_revision`.
 - `KernelLimits`.
 
 The provider configuration for the v1 Codex route includes backend, transport,
@@ -148,9 +151,13 @@ output schema, cwd scope, additional directories, MCP configuration,
 `PermissionPolicy`, and `CodexNativeOptions`.
 
 The deterministic definition fingerprint covers every value that can change a
-native session's meaning or containment. It excludes credential secret bytes,
-current input, dynamic context, the per-run plan, and host wall time. Any change
-to a covered value rotates the session and forces bootstrap.
+native session's meaning or containment, including the exact
+`session_compatibility_revision`. The owner MUST rotate that revision when an
+application, kernel, or provider-runtime semantic change makes saved sessions
+incompatible even if no other serialized definition field changed. It excludes
+credential secret bytes, current input, dynamic context, the per-run plan, and
+host time. Any change to a covered value rotates the session and forces
+bootstrap.
 
 ### 4.2 RunPlan
 
@@ -175,6 +182,15 @@ The plan is fixed for the invocation. A model cannot discover, add, widen, or
 reclassify tools. Tool descriptions in model context describe the plan; they do
 not grant authority. A proposed tool absent from the plan is protocol-invalid
 and dispatches nothing.
+
+The caller supplies a `ToolBudgetFactoryPort`, not a `BudgetState` constructed
+from out-of-band plan knowledge. After `claim` returns and the kernel validates
+the exact selected plan, the kernel calls `create(plan)` once for a run that can
+proceed. The returned `BudgetState.limits` MUST equal the claimed plan's
+`profile.run_limits`; a mismatch parks thread input or rejects an isolated run
+before context rendering, admission, provider I/O, or tool I/O. The factory
+does not transfer ownership of tool accounting to the kernel: the returned
+state and `llm-tools` executor retain that responsibility.
 
 ### 4.3 ApplicationThread and InputClaim
 
@@ -381,8 +397,9 @@ durable progress channel is a later product decision.
 Parallel and multi-call dispatch do not exist in v1. This removes partial
 outcome vectors, not-initiated suffixes, and multiple unresolved effects.
 
-`ToolDispatchPort` receives the validated binding, validated input, remaining
-plan budget, cancellation token, and immutable dispatch lineage. A thread
+`ToolDispatchPort` receives the validated binding, validated input, the budget
+constructed from the exact validated plan, cancellation token, and immutable
+dispatch lineage. A thread
 `DispatchLineage` contains:
 
 - The stable `claim_id`.
@@ -441,10 +458,16 @@ Tool bindings MUST produce bounded results under their declared
 pagination or stable source references, and typed `TooLarge`/boundary guidance
 rather than oversized payloads.
 
-The kernel maintains one cumulative model-visible context bound. When older
-recomputable read observations must be omitted, it inserts an explicit omission
-marker and preserves stable source references supplied by the host. It MUST NOT
-silently truncate an action outcome, approval payload, or uncertainty evidence.
+The kernel maintains one cumulative bound over the UTF-8 bytes of model-visible
+material it newly renders and submits during the current invocation. This
+includes its bootstrap or run delta, appended-input deltas, tool observations,
+protocol corrections, and any cold-bootstrap replay rendered in that run.
+Provider system/developer material, JSON-schema transport overhead, history
+already retained by a native session, and provider compaction are outside this
+counter and MUST NOT be described as covered by it. When older recomputable read
+observations must be omitted, the kernel inserts an explicit omission marker and
+preserves stable source references supplied by the host. It MUST NOT silently
+truncate an action outcome, approval payload, or uncertainty evidence.
 
 A generic durable observed-value store is not a v1 kernel requirement. It may be
 added by a host when source-specific reread/pagination is insufficient.
@@ -552,7 +575,7 @@ The following deterministic stops MUST settle a host-authored stopped
 conclusion and consume the current claimed input:
 
 - Exhausted protocol-repair allowance.
-- Kernel model-step or wall-time budget exhaustion.
+- Kernel model-step or cooperative elapsed-limit exhaustion.
 - Provider quota exhaustion.
 - Explicit owner cancellation/stop when host policy says the input is complete.
 - A repeated provider failure after the one permitted safe bootstrap fallback.
@@ -626,13 +649,28 @@ defaults for:
 
 - Provider turns per run.
 - Protocol-repair turns per run.
-- Total wall-clock duration.
+- Cooperative elapsed duration at safe boundaries and the hard deadline passed
+  to each provider turn.
 - Provider input/output usage when the selected route reports it.
-- Cumulative model-visible context bytes.
+- Cumulative bytes of kernel-rendered model-visible material newly submitted in
+  the current invocation.
 
 Tool calls, attempts, tool input/output bytes, tool concurrency, and tool
 deadlines remain exclusively in the frozen plan's `llm_tools.RunLimits`. The
 kernel MUST NOT maintain a second tool budget or charge a replay twice.
+
+`KernelLimits.max_cooperative_seconds` is not a hard total wall-clock guarantee.
+The clock starts at invocation entry; the kernel observes it at safe boundaries
+and passes the remaining duration to the provider turn. A host claim, context
+source, poll, session-reference operation, admission operation, dispatch,
+settlement, release, park, usage settlement, or cleanup may return after that
+duration. At the next safe boundary the kernel prevents further provider/tool
+work when possible, but it does not interrupt a host operation or pretend that
+cleanup completed on time. Tool execution is independently governed by the
+validated plan's `RunLimits.max_elapsed_seconds`. The kernel MUST NOT place a
+blunt outer timeout around a `Write`, because abandoning it outside the
+dependency recorder boundary would undermine uncertainty and reconciliation
+safety.
 
 Cancellation is cooperative and checked at every provider, polling, dispatch,
 and settlement boundary. It is passed into provider and tool adapters. A
@@ -647,8 +685,9 @@ The public behavior is equivalent to:
 
 ```text
 claim one bounded non-empty host batch or return no_work/busy/deferred
-durably reserve admission;
-  verify its token and frozen plan tightening before provider I/O
+verify frozen plan/catalog tightening
+construct a fresh tool budget from that plan and verify exact RunLimits
+durably reserve admission and verify its token before provider I/O
 load/acquire compatible continuing provider session, or cold bootstrap
 
 loop within KernelLimits:
@@ -690,6 +729,9 @@ An isolated one-shot:
 
 - Requires `SessionMode.isolated` and a structured output contract.
 - Requires a HostTable plan containing no `ToolEffect.Write` binding.
+- Validates that plan, constructs a fresh budget through
+  `ToolBudgetFactoryPort`, and requires exact plan `RunLimits` before rendering,
+  admission, provider I/O, or tool I/O.
 - Requires a host-issued admission reservation; denial returns to the caller
   without retry or provider I/O.
 - Uses a fresh native session and no `InputCheckpointPort`, admission retry
@@ -785,7 +827,10 @@ The release suite covers both single-run interior behavior and composed seams:
 17. Provider quota, expected failure, invariant defect, executor result, and
     recorder recovery remain distinct.
 18. Observation and cumulative-context bounds yield typed failures or explicit
-    omission markers, never silent truncation or a successful false result.
+    omission markers, never silent truncation or a successful false result. The
+    counter covers exactly the kernel-rendered material newly submitted in that
+    invocation and excludes provider configuration/schema overhead, retained
+    native history, and provider compaction.
 19. A cold bootstrap works after deleting all provider-session state; durable
     effect context comes from the host, while safe reads may repeat.
 20. One-shot sessions always close and never touch checkpoint or saved-ref ports.
@@ -793,6 +838,14 @@ The release suite covers both single-run interior behavior and composed seams:
     steering, suspension/resolution, startup recovery, and rolling admission.
 22. Ordinary tests use deterministic fakes; paid live qualification is opt-in
     and records no private payloads.
+23. A plan-aware factory runs only after exact plan validation; its returned
+    `BudgetState` must carry exactly the plan's `RunLimits` before rendering,
+    admission, provider I/O, or tool I/O, for both thread and one-shot runs.
+24. The cooperative elapsed limit deadlines provider turns and prevents new
+    work at safe boundaries without wrapping host cleanup or a `Write`; tool
+    execution remains under its independently frozen `llm-tools` deadline.
+25. A non-empty owner-controlled session-compatibility revision participates in
+    the definition fingerprint, and mutating it rotates saved-session identity.
 
 ## 15. Explicitly deferred
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime
+from inspect import signature
 
 import pytest
 from llm_tools import (
@@ -39,7 +40,12 @@ from provider_runtime.agent_runtime import (
 )
 from pydantic import BaseModel, ConfigDict
 
-from llm_agent_kernel.coordination import AdmissionRequest, AdmissionToken, AppendInputs
+from llm_agent_kernel import ToolBudgetFactoryPort
+from llm_agent_kernel.coordination import (
+    AdmissionRequest,
+    AdmissionToken,
+    AppendInputs,
+)
 from llm_agent_kernel.definitions import (
     AgentDefinition,
     AgentRole,
@@ -58,6 +64,7 @@ from llm_agent_kernel.definitions import (
     StructuredOutput,
     ThreadId,
 )
+from llm_agent_kernel.kernel import run_one_shot, run_thread
 
 
 class Input(BaseModel):
@@ -133,6 +140,7 @@ def _definition(**provider_changes: object) -> AgentDefinition:
         output_contract=ConversationalOutput(),
         maximum_profile=profile,
         provider=ProviderConfiguration(**provider_values),
+        session_compatibility_revision="contract-test-v1",
     )
 
 
@@ -168,6 +176,14 @@ def test_dependency_rejects_cross_catalog_implementation_substitution() -> None:
         ToolPlan(profile.id, HostTable()).freeze(substituted_catalog, profile)
 
 
+def test_entry_points_require_the_exported_plan_aware_budget_factory() -> None:
+    assert ToolBudgetFactoryPort.__name__ == "ToolBudgetFactoryPort"
+    for entry_point in (run_thread, run_one_shot):
+        parameters = signature(entry_point).parameters
+        assert "budget_factory" in parameters
+        assert "budgets" not in parameters
+
+
 def test_definition_is_frozen_and_fingerprint_covers_provider_configuration() -> None:
     first = _definition()
     same = _definition()
@@ -187,6 +203,7 @@ def test_definition_fingerprint_rotates_for_every_configurable_session_scope() -
         replace(first, definition_id=DefinitionId("other")),
         replace(first, role=AgentRole("other", first.role.instructions)),
         replace(first, role=AgentRole(first.role.role_id, _sections("Other role."))),
+        replace(first, session_compatibility_revision="contract-test-v2"),
         replace(first, stable_context=_sections("Other stable context.")),
         replace(first, session_mode=SessionMode.isolated),
         replace(first, output_contract=StructuredOutput("answer", Result)),
@@ -203,6 +220,18 @@ def test_definition_fingerprint_rotates_for_every_configurable_session_scope() -
 
     assert all(candidate.fingerprint != first.fingerprint for candidate in variants)
     assert len({candidate.fingerprint for candidate in variants}) == len(variants)
+
+
+def test_session_compatibility_revision_is_required_and_rotates_the_fingerprint() -> None:
+    first = _definition()
+
+    with pytest.raises(ValueError, match="compatibility revision"):
+        replace(first, session_compatibility_revision="")
+    with pytest.raises(ValueError, match="compatibility revision"):
+        replace(first, session_compatibility_revision="   ")
+
+    rotated = replace(first, session_compatibility_revision="contract-test-v2")
+    assert rotated.fingerprint != first.fingerprint
 
 
 def test_provider_configuration_rejects_authority_widening() -> None:
@@ -230,10 +259,10 @@ def test_structured_output_requires_a_closed_object() -> None:
         {"max_provider_turns": 0},
         {"max_protocol_repairs": -1},
         {"max_no_progress_attempts": 0},
-        {"max_wall_seconds": float("inf")},
+        {"max_cooperative_seconds": float("inf")},
         {"max_provider_input_tokens": 0},
         {"max_provider_output_tokens": 0},
-        {"max_context_bytes": 0},
+        {"max_new_context_bytes": 0},
     ],
 )
 def test_kernel_limits_are_finite_and_bounded(change: dict[str, object]) -> None:

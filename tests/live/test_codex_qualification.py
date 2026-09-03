@@ -75,6 +75,7 @@ def _definition(profile_key: str) -> AgentDefinition:
             CredentialRef("local_account", profile_key),
             os.environ.get("LLM_AGENT_KERNEL_MODEL", "gpt-5"),
         ),
+        "live-qualification-v1",
     )
 
 

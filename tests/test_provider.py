@@ -107,6 +107,7 @@ def _definition(mode: SessionMode = SessionMode.continuing) -> AgentDefinition:
             auth=CredentialRef(kind="local_account", profile_key="main"),
             model="gpt-5",
         ),
+        session_compatibility_revision="provider-test-v1",
     )
 
 

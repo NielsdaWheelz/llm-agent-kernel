@@ -12,6 +12,7 @@ from typing import cast
 from llm_tools import (
     BudgetState,
     CapabilityProfile,
+    FrozenToolPlan,
     HostTable,
     InvocationPosition,
     ProfileId,
@@ -96,6 +97,11 @@ class NoToolBudget:
         raise AssertionError(f"empty plan cannot settle {position}: {settlement}")
 
 
+class NoToolBudgetFactory:
+    def create(self, plan: FrozenToolPlan) -> BudgetState:
+        return cast(BudgetState, NoToolBudget(plan.profile.run_limits))
+
+
 class ScriptedRuntime:
     """One-response AgentRuntime test double; it performs no external I/O."""
 
@@ -154,6 +160,7 @@ async def main() -> None:
         ConversationalOutput(),
         maximum,
         ProviderConfiguration(CredentialRef("local_account", "example"), "scripted"),
+        "minimal-example-v1",
     )
 
     now = datetime.now(UTC)
@@ -184,7 +191,7 @@ async def main() -> None:
                     sections("canonical_context", "No prior thread state.")
                 ),
                 dispatcher=ScriptedToolDispatchPort(()),
-                budgets=cast(BudgetState, NoToolBudget(run_limits)),
+                budget_factory=NoToolBudgetFactory(),
             )
         finally:
             await provider.shutdown()

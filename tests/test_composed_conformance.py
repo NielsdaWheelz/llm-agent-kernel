@@ -166,6 +166,7 @@ def _definition(
         StructuredOutput("answer", StructuredResult) if structured else ConversationalOutput(),
         maximum,
         ProviderConfiguration(CredentialRef("local_account", "test"), "gpt-5"),
+        "composed-test-v1",
         limits or KernelLimits(),
     )
     return definition, plan
@@ -268,8 +269,10 @@ class _Budgets:
         raise AssertionError("scripted dispatch owns no llm-tools budget state")
 
 
-def _budgets() -> BudgetState:
-    return cast(BudgetState, _Budgets())
+class _BudgetFactory:
+    def create(self, plan: Any) -> BudgetState:
+        assert plan.profile.run_limits == RUN_LIMITS
+        return cast(BudgetState, _Budgets())
 
 
 async def _run_thread(
@@ -293,7 +296,7 @@ async def _run_thread(
         sessions=sessions,
         context_source=context_source or StaticContextSource(_sections("canonical")),
         dispatcher=dispatcher,
-        budgets=_budgets(),
+        budget_factory=_BudgetFactory(),
     )
 
 
@@ -414,7 +417,7 @@ async def test_discarded_billed_once_read_can_dispatch_again(tmp_path: Path) -> 
             admission=admission,
             provider=provider,
             dispatcher=dispatcher,
-            budgets=_budgets(),
+            budget_factory=_BudgetFactory(),
         )
         second = await run_one_shot(
             run_id=RunId("isolated-second"),
@@ -426,7 +429,7 @@ async def test_discarded_billed_once_read_can_dispatch_again(tmp_path: Path) -> 
             admission=admission,
             provider=provider,
             dispatcher=dispatcher,
-            budgets=_budgets(),
+            budget_factory=_BudgetFactory(),
         )
     finally:
         await provider.shutdown()

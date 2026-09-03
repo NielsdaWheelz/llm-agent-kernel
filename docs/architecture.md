@@ -47,6 +47,8 @@ Defines immutable provider-neutral values:
 
 - `AgentDefinition`, `SessionMode`, `OutputContract`, and `KernelLimits`.
 - Exact session-scoped provider configuration and deterministic fingerprint.
+- Required owner-controlled session-compatibility revision for deliberate
+  saved-session rotation across application/kernel/runtime semantic changes.
 - Frozen maximum profile and host-selected frozen run plan, with the exact
   catalog view covered by the plan's consistency/tightening proof.
 - `InputClaim`, host inputs, checkpoints, `DispatchLineage`, conclusions, and
@@ -56,8 +58,9 @@ Defines immutable provider-neutral values:
 
 The fingerprint includes every native option that changes session meaning or
 containment: backend, transport, credential-profile identity, model, reasoning,
-instructions, output schema, policy, cwd, directories, MCP configuration, and
-native options. Secret bytes and dynamic input are excluded.
+instructions, output schema, policy, cwd, directories, MCP configuration,
+native options, and the owner-controlled session-compatibility revision. Secret
+bytes and dynamic input are excluded.
 
 ### `provider.py`
 
@@ -129,6 +132,13 @@ XML-like rendering preserves structure and provenance but does not neutralize
 prompt injection. Untrusted human, connector, memory, and Web content remains
 untrusted data.
 
+The context counter is intentionally narrower than total provider context. It
+counts UTF-8 bytes of kernel-rendered material newly submitted during this
+invocation: initial bootstrap/run material, appended inputs, observations,
+corrections, and any cold-bootstrap replay. Provider system/developer material,
+output-schema transport overhead, retained native-session history, and provider
+compaction are outside the counter.
+
 ### `protocol.py`
 
 Owns the closed model grammar:
@@ -157,13 +167,15 @@ partial text or call. A bounded correction can consume another provider turn.
 
 Runs one claimed batch under `KernelLimits`. It:
 
-1. Polls for compatible input or preemption.
-2. Builds one bootstrap or the unsent continuation delta.
-3. Executes one structured provider turn.
-4. Stores the returned session ref by generation CAS.
-5. Validates exactly one complete step.
-6. Settles `say`/`finish`, or dispatches one `call_tool` serially.
-7. Feeds a bounded completed observation into the next provider turn, or
+1. Validates the claimed plan, constructs its tool budget, and proves exact
+   `RunLimits` equality before rendering or I/O.
+2. Polls for compatible input or preemption.
+3. Builds one bootstrap or the unsent continuation delta.
+4. Executes one structured provider turn.
+5. Stores the returned session ref by generation CAS.
+6. Validates exactly one complete step.
+7. Settles `say`/`finish`, or dispatches one `call_tool` serially.
+8. Feeds a bounded completed observation into the next provider turn, or
    settles a durable suspension and returns.
 
 The kernel polls before provider turns, before dispatch, after tool completion,
@@ -177,7 +189,7 @@ may expose typing/activity state.
 
 ### `coordination.py`
 
-Defines three host protocols.
+Defines the host coordination protocols.
 
 `InputCheckpointPort` claims a non-empty bounded batch, polls it, atomically
 settles its conclusion plus consumed checkpoint, releases interrupted work, and
@@ -198,6 +210,12 @@ cost dimension.
 `EventSink` receives bounded metadata. It is observability, not canonical input,
 delivery, or an effect recorder, and its failure is nonfatal.
 
+`ToolBudgetFactoryPort` receives the already validated frozen plan and returns a
+fresh `llm_tools.BudgetState`. The kernel requires exact equality between its
+`limits` and `plan.profile.run_limits` before context rendering, admission,
+provider I/O, or tool I/O. The factory removes any need for a caller to know a
+claimed plan out of band and does not make the kernel a tool-budget owner.
+
 ### `tools.py`
 
 Bridges a validated proposal to the host dispatcher and `llm-tools`. It never
@@ -210,8 +228,14 @@ treats it as opaque coordination metadata.
 
 `llm_tools.RunLimits` alone owns tool-call, attempt, byte, concurrency, and tool
 elapsed limits. The frozen plan sets `max_in_flight = 1`. `KernelLimits` owns
-provider turns, protocol repairs, wall time, reported provider usage, and total
-model-visible context.
+provider turns, protocol repairs, reported provider usage, the cooperative
+elapsed limit, and newly rendered model-visible context bytes.
+
+The cooperative limit is observed at safe boundaries and becomes the remaining
+hard deadline for each provider turn. It is not an outer timeout over host
+ports, settlement, cleanup, or tool dispatch. Tool execution keeps its frozen
+`llm-tools` elapsed deadline; especially for a `Write`, the kernel does not
+interrupt outside recorder/reconciliation semantics.
 
 For `Write`, the host creates or resolves a durable action/effect row before
 executor entry. Its stable ID is both the `InvocationPosition` and `EffectId`.
@@ -240,7 +264,10 @@ START
   +-- no work / busy / denied admission ----------------------> RETURN
   |
   v
-CLAIM --> ADMIT --> PROVE PLAN --> OPEN/RESUME --> POLL --> MODEL TURN
+CLAIM --> PROVE PLAN --> BUILD EXACT BUDGET --> ADMIT --> OPEN/RESUME
+                                                        |
+                                                        v
+                                                     POLL --> MODEL TURN
                                                         typed failure |
                                               bounded fallback or STOP
                                                                |
@@ -301,10 +328,12 @@ in-memory recorder is a test double, never a crash-safety claim.
 ## Observation size and recovery
 
 Bindings return bounded previews, pagination/source references, and typed
-boundary guidance. The kernel additionally caps cumulative model-visible
-context. It may replace older recomputable reads with explicit omission markers
-and stable source references. It may not silently truncate effect results,
-approval material, or reconciliation evidence.
+boundary guidance. The kernel additionally caps cumulative kernel-rendered
+model-visible bytes newly submitted in the current invocation. Provider
+configuration/schema overhead, native retained history, and provider compaction
+are outside that counter. It may replace older recomputable reads with explicit
+omission markers and stable source references. It may not silently truncate
+effect results, approval material, or reconciliation evidence.
 
 V1 intentionally has no generic observed-value table. A host can add one after
 real workloads prove that source reread and bounded results are inadequate.

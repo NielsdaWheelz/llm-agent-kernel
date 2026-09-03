@@ -338,6 +338,12 @@ class ContextSourceDefect(RuntimeError):
     """Canonical host context cannot be projected safely."""
 
 
+class ToolBudgetFactoryPort(Protocol):
+    def create(self, plan: FrozenToolPlan) -> BudgetState:
+        """Create one fresh tool budget from the already validated run plan."""
+        ...
+
+
 class ToolDispatchPort(Protocol):
     async def dispatch(
         self,
@@ -399,6 +405,7 @@ __all__ = [
     "StaleSessionRef",
     "StoreSessionRefResult",
     "StoredSessionRef",
+    "ToolBudgetFactoryPort",
     "ToolDispatchPort",
     "ToolDispatchDefect",
 ]

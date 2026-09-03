@@ -58,6 +58,8 @@ class ToolObservation:
 
 @dataclass(frozen=True, slots=True)
 class ContextProjection:
+    """Kernel-rendered model-visible material newly submitted by this run."""
+
     sections: PromptSections
     rendered: str
     visible_bytes: int
@@ -192,7 +194,7 @@ def _project(
         rendered = render_prompt(sections)
         visible_bytes = len(rendered.encode("utf-8"))
         cumulative = prior_visible_bytes + visible_bytes
-        if cumulative <= definition.limits.max_context_bytes:
+        if cumulative <= definition.limits.max_new_context_bytes:
             return ContextProjection(sections, rendered, visible_bytes, cumulative)
 
         removable = next(
