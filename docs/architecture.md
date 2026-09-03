@@ -47,7 +47,8 @@ Defines immutable provider-neutral values:
 
 - `AgentDefinition`, `SessionMode`, `OutputContract`, and `KernelLimits`.
 - Exact session-scoped provider configuration and deterministic fingerprint.
-- Frozen maximum profile and host-selected frozen run plan.
+- Frozen maximum profile and host-selected frozen run plan, with the exact
+  catalog view covered by the plan's consistency/tightening proof.
 - `InputClaim`, host inputs, checkpoints, `DispatchLineage`, conclusions, and
   run outcomes.
 - Closed `SayStep`, `CallToolStep`, and `FinishStep` models.
@@ -65,13 +66,15 @@ lifecycle:
 
 ```text
 open_session(AgentSessionRequest)
-run_turn(AgentSession, TurnRequest, cancel=...)
+stream_turn(AgentSession, TurnRequest, cancel=...)
 close_session(AgentSession)
 ```
 
-The adapter owns live-session leases and maps typed runtime terminals. It
-publishes the kernel's closed JSON schema through `JsonSchemaAgentOutput` and
-constructs the exact containment request:
+The adapter owns live-session leases, consumes and inspects every streamed
+event, and maps typed runtime terminals. It never uses the convenience
+`AgentRuntime.run_turn` projection because that method discards the event
+history required for containment. It publishes the kernel's closed JSON schema
+through `JsonSchemaAgentOutput` and constructs the exact containment request:
 
 - subscription-backed Codex route;
 - private empty absolute cwd with read-only filesystem policy;
@@ -81,9 +84,11 @@ constructs the exact containment request:
   pinned runtime.
 
 The sentinel is not application authority. Any native `AgentToolUse` or
-`AgentPermissionRequest` event discards the session and fails the run before a
-host tool or model-authored conclusion can cross the boundary. Streaming text
-is not delivered; only terminal structured output enters the kernel protocol.
+`AgentPermissionRequest` event taints and discards the session and fails the run
+without returning its terminal to the loop, before a host tool or model-authored
+conclusion can cross the boundary. Streaming text is not delivered; only
+terminal structured output from a fully inspected clean stream enters the
+kernel protocol.
 
 ### `sessions.py`
 
@@ -136,8 +141,11 @@ finish(optional reason, output-contract result)
 
 It revalidates the complete runtime-parsed value, applies the output contract,
 resolves the exact frozen-plan binding, and invokes the qualified pure
-`llm-tools` argument validator. Validation does not occupy a position, reserve
-tool budget, touch a recorder, or dispatch.
+`llm-tools` argument validator. Before any plan is rendered, the dependency's
+public proof must bind every published tool specification and revision to its
+frozen grant and prove that the complete plan tightens the maximum profile; a
+profile-only comparison is not sufficient. Validation does not occupy a
+position, reserve tool budget, touch a recorder, or dispatch.
 
 There is no model-authored preview, call ID, effect ID, authority label,
 approval instruction, or delivery instruction. One malformed value produces no

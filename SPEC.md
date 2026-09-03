@@ -33,29 +33,34 @@ The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
-- `llm-tools`: `8df458a199703120005296ae12f997b39d208fed`
+- `llm-tools`: `2f22c985613e04c08baa456893e63d0b68000dc3`
 
 The provider baseline is usable without modification. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
 root `ProviderRuntime.generate` lane.
 
-The reviewed `llm-tools` revision does not yet expose every public seam this
-kernel needs. Before kernel implementation, `llm-tools` MUST add and qualify:
+The reviewed `llm-tools` revision exposes and qualifies the public seams this
+kernel needs:
 
 1. Pure strict input validation that performs no position occupation, budget
    reservation, recorder write, or dispatch.
-2. A public proof that one frozen capability profile is a tightening of another,
-   including grants, limits, contract revisions, and policy revisions.
+2. A public proof that one frozen tool plan is internally consistent with its
+   catalog view and tightens a maximum frozen capability profile, including
+   exposed bindings, grants, limits, contract revisions, and policy revisions.
+   Freezing and publication MUST reject a catalog view whose tool revision does
+   not exactly match the corresponding frozen grant.
 3. A public `HostTable` publication/rendering contract for the tools represented
    to a model through structured host prompts rather than provider-native tools.
 4. An asynchronous durable execution/recorder path suitable for an async host,
    without blocking the event loop on persistent recorder operations.
 
-The upgraded revision MUST preserve `ToolEffect`, `ReplayPolicy`,
+The qualified revision preserves `ToolEffect`, `ReplayPolicy`,
 `FrozenToolPlan`, `InvocationPosition`, `EffectId`, recorder uncertainty,
-position conflict, and tool-budget behavior. The exact upgraded git revision is
-recorded here before implementation begins. Until then, the current pin is a
-review baseline, not an implementable dependency lock.
+position conflict, and tool-budget behavior. Its conformance suite includes
+adversarial cross-catalog substitution and direct inconsistent-plan tests at
+construction, proof, publication, and execution. Release still requires this
+immutable revision to be fetchable from the configured remote and locked by the
+package resolver rather than imported from a sibling worktree.
 
 The kernel MUST NOT import a private dependency module to bypass a missing
 public seam. It MUST NOT duplicate provider SDK integration, tool execution,
@@ -76,7 +81,8 @@ schema compilation, prompt-section rendering, or recorder semantics.
 
 ### 3.2 llm-tools owns
 
-- Tool declarations, bindings, catalogs, frozen profiles and plans.
+- Tool declarations, bindings, catalogs, frozen profiles and plans, including
+  plan/catalog consistency and tightening proofs.
 - `ToolEffect` (`Pure`, `Read`, `Write`) and orthogonal `ReplayPolicy`
   (`BilledOnce`, `ReDispatchable`).
 - Tool schemas and pure strict argument validation.
@@ -149,8 +155,13 @@ to a covered value rotates the session and forces bootstrap.
 
 Each invocation receives one frozen `llm-tools` plan with `HostTable` exposure.
 Before provider or tool I/O, the kernel uses the qualified public dependency
-predicate to prove that its frozen profile tightens the definition's maximum
-profile. The plan MUST set `max_in_flight = 1`.
+predicate to prove both that the plan is internally consistent with the exact
+catalog view it will publish and that the entire plan tightens the definition's
+maximum profile. Comparing the embedded profiles alone is insufficient. The
+published effect, schemas, replay policy, implementation revision, contract
+revision, and policy revision MUST be the values covered by that proof. Any
+mismatch fails before rendering or provider/tool I/O. The plan MUST set
+`max_in_flight = 1`.
 
 The plan is fixed for the invocation. A model cannot discover, add, widen, or
 reclassify tools. Tool descriptions in model context describe the plan; they do
@@ -181,8 +192,11 @@ A run is one bounded invocation over one claim. It may perform several provider
 turns and serial tool calls but does not silently start a fresh-budget successor
 over the same failed input.
 
-A provider turn is one `AgentRuntime.run_turn` call. A model step is the one
-validated structured value returned by its successful `AgentTerminal`.
+A provider turn is one complete consumption of an `AgentRuntime.stream_turn`
+event stream. A model step is the one validated structured value returned by
+its successful terminal event. The convenience `AgentRuntime.run_turn` method
+MUST NOT be used: it consumes and discards the intermediate events that the
+kernel must inspect to enforce containment.
 
 An isolated one-shot has explicit host input, no application claim/checkpoint or
 saved session reference, a fresh native session, a structured output contract,
@@ -197,9 +211,15 @@ V1 uses only:
 ```text
 provider_runtime.agent_runtime.AgentRuntime
   open_session(AgentSessionRequest)
-  run_turn(AgentSession, TurnRequest)
+  stream_turn(AgentSession, TurnRequest)
   close_session(AgentSession)
 ```
+
+These are public dependency APIs. The adapter MUST consume every event yielded
+by `stream_turn`; it MUST NOT call the convenience `run_turn` projection in
+production or infer event history from its terminal. The adapter returns a
+terminal to the kernel only after observing a well-formed stream through that
+terminal.
 
 The adapter MUST represent the kernel step schema through
 `JsonSchemaAgentOutput`. Jarvis tools are not provider-native tools and are not
@@ -236,11 +256,17 @@ pretending it is a stateless call:
 ```text
 acquire_continuing(definition, saved_ref | none) -> live session lease
 open_isolated(definition) -> live isolated session lease
-run_turn(lease, typed content, cancellation) -> AgentTerminal
+run_observed_turn(lease, typed content, cancellation) -> AgentTerminal
 release(lease) -> return continuing session to host cache
 discard(lease) -> close and invalidate session
 close(lease) -> close isolated or retired session
 ```
+
+`run_observed_turn` is a kernel port operation, not a wrapper around
+`AgentRuntime.run_turn`: its implementation drives `AgentRuntime.stream_turn`,
+suppresses text chunks, accumulates usage, and inspects every event. On a native
+tool-use or permission-request event it taints and discards the session and
+returns no terminal or model-authored output to the loop.
 
 The host MAY retain a continuing live session between runs for latency and
 provider caching. A lease permits one active turn. Shutdown closes every live
@@ -608,8 +634,8 @@ load/acquire compatible continuing provider session, or cold bootstrap
 loop within KernelLimits:
   poll and append compatible host input, or handle preemption
   build only new continuation material, or one cold bootstrap
-  run one AgentRuntime turn
-  reject native tool/permission events
+  consume one complete AgentRuntime streamed turn while inspecting every event
+  reject native tool/permission events without projecting a terminal
   map typed terminal failure, or persist returned AgentSessionRef by generation CAS
   validate one complete structured step
 
@@ -702,12 +728,16 @@ does not promise provider deletion. Consumers MUST state that privacy trade-off.
 
 The release suite covers both single-run interior behavior and composed seams:
 
-1. Exact `AgentRuntime` request mapping and lifecycle against the pinned route.
+1. Exact `AgentRuntime` request mapping and open/stream/close lifecycle against
+   the pinned route; production never calls the event-discarding `run_turn`
+   convenience projection.
 2. Native built-ins disabled, empty read-only cwd, disabled network/environment,
    approval deny, no MCP, and fail-stop on any native tool/permission event.
 3. Provider JSON-schema enforcement plus independent kernel semantic validation.
 4. Pure argument validation performs no recorder/budget/dispatch operation.
-5. Frozen plan tightening and `HostTable` exposure are proven before I/O.
+5. Frozen plan/catalog consistency, full-plan tightening, and exact `HostTable`
+   exposure are proven before rendering or I/O, including adversarial
+   cross-catalog substitution tests.
 6. Exactly one serial tool call per model step; no parallel or multi-call path.
 7. `Write` execution has stable action-owned position/effect ID, immutable
    claim/checkpoint/input/step lineage, and a durable recorder; conflicts and

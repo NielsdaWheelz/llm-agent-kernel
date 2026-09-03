@@ -5,12 +5,13 @@ contain `llm-agent-kernel`, imported as `llm_agent_kernel`.
 
 ## Current phase
 
-- Documentation only. Do not add runtime code, packaging, generated artifacts,
-  or dependencies until explicitly asked.
+- Runtime implementation has been explicitly authorized. Follow the slices and
+  acceptance gates; do not skip a boundary because a later slice needs it.
 - `SPEC.md` is normative. Architecture, acceptance, slices, and ADRs must agree
   with it.
-- Implementation is blocked until the public `llm-tools` seams in SPEC section
-  2 exist at a pinned qualified revision.
+- The public `llm-tools` seams in SPEC section 2 are qualified at the pinned
+  revision. Release still requires that pin to be fetchable from a durable
+  remote rather than a mutable sibling worktree.
 
 ## Permanent boundaries
 
@@ -41,11 +42,14 @@ contain `llm-agent-kernel`, imported as `llm_agent_kernel`.
   kernel neither interprets nor persists either form.
 - Native Codex built-ins and Web are disabled; cwd is private, empty, and
   read-only; network, copied environment, MCP, and approvals are disabled.
-- Fail-stop and discard the session on any provider-native tool or permission
-  event.
+- Consume `AgentRuntime.stream_turn` directly; never use the event-discarding
+  `run_turn` projection. Fail-stop and discard the session on any
+  provider-native tool or permission event.
 - The complete native session policy is part of the definition fingerprint.
 - Effective authority is the intersection of provider containment and the
-  host-selected frozen plan, proven to tighten the definition maximum.
+  host-selected frozen plan. Before rendering or I/O, prove the exact
+  plan/catalog view is internally consistent and tightens the definition
+  maximum; comparing profiles alone is insufficient.
 - `KernelLimits` and `llm_tools.RunLimits` are distinct. Never double-account a
   tool call, attempt, byte, deadline, or replay.
 - `Write` requires a host-created durable action/effect record whose stable ID

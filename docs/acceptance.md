@@ -11,8 +11,10 @@ assigned to exactly one implementation slice.
   `provider-runtime` and `llm-tools`; ordinary CI never imports mutable sibling
   worktrees.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
-  strict input validation, frozen-profile tightening proof, `HostTable`
-  publication/rendering, and async durable execution/recording.
+  strict input validation, frozen-plan/catalog consistency and tightening
+  proof, exact `HostTable` publication/rendering, and async durable
+  execution/recording. Freezing and publication reject a view whose tool
+  revision differs from its frozen grant.
 - **K004** — Pure validation performs no position occupation, budget
   reservation, recorder access, or dispatch.
 - **K005** — The kernel imports no private dependency module and contains no
@@ -28,8 +30,9 @@ assigned to exactly one implementation slice.
 ## Exact provider surface
 
 - **K008** — V1 uses only public
-  `provider_runtime.agent_runtime.AgentRuntime` open/run/close APIs; it does not
-  use stateless root generation.
+  `provider_runtime.agent_runtime.AgentRuntime` open/stream/close APIs; it does
+  not use stateless root generation or the event-discarding `run_turn`
+  convenience projection.
 - **K009** — The adapter passes the closed kernel step schema through
   `JsonSchemaAgentOutput` and independently revalidates the parsed terminal
   value inside the kernel.
@@ -40,9 +43,10 @@ assigned to exactly one implementation slice.
   `builtin_tools="disabled"`.
 - **K011** — The Codex `allowed_tools=("*",)` sentinel appears only where the
   pinned runtime requires it and is never interpreted as application authority.
-- **K012** — Any native tool-use or permission-request event fails the turn,
-  discards the session, dispatches no host tool, and settles no model-authored
-  conclusion.
+- **K012** — The adapter consumes and inspects every `stream_turn` event. Any
+  native tool-use or permission-request event fails the turn, discards the
+  session, returns no terminal to the loop, dispatches no host tool, and settles
+  no model-authored conclusion.
 - **K013** — Streaming model text is never delivered; only a successful terminal
   structured step can cross the host output boundary.
 - **K014** — Live continuing sessions are acquired/released and may be cached;
@@ -64,9 +68,11 @@ assigned to exactly one implementation slice.
   and containment value, including `PermissionPolicy` and native options;
   changing any covered value rotates the session. Secret bytes and dynamic
   input are excluded.
-- **K019** — Before provider or tool I/O, a qualified public predicate proves
-  that the host-selected frozen plan tightens the definition maximum and sets
-  `llm_tools.RunLimits.max_in_flight = 1`.
+- **K019** — Before rendering or provider/tool I/O, a qualified public predicate
+  proves that the host-selected frozen plan is internally consistent with its
+  exact catalog view, tightens the definition maximum in full, and sets
+  `llm_tools.RunLimits.max_in_flight = 1`. Tests reject cross-catalog effect,
+  schema, replay-policy, and revision substitution.
 - **K020** — The kernel has no run-class abstraction. The host claim returns one
   non-empty bounded input batch and its already-selected plan; the host owns
   priority, batching, and compatibility.
@@ -192,8 +198,9 @@ assigned to exactly one implementation slice.
   startup scanning that releases orphaned concurrency without refunding its
   conservative rolling charge.
 - **K052** — Opt-in live qualification exercises the exact pinned AgentRuntime
-  request, event, resume, cancellation, quota, and containment behavior without
-  running in ordinary CI or recording private payloads.
+  request, streamed event, resume, cancellation, quota, and containment
+  behavior without running in ordinary CI or recording private payloads. A
+  contract test proves that production calls `stream_turn`, never `run_turn`.
 
 ## Slice assignment
 

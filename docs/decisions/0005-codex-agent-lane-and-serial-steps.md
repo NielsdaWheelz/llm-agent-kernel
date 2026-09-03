@@ -17,8 +17,11 @@ tools must remain behind the host's plan, approval, and recorder boundaries.
 ## Decision
 
 V1 uses only subscription-backed
-`provider_runtime.agent_runtime.AgentRuntime` with explicit open/run/close
-lifecycle and `JsonSchemaAgentOutput`.
+`provider_runtime.agent_runtime.AgentRuntime` with explicit open/stream/close
+lifecycle and `JsonSchemaAgentOutput`. The adapter consumes the public
+`stream_turn` event stream and does not use the `run_turn` convenience
+projection, because the latter exposes only the terminal and cannot support the
+required native-authority fail-stop.
 
 Provider-native built-ins, native Web, MCP, network, copied environment,
 writeable filesystem, and provider approvals are disabled. The cwd is private,

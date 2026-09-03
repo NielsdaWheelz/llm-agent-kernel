@@ -19,21 +19,27 @@ boundary and divergent replay behavior.
 ## Decision
 
 Use public `provider-runtime` contracts for native Codex session creation,
-resume, turns, events, interruption, references, close, containment policy,
-native options, structured-output lowering, quota, and normalized usage.
+resume, streamed turns, events, interruption, references, close, containment
+policy, native options, structured-output lowering, quota, and normalized usage.
+The kernel consumes the public event stream rather than the convenience
+terminal projection because containment depends on observing native authority
+events.
 
 Use public `llm-tools` contracts for prompt sections, declarations, catalogs,
-bindings, frozen profiles/plans, `HostTable`, schemas, pure argument validation,
-`ToolEffect`, `ReplayPolicy`, tool budgets, positions, effect IDs, recorder
-semantics, execution, and results.
+bindings, frozen profiles/plans, plan/catalog consistency and tightening,
+`HostTable`, schemas, pure argument validation, `ToolEffect`, `ReplayPolicy`,
+tool budgets, positions, effect IDs, recorder semantics, execution, and results.
 
-Before implementation, add the four missing public `llm-tools` seams enumerated
-in SPEC section 2. Do not import private modules or reimplement them locally.
+Use the qualified `llm-tools` revision recorded in SPEC section 2, which adds
+the four previously missing public seams. Do not import private modules or
+reimplement them locally.
 
-The kernel owns semantic step/output validation and enforces proof that a run
-plan tightens a definition maximum. The host owns policy, plan selection,
-effect-ID minting, the durable recorder implementation, external
-reconciliation, and product state.
+The kernel owns semantic step/output validation and requires the dependency's
+public proof that the exact plan/catalog view being published is internally
+consistent and tightens a definition maximum. A profile-only comparison cannot
+authorize publication. The host owns policy, plan selection, effect-ID minting,
+the durable recorder implementation, external reconciliation, and product
+state.
 
 The host dispatcher returns a completed `llm_tools.ToolResult` or a durable
 suspension. It does not compress approval, denial, failure, and uncertainty into
@@ -50,7 +56,8 @@ Benefits:
 
 Costs:
 
-- `llm-tools` must be upgraded before kernel implementation.
+- The kernel requires the qualified upgraded `llm-tools` revision rather than
+  the earlier release baseline.
 - Compatibility spans three packages and requires an integration matrix.
 - Applications remain responsible for durable action/effect storage and
   reconciliation.

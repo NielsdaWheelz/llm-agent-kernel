@@ -12,15 +12,16 @@ Jarvis is the first consumer, but the package is not Jarvis-specific.
 
 ## Status
 
-This repository specifies v1. Runtime implementation begins only after the
-required `llm-tools` public seams are added and pinned. The target is Python
-3.12 or newer.
+This repository specifies v1 and runtime implementation is authorized. The
+required `llm-tools` public seams are qualified at the pin below. Release still
+requires immutable dependency resolution from a durable remote. The target is
+Python 3.12 or newer.
 
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
-- `llm-tools` at `8df458a199703120005296ae12f997b39d208fed`
+- `llm-tools` at `2f22c985613e04c08baa456893e63d0b68000dc3`
 
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
@@ -63,13 +64,13 @@ record.
 durable host input
         |
         v
-claim batch + reserve rolling admission + prove plan tightening
+claim batch + reserve rolling admission + prove exact plan/catalog tightening
         |
         v
 open/resume contained Codex agent session
         |
         v
-poll new compatible input --> structured provider turn
+poll new compatible input --> fully observed structured provider stream
                                   |
                        persist returned session ref
                                   |

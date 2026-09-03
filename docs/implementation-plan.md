@@ -5,16 +5,18 @@ boundary and passes its assigned acceptance criteria before the next begins.
 
 ## Slice 0: dependency truth and package contract
 
-First upgrade `llm-tools` through its own reviewed pull request to expose:
+The pinned `llm-tools` revision provides:
 
 - Pure strict argument validation with no dispatch-side mutation.
-- Public frozen-profile tightening proof.
+- Public frozen-plan/catalog consistency and full tightening proof.
 - Public `HostTable` publication/rendering.
 - Async durable executor/recorder operations.
 
-Qualify the upgrade against existing replay, uncertainty, `ToolEffect`,
-`ReplayPolicy`, `InvocationPosition`, `EffectId`, and budget behavior. Record the
-immutable new revision in the kernel spec and lock files.
+It is qualified against existing replay, uncertainty, `ToolEffect`,
+`ReplayPolicy`, `InvocationPosition`, `EffectId`, and budget behavior, plus
+cross-catalog effect/schema/replay-policy/revision substitution before
+publication. The immutable revision is recorded in the kernel spec; Slice 0
+must lock it from a durable remote rather than import a sibling worktree.
 
 Then deliver:
 
@@ -32,13 +34,13 @@ Exit: K001–K007 pass. No model or application tool is called in this slice.
 
 Deliver:
 
-- The exact `AgentRuntime` open/run/close adapter, not a synthetic stateless
-  provider façade.
+- The exact `AgentRuntime` open/stream/close adapter, not a synthetic stateless
+  provider façade or the event-discarding `run_turn` convenience projection.
 - `JsonSchemaAgentOutput` mapping for the closed kernel step schema.
 - Fully fingerprinted `AgentSessionRequest`, `PermissionPolicy`, native options,
   private cwd lifecycle, and empty environment/MCP/network configuration.
-- Event fail-stop for native tool-use or permission requests and suppression of
-  streaming text delivery.
+- Complete stream consumption and event fail-stop for native tool-use or
+  permission requests, plus suppression of streaming text delivery.
 - Live continuing-session leases, isolated lifecycle, shutdown close, and typed
   provider terminal mapping.
 - Generation-CAS session-ref port, resume compatibility, speculative-ref
