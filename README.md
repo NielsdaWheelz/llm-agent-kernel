@@ -13,15 +13,15 @@ Jarvis is the first consumer, but the package is not Jarvis-specific.
 ## Status
 
 This repository specifies v1 and runtime implementation is authorized. The
-required `llm-tools` public seams are qualified at the pin below. Release still
-requires immutable dependency resolution from a durable remote. The target is
-Python 3.12 or newer.
+required `llm-tools` public seams are qualified at the durable remote pin below;
+the implementation must lock that exact commit. The target is Python 3.12 or
+newer.
 
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
-- `llm-tools` at `2f22c985613e04c08baa456893e63d0b68000dc3`
+- `llm-tools` at `728f35c0b3a8be91b380ed4258d2b73ad68fc8fa`
 
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless

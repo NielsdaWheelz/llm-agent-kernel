@@ -33,7 +33,7 @@ The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
-- `llm-tools`: `2f22c985613e04c08baa456893e63d0b68000dc3`
+- `llm-tools`: `728f35c0b3a8be91b380ed4258d2b73ad68fc8fa`
 
 The provider baseline is usable without modification. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
@@ -46,9 +46,10 @@ kernel needs:
    reservation, recorder write, or dispatch.
 2. A public proof that one frozen tool plan is internally consistent with its
    catalog view and tightens a maximum frozen capability profile, including
-   exposed bindings, grants, limits, contract revisions, and policy revisions.
-   Freezing and publication MUST reject a catalog view whose tool revision does
-   not exactly match the corresponding frozen grant.
+   exposed bindings, grants, limits, contract revisions, implementation
+   revisions, and policy revisions. Freezing and publication MUST reject a
+   catalog view whose tool, implementation, or policy revision does not exactly
+   match the corresponding frozen grant.
 3. A public `HostTable` publication/rendering contract for the tools represented
    to a model through structured host prompts rather than provider-native tools.
 4. An asynchronous durable execution/recorder path suitable for an async host,
@@ -58,9 +59,9 @@ The qualified revision preserves `ToolEffect`, `ReplayPolicy`,
 `FrozenToolPlan`, `InvocationPosition`, `EffectId`, recorder uncertainty,
 position conflict, and tool-budget behavior. Its conformance suite includes
 adversarial cross-catalog substitution and direct inconsistent-plan tests at
-construction, proof, publication, and execution. Release still requires this
-immutable revision to be fetchable from the configured remote and locked by the
-package resolver rather than imported from a sibling worktree.
+construction, proof, publication, and execution. The immutable revision is
+fetchable from the configured remote; the package resolver MUST lock that exact
+commit rather than import from a sibling worktree.
 
 The kernel MUST NOT import a private dependency module to bypass a missing
 public seam. It MUST NOT duplicate provider SDK integration, tool execution,
@@ -162,6 +163,13 @@ published effect, schemas, replay policy, implementation revision, contract
 revision, and policy revision MUST be the values covered by that proof. Any
 mismatch fails before rendering or provider/tool I/O. The plan MUST set
 `max_in_flight = 1`.
+
+Every binding MUST declare a non-empty owner-controlled
+`implementation_revision` covering its handler and transitive execution
+behavior. A handler or behavior-affecting dependency change requires a revision
+bump unless that change is already represented by revisioned `policy_inputs`.
+The revision is identity and recovery evidence, not a claim that code was
+automatically hashed or independently attested.
 
 The plan is fixed for the invocation. A model cannot discover, add, widen, or
 reclassify tools. Tool descriptions in model context describe the plan; they do
@@ -737,7 +745,7 @@ The release suite covers both single-run interior behavior and composed seams:
 4. Pure argument validation performs no recorder/budget/dispatch operation.
 5. Frozen plan/catalog consistency, full-plan tightening, and exact `HostTable`
    exposure are proven before rendering or I/O, including adversarial
-   cross-catalog substitution tests.
+   cross-catalog handler-implementation substitution tests.
 6. Exactly one serial tool call per model step; no parallel or multi-call path.
 7. `Write` execution has stable action-owned position/effect ID, immutable
    claim/checkpoint/input/step lineage, and a durable recorder; conflicts and

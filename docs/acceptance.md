@@ -13,8 +13,9 @@ assigned to exactly one implementation slice.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
-  execution/recording. Freezing and publication reject a view whose tool
-  revision differs from its frozen grant.
+  execution/recording. Every binding has a non-empty owner-controlled
+  implementation revision. Freezing and publication reject a view whose
+  contract, implementation, or policy revision differs from its frozen grant.
 - **K004** — Pure validation performs no position occupation, budget
   reservation, recorder access, or dispatch.
 - **K005** — The kernel imports no private dependency module and contains no
@@ -72,7 +73,7 @@ assigned to exactly one implementation slice.
   proves that the host-selected frozen plan is internally consistent with its
   exact catalog view, tightens the definition maximum in full, and sets
   `llm_tools.RunLimits.max_in_flight = 1`. Tests reject cross-catalog effect,
-  schema, replay-policy, and revision substitution.
+  schema, handler-implementation, replay-policy, and revision substitution.
 - **K020** — The kernel has no run-class abstraction. The host claim returns one
   non-empty bounded input batch and its already-selected plan; the host owns
   priority, batching, and compatibility.

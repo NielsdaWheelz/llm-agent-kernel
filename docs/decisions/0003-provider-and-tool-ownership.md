@@ -28,7 +28,8 @@ events.
 Use public `llm-tools` contracts for prompt sections, declarations, catalogs,
 bindings, frozen profiles/plans, plan/catalog consistency and tightening,
 `HostTable`, schemas, pure argument validation, `ToolEffect`, `ReplayPolicy`,
-tool budgets, positions, effect IDs, recorder semantics, execution, and results.
+owner-controlled binding implementation revisions, tool budgets, positions,
+effect IDs, recorder semantics, execution, and results.
 
 Use the qualified `llm-tools` revision recorded in SPEC section 2, which adds
 the four previously missing public seams. Do not import private modules or
@@ -37,9 +38,11 @@ reimplement them locally.
 The kernel owns semantic step/output validation and requires the dependency's
 public proof that the exact plan/catalog view being published is internally
 consistent and tightens a definition maximum. A profile-only comparison cannot
-authorize publication. The host owns policy, plan selection, effect-ID minting,
-the durable recorder implementation, external reconciliation, and product
-state.
+authorize publication. An implementation revision covers the handler and its
+transitive execution behavior; it must change when that behavior changes unless
+revisioned policy inputs already represent the change. The host owns policy,
+plan selection, effect-ID minting, the durable recorder implementation,
+external reconciliation, and product state.
 
 The host dispatcher returns a completed `llm_tools.ToolResult` or a durable
 suspension. It does not compress approval, denial, failure, and uncertainty into

@@ -144,8 +144,10 @@ resolves the exact frozen-plan binding, and invokes the qualified pure
 `llm-tools` argument validator. Before any plan is rendered, the dependency's
 public proof must bind every published tool specification and revision to its
 frozen grant and prove that the complete plan tightens the maximum profile; a
-profile-only comparison is not sufficient. Validation does not occupy a
-position, reserve tool budget, touch a recorder, or dispatch.
+profile-only comparison is not sufficient. Every binding carries an
+owner-controlled implementation revision covering its handler and transitive
+execution behavior. Validation does not occupy a position, reserve tool budget,
+touch a recorder, or dispatch.
 
 There is no model-authored preview, call ID, effect ID, authority label,
 approval instruction, or delivery instruction. One malformed value produces no

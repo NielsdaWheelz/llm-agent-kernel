@@ -9,9 +9,9 @@ contain `llm-agent-kernel`, imported as `llm_agent_kernel`.
   acceptance gates; do not skip a boundary because a later slice needs it.
 - `SPEC.md` is normative. Architecture, acceptance, slices, and ADRs must agree
   with it.
-- The public `llm-tools` seams in SPEC section 2 are qualified at the pinned
-  revision. Release still requires that pin to be fetchable from a durable
-  remote rather than a mutable sibling worktree.
+- The public `llm-tools` seams in SPEC section 2 are qualified at a durable
+  remote revision. Lock that exact pin; never substitute a mutable sibling
+  worktree.
 
 ## Permanent boundaries
 
@@ -50,6 +50,9 @@ contain `llm-agent-kernel`, imported as `llm_agent_kernel`.
   host-selected frozen plan. Before rendering or I/O, prove the exact
   plan/catalog view is internally consistent and tightens the definition
   maximum; comparing profiles alone is insufficient.
+- Every tool binding has a non-empty owner-controlled implementation revision
+  covering its handler and transitive execution behavior. Bump it when that
+  behavior changes unless revisioned policy inputs already capture the change.
 - `KernelLimits` and `llm_tools.RunLimits` are distinct. Never double-account a
   tool call, attempt, byte, deadline, or replay.
 - `Write` requires a host-created durable action/effect record whose stable ID

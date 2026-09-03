@@ -14,9 +14,12 @@ The pinned `llm-tools` revision provides:
 
 It is qualified against existing replay, uncertainty, `ToolEffect`,
 `ReplayPolicy`, `InvocationPosition`, `EffectId`, and budget behavior, plus
-cross-catalog effect/schema/replay-policy/revision substitution before
-publication. The immutable revision is recorded in the kernel spec; Slice 0
-must lock it from a durable remote rather than import a sibling worktree.
+cross-catalog effect/schema/handler-implementation/replay-policy/revision
+substitution before publication. Every binding declares an owner-controlled
+implementation revision covering its handler and transitive execution behavior.
+The immutable revision is recorded in the kernel spec and reachable from the
+durable remote; Slice 0 must lock that exact commit rather than import a sibling
+worktree.
 
 Then deliver:
 
