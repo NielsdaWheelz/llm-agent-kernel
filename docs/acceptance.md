@@ -1,6 +1,6 @@
 # Acceptance criteria
 
-These criteria are the future implementation's release contract. Every ID is
+These criteria are the implementation's release contract. Every ID is
 assigned to exactly one implementation slice.
 
 ## Dependency and package boundary

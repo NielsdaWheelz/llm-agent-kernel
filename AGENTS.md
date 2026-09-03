@@ -1,17 +1,16 @@
 # Repository instructions
 
-This repository specifies and, after an explicit implementation request, will
-contain `llm-agent-kernel`, imported as `llm_agent_kernel`.
+This repository specifies and contains `llm-agent-kernel`, imported as
+`llm_agent_kernel`.
 
 ## Current phase
 
-- Runtime implementation has been explicitly authorized. Follow the slices and
-  acceptance gates; do not skip a boundary because a later slice needs it.
+- V1 runtime implementation and packaging are present. Keep changes within the
+  reusable kernel boundary and prove them through the conformance suite.
 - `SPEC.md` is normative. Architecture, acceptance, slices, and ADRs must agree
   with it.
-- The public `llm-tools` seams in SPEC section 2 are qualified at a durable
-  remote revision. Lock that exact pin; never substitute a mutable sibling
-  worktree.
+- The public `llm-tools` seams in SPEC section 2 are qualified and locked at the
+  exact immutable revision recorded there and in `pyproject.toml`/`uv.lock`.
 
 ## Permanent boundaries
 

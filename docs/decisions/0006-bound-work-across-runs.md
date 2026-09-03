@@ -34,6 +34,9 @@ Bound the complete run sequence:
   concurrency slot per root work epoch before provider I/O. A strictly serial
   child one-shot may share that slot only when its allowance is included in the
   parent reservation.
+- Since the selected runtime reports tokens only after a turn, the host
+  conservatively includes its qualified maximum one-turn token overshoot in the
+  admission reservation. That reserve does not widen the kernel's usage limit.
 - Success, ordinary failure, and cancellation settle actual usage and refund
   unused capacity in cleanup. Process interruption retains the full rolling
   turn/token charge.

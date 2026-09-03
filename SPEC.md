@@ -518,6 +518,7 @@ poll(claim, through_checkpoint) -> poll result
 settle(claim, through_checkpoint, host_conclusion)
   -> idle | more_input
 release(claim, reason) -> released | already_released
+park(claim, reason) -> parked | already_parked
 ```
 
 `claim` MUST never return an empty batch. `no_work` calls no provider. The host
@@ -540,6 +541,10 @@ is deliberate.
 `release` is cleanup for shutdown, invariant defects, or an interrupted host
 boundary. It never arms a successor by itself. The input remains visibly
 unconsumed for explicit recovery.
+
+`park` atomically releases claim ownership into a durable operator-only state
+and trips the applicable circuit breaker. It is the configuration-defect exit;
+normal startup scanning cannot reclaim parked input until operator correction.
 
 ### 9.2 No-progress stops
 
@@ -591,6 +596,13 @@ Before provider I/O, the host MUST durably reserve against the rolling policy:
 - The run's maximum remaining provider turns.
 - The route's configured input/output-token allowance when that usage dimension
   is available.
+
+Because `AgentRuntime` reports tokens only after a turn and exposes no hard
+per-turn token cap, the host MAY issue a token reserving more than the requested
+allowance. A production host MUST configure that conservative excess from the
+route's qualified finite context/output bounds so one terminal report cannot
+exceed its reservation. The kernel still stops when reported cumulative usage
+crosses `KernelLimits`; the excess is admission capacity, not extra run budget.
 
 The resulting `AdmissionToken` identifies the run, rolling window, reserved
 capacity, and reservation state. A clean exit settles actual available usage

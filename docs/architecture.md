@@ -39,7 +39,7 @@ The ownership split is fixed by [ADR 0001](decisions/0001-library-boundary.md),
 
 ## Runtime modules
 
-The names below are implementation targets, not current source files.
+The runtime is organized into the source modules below.
 
 ### `definitions.py`
 
@@ -153,7 +153,7 @@ There is no model-authored preview, call ID, effect ID, authority label,
 approval instruction, or delivery instruction. One malformed value produces no
 partial text or call. A bounded correction can consume another provider turn.
 
-### `loop.py`
+### `kernel.py`
 
 Runs one claimed batch under `KernelLimits`. It:
 
@@ -180,9 +180,9 @@ may expose typing/activity state.
 Defines three host protocols.
 
 `InputCheckpointPort` claims a non-empty bounded batch, polls it, atomically
-settles its conclusion plus consumed checkpoint, and releases interrupted work.
-The host owns selection, priority, compatibility, and plan choice. The kernel
-has no `run_class`.
+settles its conclusion plus consumed checkpoint, releases interrupted work, and
+durably parks configuration defects. The host owns selection, priority,
+compatibility, and plan choice. The kernel has no `run_class`.
 
 `AdmissionPort` durably reserves one live slot per exclusive root work epoch plus
 maximum turn and available token allowance before provider I/O. A strictly

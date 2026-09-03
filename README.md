@@ -12,10 +12,9 @@ Jarvis is the first consumer, but the package is not Jarvis-specific.
 
 ## Status
 
-This repository specifies v1 and runtime implementation is authorized. The
-required `llm-tools` public seams are qualified at the durable remote pin below;
-the implementation must lock that exact commit. The target is Python 3.12 or
-newer.
+Version 0.1.0 implements the v1 kernel and targets Python 3.12 or newer. The
+lockfile resolves the two runtime libraries from the exact qualified revisions
+below, never from mutable branches or sibling worktrees.
 
 The reviewed dependency baselines are:
 
@@ -26,6 +25,47 @@ The reviewed dependency baselines are:
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
 generation, MCP application tools, or provider-native application tools.
+
+## Install and verify
+
+The package is independently buildable with `uv`:
+
+```console
+uv sync --frozen --all-groups
+uv lock --check
+uv run ruff format --check .
+uv run ruff check .
+uv run pyright
+uv run pytest -q
+uv build
+uv run pip-audit
+git diff --check
+```
+
+The primary entry points are `run_thread(...)` and `run_one_shot(...)`.
+Applications construct an immutable `AgentDefinition`, provide one qualified
+frozen `llm-tools` plan and budget, and implement the typed ports. A continuing
+run composes `CodexProvider` with `SessionCoordinator`; production provider work
+therefore consumes `AgentRuntime.stream_turn` and never the event-discarding
+`run_turn` projection.
+
+The package root exports the public values, ports, outcomes, provider/session
+lifecycle, protocol and context helpers, loop entry points, opt-in
+`DiagnosticTranscript` redaction boundary, and deterministic fakes. Diagnostics
+are emitted only after the caller's redactor returns an explicit `RedactedText`;
+redactor and sink failures are nonfatal. The same API remains grouped by module
+under `llm_agent_kernel` for consumers that prefer qualified imports.
+
+The [minimal thread example](examples/minimal_thread.py) runs entirely against a
+scripted `AgentRuntime` and the process-local fakes:
+
+```console
+uv run python examples/minimal_thread.py
+```
+
+It performs no provider or network I/O. Its checkpoint, session-reference, and
+admission state disappear with the process; they are not examples of production
+durability.
 
 ## Boundary
 
@@ -57,6 +97,25 @@ Owning no schema does not mean requiring no durable state. A continuing host
 with writes normally needs canonical input/conclusion/delivery state, disposable
 provider-session-reference state, and a durable `llm-tools` recorder/effect
 record.
+
+The included `InMemory*`, `Static*`, `Scripted*`, and `Recording*` classes are
+process-local test doubles. They are intentionally honest about restart: they
+do not make input, conclusion, session-reference, effect, or admission facts
+durable. A production continuing host must durably store:
+
+- canonical input, exclusive claim ownership, attempt number, checkpoint, and
+  atomic conclusion/consumption;
+- session references keyed by thread and definition fingerprint with generation
+  CAS;
+- rolling admission reservations, actual usage, and orphaned-slot recovery;
+- for every `Write`, the host action/effect record and `llm-tools` durable
+  recorder state, using one stable ID as both `InvocationPosition` and
+  `EffectId`;
+- suspension references plus the original validated arguments and later safe
+  reconciliation evidence.
+
+The host also owns startup scans over canonical unconsumed input and orphaned
+admission records. Kernel cleanup never schedules a successor.
 
 ## Execution at a glance
 
@@ -103,5 +162,7 @@ parallel calls, and a durable generic observation store.
 - [Specification](SPEC.md)
 - [Architecture](docs/architecture.md)
 - [Acceptance criteria](docs/acceptance.md)
+- [Conformance map](docs/conformance.md)
 - [Implementation plan](docs/implementation-plan.md)
 - [Architecture decisions](docs/decisions/README.md)
+- [Host integration and release qualification](docs/host-integration.md)

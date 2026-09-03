@@ -8,3 +8,4 @@
 | [0004](0004-defer-program-agents-and-delegation.md) | Defer program agents, discovery, and delegation | Accepted |
 | [0005](0005-codex-agent-lane-and-serial-steps.md) | Use the Codex AgentRuntime lane and one serial tool step | Accepted |
 | [0006](0006-bound-work-across-runs.md) | Bound work across runs | Accepted |
+| [0007](0007-configuration-defect-parking.md) | Park configuration defects atomically | Accepted |
