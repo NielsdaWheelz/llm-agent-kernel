@@ -265,6 +265,17 @@ the provider callback immediately before dispatch. This remains dependency-owned
 tool execution behavior; the kernel does not add another timer or attempt
 counter.
 
+That pin advances the dependency-owned `web.read` implementation to
+`llm-tools-web-read-v2`. Plain-text extraction only decodes the declared
+charset and collapses whitespace; HTML/XHTML delegates its one entity-decoding
+pass to the visible-text parser. Their evidence locators are respectively
+`plain-text-v2` and `html-visible-text-v2`. The Web declarations, limits,
+policy epochs, policy inputs, and policy revisions—including every
+`web-search-v2` value—remain stable. A host that grants `web.read` must
+recompose and re-freeze the affected catalog, profile, plan, and exact
+`HostTable` publication; the kernel still owns none of those dependency
+implementations or persistent artifacts.
+
 The cooperative limit is observed at safe boundaries and becomes the remaining
 hard deadline for each provider turn. It is not an outer timeout over host
 ports, settlement, cleanup, or tool dispatch. Tool execution keeps its frozen

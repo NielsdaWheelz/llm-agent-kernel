@@ -33,7 +33,7 @@ The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
-- `llm-tools`: `05f89e238f52fbc69e83d9aacea1bcf2d8e6de88`
+- `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 
 The provider baseline is usable without modification. V1 selects only
@@ -79,6 +79,21 @@ inner expiry becomes the declared `UpstreamUnavailable` result with the actual
 started-attempt count; unexpected outer timeout and cancellation retain the
 existing executor replay and uncertainty semantics. The kernel neither starts
 nor separately accounts this tool deadline.
+
+The same revision corrects `web.read` extraction without changing its portable
+contract or policy. Both available and unavailable bindings MUST identify the
+implementation as `llm-tools-web-read-v2`. Plain-text evidence MUST identify
+`plain-text-v2`, which performs strict declared-charset decoding and whitespace
+collapse without interpreting entities or markup. HTML/XHTML evidence MUST
+identify `html-visible-text-v2`, which uses the parser's single entity-decoding
+pass and MUST NOT interpret the parser output a second time. JSON remains
+`json-canonical-v1`. `WEB_READ_SPEC`, the Web contracts and limits,
+`web-read-v1` policy epoch, policy inputs, and policy revision remain unchanged;
+`web.search` remains implementation `llm-tools-web-search-v2` with policy epoch
+`web-search-v2` and its existing contract, policy revision, and policy inputs.
+Any host catalog, frozen profile, frozen plan, or `HostTable` publication that
+contains `web.read` MUST be recomposed and re-frozen from the v2 binding. A v1
+frozen identity MUST fail closed against the v2 catalog rather than be reused.
 
 The kernel MUST NOT import a private dependency module to bypass a missing
 public seam. It MUST NOT duplicate provider SDK integration, tool execution,

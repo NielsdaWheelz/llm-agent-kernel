@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from collections.abc import Callable
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime
 from inspect import signature
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from llm_tools import (
+    WEB_READ_SPEC,
     WEB_SEARCH_SPEC,
     Available,
     CapabilityProfile,
@@ -21,6 +26,7 @@ from llm_tools import (
     PromptText,
     ReplayPolicy,
     RunLimits,
+    SafeWebReader,
     SchemaDecodeError,
     ToolBinding,
     ToolCatalog,
@@ -35,7 +41,9 @@ from llm_tools import (
     WebSearchRequest,
     WebSearchResponse,
     bind_brave_web_search,
+    bind_web_read,
     publish_host_table,
+    render_prompt,
     validate_tool_input,
     web_family,
 )
@@ -111,6 +119,60 @@ class CompatibleWebSearchProvider:
         attempt_started: Callable[[], None] | None = None,
     ) -> WebSearchResponse:
         raise AssertionError(f"contract canary performed Web I/O: {request!r}, {attempt_started!r}")
+
+
+class StaticWebResolver:
+    async def resolve(self, hostname: str, port: int) -> tuple[str, ...]:
+        del hostname, port
+        return ("8.8.8.8",)
+
+
+class MemoryWebWriter:
+    def __init__(self) -> None:
+        self.requests: list[bytes] = []
+
+    def write(self, data: bytes) -> None:
+        self.requests.append(data)
+
+    async def drain(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+    async def wait_closed(self) -> None:
+        return None
+
+
+class MemoryWebConnector:
+    def __init__(self, body: bytes, content_type: str) -> None:
+        self.body = body
+        self.content_type = content_type
+
+    async def connect(
+        self,
+        address: str,
+        port: int,
+        *,
+        hostname: str,
+        tls: bool,
+        timeout_seconds: float,
+    ) -> Any:
+        del port, hostname, tls, timeout_seconds
+        reader = asyncio.StreamReader()
+        reader.feed_data(
+            b"HTTP/1.1 200 OK\r\n"
+            + f"Content-Type: {self.content_type}; charset=utf-8\r\n".encode()
+            + f"Content-Length: {len(self.body)}\r\n".encode()
+            + b"Connection: close\r\n\r\n"
+            + self.body
+        )
+        reader.feed_eof()
+        return SimpleNamespace(
+            reader=reader,
+            writer=MemoryWebWriter(),
+            peer_address=address,
+        )
 
 
 async def _must_not_run(value: object, context: object) -> object:
@@ -213,14 +275,104 @@ def test_dependency_web_search_operation_deadline_api_is_revisioned() -> None:
     unavailable = web_family().bindings[0]
 
     assert WEB_SEARCH_SPEC.limits.deadline_seconds == 15.0
+    assert (
+        WEB_SEARCH_SPEC.tool_contract_revision
+        == "c46877ad7f12d672c2717fd0895f5bd95983dd5f6ffb6e6c9c4a2c22c573b78e"
+    )
     assert default.implementation_revision == "llm-tools-web-search-v2"
     assert default.policy_epoch == PolicyEpoch("web-search-v2")
-    assert default.policy_inputs["operation_deadline_seconds"] == 12.0
+    assert (
+        default.policy_revision
+        == "5717aea83625adff48bf1c870a46eb3086c0f166e6ad2088abe9efbe21445933"
+    )
+    assert default.policy_inputs == {
+        "locale": "US/en",
+        "max_results": 10,
+        "operation_deadline_seconds": 12.0,
+        "safe_search": "moderate",
+    }
     assert unavailable.policy_revision == default.policy_revision
     assert tightened.policy_inputs["operation_deadline_seconds"] == 11.5
     assert tightened.policy_revision != default.policy_revision
     with pytest.raises(ValueError, match="operation_deadline_seconds"):
         bind_brave_web_search(CompatibleWebSearchProvider(), operation_deadline_seconds=12.001)
+
+
+def test_dependency_web_read_revision_refreezes_exact_host_table_plan() -> None:
+    available = bind_web_read(SafeWebReader())
+    unavailable = web_family().bindings[1]
+
+    assert (
+        WEB_READ_SPEC.tool_contract_revision
+        == "a5de4258e043dd25f47cad2768ff1f5d9db4b93ac4a90347022d030a916bad1b"
+    )
+    assert WEB_READ_SPEC.limits.max_attempts == 8
+    assert WEB_READ_SPEC.limits.deadline_seconds == 20.0
+    assert available.implementation_revision == "llm-tools-web-read-v2"
+    assert unavailable.implementation_revision == "llm-tools-web-read-v2"
+    assert available.policy_epoch == PolicyEpoch("web-read-v1")
+    assert available.policy_inputs == {
+        "accepted_media": (
+            "application/json",
+            "application/xhtml+xml",
+            "text/html",
+            "text/plain",
+        ),
+        "mode": "direct",
+    }
+    assert (
+        available.policy_revision
+        == "587bfe6151dc8ad6880aea5414edb974fdf159da4148cdd1c9ffa2420dd74084"
+    )
+    assert unavailable.policy_revision == available.policy_revision
+
+    catalog = ToolCatalog.compose((web_family(read=available),))
+    maximum = CapabilityProfile(
+        ProfileId("kernel-web-read-v2"),
+        (ToolGrant(WEB_READ_SPEC.id, None),),
+        RunLimits(1, 8, 24_616, 512 * 1_024, 1, 30.0),
+    ).freeze(catalog)
+    plan = ToolPlan(maximum.id, HostTable()).freeze(catalog, maximum)
+    published = render_prompt(publish_host_table(plan))
+
+    assert maximum.profile_revision == (
+        "1c2957e53e23d277e8f58c9d7f3ceecf11dbe6b8a1a2f2be3c185fe91328f7e5"
+    )
+    assert plan.plan_revision == "7f88eea84fa31631677b7499d468281f5e4e1dcdfa761f50e236246dfabeb749"
+    assert '"implementation_revision":"llm-tools-web-read-v2"' in published
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("body", "content_type", "expected_text", "expected_extraction"),
+    [
+        (
+            b"literal &amp; <b>plain</b>",
+            "text/plain",
+            "literal &amp; <b>plain</b>",
+            "plain-text-v2",
+        ),
+        (
+            b"<p>nested &amp;amp; encoded &amp;lt;script&amp;gt;</p>",
+            "text/html",
+            "nested &amp; encoded &lt;script&gt;",
+            "html-visible-text-v2",
+        ),
+    ],
+)
+async def test_dependency_web_read_v2_extraction_locators_are_exact(
+    body: bytes,
+    content_type: str,
+    expected_text: str,
+    expected_extraction: str,
+) -> None:
+    result = await SafeWebReader(
+        resolver=StaticWebResolver(),
+        connector=MemoryWebConnector(body, content_type),
+    ).read("http://web-read-canary.test/")
+
+    assert result.value.text == expected_text
+    assert json.loads(result.value.evidence.locator)["extraction"] == expected_extraction
 
 
 def test_entry_points_require_the_exported_plan_aware_budget_factory() -> None:

@@ -8,8 +8,8 @@ claim to prove.
 | Acceptance | Status | Primary evidence or remaining qualification |
 | --- | --- | --- |
 | K001 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies`; `test_import_has_no_filesystem_or_network_side_effect` |
-| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks both exact immutable git revisions and `openai-codex==0.144.4`; `uv.lock` locks the matching SDK/runtime pair. `test_slice0_contracts.py::test_dependency_web_search_operation_deadline_api_is_revisioned` compiles against the new public API. |
-| K003 | Deterministic | `test_slice0_contracts.py::test_dependency_pure_validation_and_host_table_publication`; `test_dependency_rejects_cross_catalog_implementation_substitution`; `test_dependency_web_search_operation_deadline_api_is_revisioned`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
+| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks both exact immutable git revisions and `openai-codex==0.144.4`; `uv.lock` locks the matching SDK/runtime pair. `test_slice0_contracts.py::test_dependency_web_search_operation_deadline_api_is_revisioned`, `test_dependency_web_read_revision_refreezes_exact_host_table_plan`, and `test_dependency_web_read_v2_extraction_locators_are_exact` exercise the exact public Web APIs and identities. |
+| K003 | Deterministic | `test_slice0_contracts.py::test_dependency_pure_validation_and_host_table_publication`; `test_dependency_rejects_cross_catalog_implementation_substitution`; `test_dependency_web_search_operation_deadline_api_is_revisioned`; `test_dependency_web_read_revision_refreezes_exact_host_table_plan`; `test_dependency_web_read_v2_extraction_locators_are_exact`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
 | K004 | Deterministic | `test_tools.py::test_tool_validation_is_pure_strict_and_uses_the_plan_owned_binding`; `test_protocol.py::test_invalid_tool_input_is_one_protocol_failure_before_dispatch` |
 | K005 | Deterministic | `test_slice0_package.py::test_runtime_uses_no_private_dependency_imports`; `test_kernel_does_not_reimplement_llm_tools_owners` |
 | K006 | Deterministic | `test_slice0_package.py::test_package_contains_no_application_infrastructure` |
@@ -66,11 +66,14 @@ until explicit host reconciliation supplies recovered-lease evidence. No
 in-memory fake in this repository is evidence of crash durability.
 
 The `llm-tools` propagation from kernel
-`c9eefcb458ee5245010dd5e99b48f7116cd1139a` qualifies dependency revision
-`05f89e238f52fbc69e83d9aacea1bcf2d8e6de88` through the exact-pin package test
-and the public `web.search` deadline API canary above. It does not change
-`provider-runtime`, `openai-codex`, the provider adapter, request containment, or
-the structured-output wire. The paid `gpt-5.6-terra` and `gpt-5.4`
+`b53e4329d6a8fc8af622747c9670cf586cf9e1ff` qualifies dependency revision
+`9e6d155f3b64f03495911435b7cae8b8d131f9a2` through the exact-pin package test,
+public Web API and extraction canaries, the recomposed v2 `web.read` HostTable
+publication, and the fetched dependency suite. The `web.read` implementation and
+extraction locator identities rotate, while its contract and policy identities
+and all `web-search-v2` identities remain unchanged. No kernel source,
+`provider-runtime`, `openai-codex`, provider adapter, request containment, or
+structured-output wire changes. The paid `gpt-5.6-terra` and `gpt-5.4`
 qualification recorded for that unchanged provider surface therefore remains
 applicable; a change to any of those provider-facing inputs requires both live
 routes to be rerun.

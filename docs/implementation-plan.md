@@ -20,6 +20,11 @@ implementation revision covering its handler and transitive execution behavior.
 The qualified pin also carries `web.search`'s revisioned whole-operation
 deadline, started-attempt callback contract, cancellation propagation, and
 policy-identity input without moving tool timing or accounting into the kernel.
+It carries `web.read` implementation revision `llm-tools-web-read-v2` and the
+`plain-text-v2` and `html-visible-text-v2` extraction locators. The Web
+contracts, limits, epochs, policy revisions, and policy inputs remain unchanged,
+and dependency canaries recompose, freeze, and publish the affected HostTable
+plan from those exact identities.
 The immutable revision is recorded in the kernel spec and reachable from the
 durable remote; Slice 0 must lock that exact commit rather than import a sibling
 worktree.

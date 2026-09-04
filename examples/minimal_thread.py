@@ -1,4 +1,4 @@
-"""Run one fake-backed continuing thread without provider or network access."""
+"""Run one fake-backed thread with a freshly frozen empty HostTable plan."""
 
 from __future__ import annotations
 

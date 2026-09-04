@@ -11,7 +11,8 @@ assigned to exactly one implementation slice.
   `provider-runtime` and `llm-tools` plus the exact Codex SDK/runtime version
   certified by the provider revision; ordinary CI never imports mutable sibling
   worktrees or an uncertified transitive Codex release. The `llm-tools` pin
-  exposes the revisioned `web.search` whole-operation deadline API.
+  exposes the revisioned `web.search` whole-operation deadline API and the
+  corrected `web.read` v2 extraction identity.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
@@ -20,7 +21,12 @@ assigned to exactly one implementation slice.
   contract, implementation, or policy revision differs from its frozen grant.
   `web.search` freezes its bounded whole-operation deadline into policy identity
   and reports every started attempt without weakening cancellation, replay, or
-  uncertainty semantics.
+  uncertainty semantics. `web.read` publishes implementation revision
+  `llm-tools-web-read-v2` and evidence locators `plain-text-v2` or
+  `html-visible-text-v2` while its contract, limits, `web-read-v1` policy epoch,
+  policy inputs, and policy revision remain unchanged. An affected profile,
+  plan, and `HostTable` publication is recomposed and re-frozen rather than
+  reusing a v1 identity.
 - **K004** — Pure validation performs no position occupation, budget
   reservation, recorder access, or dispatch.
 - **K005** — The kernel imports no private dependency module and contains no
