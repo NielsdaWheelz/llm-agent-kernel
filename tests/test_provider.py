@@ -247,21 +247,24 @@ async def test_exact_request_mapping_private_cwd_cache_and_shutdown(tmp_path: Pa
     assert runtime.run_turn_calls == 0
 
 
-async def test_observed_turn_drains_stream_suppresses_text_and_accumulates_usage(
+async def test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn(
     tmp_path: Path,
 ) -> None:
     runtime = _RecordingRuntime()
     provider = CodexProvider(_runtime(runtime), cwd_parent=tmp_path)
     lease = await provider.acquire_continuing(_definition(), None)
-    first_usage = _usage(10, 4)
+    early_first_usage = _usage(2, 1)
+    latest_first_usage = _usage(10, 4)
+    terminal_first_usage = _usage(11, 5)
     second_usage = _usage(3, 2)
     runtime.scripts.extend(
         [
             (
                 AgentText("must not be delivered"),
                 AgentNative("reasoning", freeze_json_object({}, context="native")),
-                AgentUsage(first_usage),
-                _terminal(lease.session.ref, usage=first_usage),
+                AgentUsage(early_first_usage),
+                AgentUsage(latest_first_usage),
+                _terminal(lease.session.ref, usage=terminal_first_usage),
             ),
             (
                 AgentUsage(second_usage),
@@ -283,11 +286,54 @@ async def test_observed_turn_drains_stream_suppresses_text_and_accumulates_usage
         cancellation,
     )
 
-    assert lease.usage == ProviderUsage(input_tokens=13, output_tokens=6)
-    assert runtime.events_yielded == 6
+    assert lease.usage == ProviderUsage(input_tokens=14, output_tokens=7)
+    assert runtime.events_yielded == 7
     assert runtime.stream_closed == 2
     assert runtime.stream_calls == 2
     assert runtime.run_turn_calls == 0
+    await provider.discard(lease)
+
+
+async def test_observed_turn_uses_latest_progressive_snapshot_when_terminal_usage_is_absent(
+    tmp_path: Path,
+) -> None:
+    runtime = _RecordingRuntime()
+    provider = CodexProvider(_runtime(runtime), cwd_parent=tmp_path)
+    lease = await provider.acquire_continuing(_definition(), None)
+    runtime.scripts.append(
+        (
+            AgentUsage(_usage(2, 1)),
+            AgentUsage(_usage(5, 2)),
+            _terminal(lease.session.ref),
+        )
+    )
+
+    await provider.run_observed_turn(
+        lease,
+        (TextContent("one"),),
+        cast(CancelSignal, asyncio.Event()),
+    )
+
+    assert lease.usage == ProviderUsage(input_tokens=5, output_tokens=2)
+    await provider.discard(lease)
+
+
+async def test_resumed_session_charges_only_invocation_local_usage(tmp_path: Path) -> None:
+    runtime = _RecordingRuntime()
+    provider = CodexProvider(_runtime(runtime), cwd_parent=tmp_path)
+    saved = _ref("saved")
+    lease = await provider.acquire_continuing(_definition(), saved)
+    local_usage = _usage(7, 3)
+    runtime.scripts.append((AgentUsage(local_usage), _terminal(saved, usage=local_usage)))
+
+    await provider.run_observed_turn(
+        lease,
+        (TextContent("continued"),),
+        cast(CancelSignal, asyncio.Event()),
+    )
+
+    assert isinstance(runtime.requests[0].open, ResumeSession)
+    assert lease.usage == ProviderUsage(input_tokens=7, output_tokens=3)
     await provider.discard(lease)
 
 
@@ -369,7 +415,13 @@ async def test_typed_non_success_terminal_is_preserved_and_session_is_closed(
     runtime = _RecordingRuntime()
     provider = CodexProvider(_runtime(runtime), cwd_parent=tmp_path)
     lease = await provider.acquire_continuing(_definition(), None)
-    runtime.scripts.append((_terminal(lease.session.ref, status=status, failure=failure),))
+    usage = _usage(5, 2)
+    runtime.scripts.append(
+        (
+            AgentUsage(_usage(3, 1)),
+            _terminal(lease.session.ref, status=status, failure=failure, usage=usage),
+        )
+    )
 
     terminal = await provider.run_observed_turn(
         lease,
@@ -379,6 +431,7 @@ async def test_typed_non_success_terminal_is_preserved_and_session_is_closed(
 
     assert terminal.status == status
     assert terminal.failure == failure
+    assert lease.usage == ProviderUsage(input_tokens=5, output_tokens=2)
     assert runtime.closed == [lease.session]
     assert not lease.cwd.exists()
 

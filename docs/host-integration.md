@@ -48,6 +48,26 @@ the former top-level logical JSON shape from Codex. Logical `SayStep`,
 not change. The definition fingerprint includes the new wire schema, so the
 upgrade cold-bootstraps rather than resuming an old-schema native session.
 
+For the provider-runtime propagation from kernel
+`c9dac7a610636a668bbf932cc2f961c0904f9157`, a consumer pins the successor
+kernel revision and regenerates its lock to exact provider-runtime revision
+`f477dcdcad03c30019576203d4eb8a3581a6d32f`. It keeps `llm-tools` at
+`9e6d155f3b64f03495911435b7cae8b8d131f9a2` and `openai-codex` at `0.144.4`.
+No provider request, provider wire schema, public kernel API, persistence schema,
+or session-reference format changes. Existing native sessions remain compatible,
+so a host MUST NOT rotate `session_compatibility_revision` solely for this
+correction.
+
+The revised provider contract defines `AgentUsage` events as progressive,
+non-additive snapshots for the current invocation and `AgentTerminal.usage` as
+invocation-local on every status. Provider-runtime owns subtraction of restored
+or prior-turn cumulative provider state. The kernel adapter keeps the latest
+progressive snapshot, prefers terminal usage, adds usage once per provider turn,
+and sums those invocation-local values across kernel turns. A host MUST NOT add
+another cumulative-delta layer. `Absent` means usage is incomplete, not zero;
+the admission implementation must retain the run's reserved token dimensions
+when settling incomplete usage.
+
 For the dependency propagation from kernel `b53e4329d6a8fc8af622747c9670cf586cf9e1ff`,
 a consumer pins the successor kernel revision, regenerates its lock to exact
 `llm-tools` revision `9e6d155f3b64f03495911435b7cae8b8d131f9a2`,
@@ -141,6 +161,13 @@ pins, kernel provider adapter, containment request, and structured-output wire
 are unchanged and the complete deterministic suite still passes. The
 `web.read` extraction propagation meets those conditions. Any provider-facing
 change requires the paid matrix to run again.
+
+This provider-runtime propagation changes a provider-facing input and therefore
+requires the paid matrix on both qualified models. The continuation probe must
+prove same-lease per-turn addition and close/reopen/resume without historical
+recharge; the separately gated in-flight cancellation probe must also run.
+Quota exhaustion runs only against a qualification profile that is already
+exhausted and MUST NOT be induced for release testing.
 
 The library release commands are:
 

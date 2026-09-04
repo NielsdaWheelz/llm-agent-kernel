@@ -32,11 +32,13 @@ The distribution is `llm-agent-kernel`; applications import
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
+  `f477dcdcad03c30019576203d4eb8a3581a6d32f`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 
-The provider baseline is usable without modification. V1 selects only
+The provider baseline is usable without modification. It normalizes any
+provider-native cumulative accounting into invocation-local usage before the
+public agent-runtime boundary. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
 root `ProviderRuntime.generate` lane. The kernel distribution directly pins the
 Codex SDK version certified by that immutable provider revision so a later
@@ -110,6 +112,8 @@ schema compilation, prompt-section rendering, or recorder semantics.
 - Strict parsing of the provider's declared JSON-schema output.
 - Normalized events, usage when available, quota exhaustion, and typed provider
   failures.
+- Projection of provider-native cumulative accounting into progressive,
+  invocation-local usage without charging restored historical usage.
 - Child process, private state-root, environment, and sandbox lifecycle.
 
 ### 3.2 llm-tools owns
@@ -324,9 +328,23 @@ close(lease) -> close isolated or retired session
 
 `run_observed_turn` is a kernel port operation, not a wrapper around
 `AgentRuntime.run_turn`: its implementation drives `AgentRuntime.stream_turn`,
-suppresses text chunks, accumulates usage, and inspects every event. On a native
-tool-use or permission-request event it taints and discards the session and
-returns no terminal or model-authored output to the loop.
+suppresses text chunks, accumulates usage, and inspects every event. Each
+`AgentUsage` is a progressive invocation-to-date snapshot, so snapshots within
+one turn are non-additive. The adapter retains the latest snapshot rather than
+summing snapshots, prefers `AgentTerminal.usage` when present, and adds exactly
+one invocation-local usage value to the lease per started provider turn. The
+lease total therefore sums distinct kernel turns, including consecutive turns,
+without charging usage restored from a resumed native session. Provider-runtime
+owns native cumulative-to-invocation normalization; the kernel MUST NOT
+reimplement that provider-specific delta algorithm. On a native tool-use or
+permission-request event it taints and discards the session and returns no
+terminal or model-authored output to the loop.
+
+`AgentTerminal.usage` is invocation-local for success, failure, cancellation,
+and quota terminals. `Absent` means the provider supplied no safely attributable
+usage. Any missing turn makes the lease token total incomplete rather than
+fabricating zero or a cumulative delta, although its started turn remains
+counted.
 
 The host MAY retain a continuing live session between runs for latency and
 provider caching. A lease permits one active turn. Shutdown closes every live
@@ -692,8 +710,11 @@ crosses `KernelLimits`; the excess is admission capacity, not extra run budget.
 The resulting `AdmissionToken` identifies the run, rolling window, reserved
 capacity, and reservation state. A clean exit settles actual available usage
 and refunds unused capacity in `finally`, including ordinary failure and
-cancellation. Process death is charged conservatively: the full turn/token
-reservation remains consumed until its rolling window expires. During startup
+cancellation. Invocation-local values are summed across kernel turns exactly
+once. If any started turn has `Absent` usage, the corresponding run token
+dimensions remain unavailable and clean settlement conservatively retains the
+full token reservation. Process death is charged conservatively: the full
+turn/token reservation remains consumed until its rolling window expires. During startup
 under the host's exclusive deployment/ownership lock, an orphaned in-flight
 reservation is marked interrupted and its live concurrency slot is released;
 its turn/token charge is not refunded. A missing or corrupt admission journal

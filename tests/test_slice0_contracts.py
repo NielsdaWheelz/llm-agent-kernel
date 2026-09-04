@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, fields, replace
 from datetime import UTC, datetime
 from inspect import signature
 from types import SimpleNamespace
@@ -48,6 +48,8 @@ from llm_tools import (
     web_family,
 )
 from provider_runtime.agent_runtime import (
+    AgentTerminal,
+    AgentUsage,
     CredentialRef,
     PermissionPolicy,
     ReasoningSpec,
@@ -109,6 +111,28 @@ class OptionalResult(BaseModel):
 
 class OpenResult(BaseModel):
     answer: str
+
+
+def test_dependency_usage_contract_is_invocation_local_and_progressive() -> None:
+    usage_contract = AgentUsage.__doc__ or ""
+    terminal_contract = AgentTerminal.__doc__ or ""
+
+    assert "invocation-to-date usage snapshot" in usage_contract
+    assert "Snapshots within a turn are not additive" in usage_contract
+    assert "only usage attributable" in usage_contract
+    assert "usage`` is invocation-local on every status" in terminal_contract
+    assert "never includes historical" in terminal_contract
+    assert "Absent`` means the provider supplied no safely attributable usage" in terminal_contract
+    assert [field.name for field in fields(AgentUsage)] == ["usage"]
+    assert [field.name for field in fields(AgentTerminal)] == [
+        "status",
+        "failure",
+        "final_text",
+        "session_ref",
+        "structured_output",
+        "usage",
+        "diagnostics",
+    ]
 
 
 class CompatibleWebSearchProvider:

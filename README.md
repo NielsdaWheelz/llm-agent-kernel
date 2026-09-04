@@ -19,7 +19,7 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
+  `f477dcdcad03c30019576203d4eb8a3581a6d32f`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - provider-certified `openai-codex==0.144.4`
 
@@ -35,6 +35,12 @@ kernel orchestration behavior do not change.
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
 generation, MCP application tools, or provider-native application tools.
+`AgentUsage` events are progressive, non-additive snapshots of the current
+invocation, and `AgentTerminal.usage` is invocation-local on every status. The
+adapter retains the latest event snapshot, prefers terminal usage, and adds one
+usage value exactly once per provider turn. Resumed historical usage is never
+charged; unavailable safely attributable usage remains unknown so admission
+settlement conservatively retains its token reservation.
 
 ## Install and verify
 

@@ -47,6 +47,7 @@ from provider_runtime.agent_runtime import (
     TextContent,
     TurnNotStarted,
 )
+from provider_runtime.types import Absent, Present
 from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel.cancellation import CancellationToken
@@ -58,6 +59,7 @@ from llm_agent_kernel.definitions import (
     FinishStep,
     OutputContract,
     ProviderConfiguration,
+    ProviderUsage,
     SessionMode,
     StructuredOutput,
 )
@@ -157,21 +159,48 @@ async def test_live_codex_stream_continuation_and_cancellation() -> None:
         )
         assert first.status == "succeeded"
         validate_provider_step(first.structured_output, definition.output_contract, _empty_plan())
-        await provider.release(lease)
+        assert isinstance(first.usage, Present)
+        assert await provider.accumulated_usage(lease) == ProviderUsage(
+            first.usage.value.input_tokens,
+            first.usage.value.output_tokens,
+        )
 
-        continued = await provider.acquire_continuing(definition, first.session_ref)
         second = await provider.run_observed_turn(
-            continued,
-            (TextContent("Respond through the finish branch with no internal reason."),),
+            lease,
+            (TextContent("Respond through the say branch with the text pong again."),),
             CancellationToken(),
             timeout_seconds=600.0,
         )
         assert second.status == "succeeded"
         validate_provider_step(second.structured_output, definition.output_contract, _empty_plan())
-        assert second.session_ref.native_session_id == first.session_ref.native_session_id
+        assert isinstance(second.usage, Present)
+        assert await provider.accumulated_usage(lease) == ProviderUsage(
+            first.usage.value.input_tokens + second.usage.value.input_tokens,
+            first.usage.value.output_tokens + second.usage.value.output_tokens,
+        )
+        await provider.release(lease)
+
+        continued = await provider.acquire_continuing(definition, second.session_ref)
+        resumed = await provider.run_observed_turn(
+            continued,
+            (TextContent("Respond through the finish branch with no internal reason."),),
+            CancellationToken(),
+            timeout_seconds=600.0,
+        )
+        assert resumed.status == "succeeded"
+        validate_provider_step(resumed.structured_output, definition.output_contract, _empty_plan())
+        assert resumed.session_ref.native_session_id == first.session_ref.native_session_id
+        if isinstance(resumed.usage, Present):
+            assert await provider.accumulated_usage(continued) == ProviderUsage(
+                resumed.usage.value.input_tokens,
+                resumed.usage.value.output_tokens,
+            )
+        else:
+            assert isinstance(resumed.usage, Absent)
+            assert await provider.accumulated_usage(continued) == ProviderUsage()
         await provider.release(continued)
 
-        cancelled = await provider.acquire_continuing(definition, second.session_ref)
+        cancelled = await provider.acquire_continuing(definition, resumed.session_ref)
         cancellation = CancellationToken()
         cancellation.cancel()
         with pytest.raises(TurnNotStarted, match="cancel"):

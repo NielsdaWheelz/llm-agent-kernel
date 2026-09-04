@@ -54,7 +54,7 @@ from provider_runtime.agent_runtime import (
     TurnRequest,
     freeze_json_object,
 )
-from provider_runtime.types import Absent, CancelSignal, TokenUsage
+from provider_runtime.types import Absent, CancelSignal, Present, TokenUsage
 from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel.cancellation import CancellationToken
@@ -238,14 +238,29 @@ def _ref(name: str = "session-1") -> AgentSessionRef:
     )
 
 
-def _terminal(value: dict[str, object], ref: AgentSessionRef | None = None) -> AgentTerminal:
+def _usage(input_tokens: int, output_tokens: int) -> TokenUsage:
+    return TokenUsage.from_components(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=Absent(),
+        reasoning_tokens=Absent(),
+        cache_read_input_tokens=Absent(),
+        cache_write_input_tokens=Absent(),
+    )
+
+
+def _terminal(
+    value: dict[str, object],
+    ref: AgentSessionRef | None = None,
+    usage: TokenUsage | None = None,
+) -> AgentTerminal:
     return AgentTerminal(
         status="succeeded",
         failure=None,
         final_text="not a trusted projection",
         session_ref=ref or _ref(),
         structured_output=freeze_json_object(_wire_step(value)),
-        usage=Absent(),
+        usage=Absent() if usage is None else Present(usage),
     )
 
 
@@ -274,6 +289,7 @@ def _wire_step(value: dict[str, object]) -> dict[str, object]:
 def _failed_terminal(
     failure: AgentFailure | AgentQuotaExhausted,
     ref: AgentSessionRef | None = None,
+    usage: TokenUsage | None = None,
 ) -> AgentTerminal:
     return AgentTerminal(
         status="failed",
@@ -281,7 +297,7 @@ def _failed_terminal(
         final_text="",
         session_ref=ref or _ref(),
         structured_output=None,
-        usage=Absent(),
+        usage=Absent() if usage is None else Present(usage),
     )
 
 
@@ -673,6 +689,108 @@ async def test_thread_streams_stores_ref_then_settles_valid_say(tmp_path: Path) 
         ConversationConclusion("done")
     ]
     assert await refs.load(ThreadId("thread-1"), definition.fingerprint) is not None
+
+
+async def test_six_turn_resumed_session_settles_invocation_local_usage_once_per_turn(
+    tmp_path: Path,
+) -> None:
+    limits = KernelLimits(
+        max_provider_turns=6,
+        max_provider_input_tokens=60,
+        max_provider_output_tokens=12,
+    )
+    definition, plan, _ = _definition(effect=ToolEffect.Read, limits=limits)
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    saved = _ref("saved-six-turn-session")
+    references = InMemorySessionRefPort()
+    await references.compare_and_set(ThreadId("thread-1"), definition.fingerprint, None, saved)
+    local_usage = _usage(10, 2)
+    scripts: list[tuple[AgentEvent, ...]] = [
+        (
+            _terminal(
+                {
+                    "type": "call_tool",
+                    "tool_id": "test.observe",
+                    "arguments": {"value": f"turn-{turn}"},
+                },
+                saved,
+                local_usage,
+            ),
+        )
+        for turn in range(1, 6)
+    ]
+    scripts.append((_terminal({"type": "say", "text": "done"}, saved, local_usage),))
+    dispatch = ScriptedToolDispatchPort(
+        tuple(
+            DispatchCompleted({"type": "Success", "value": {"value": f"seen-{turn}"}})
+            for turn in range(1, 6)
+        )
+    )
+    admission = InMemoryAdmissionPort(
+        max_turns=6,
+        max_input_tokens=60,
+        max_output_tokens=12,
+    )
+    runtime = _Runtime(scripts)
+
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        runtime,
+        checkpoints,
+        dispatch,
+        admission,
+        references,
+    )
+
+    assert outcome.type == "completed"
+    assert outcome.metrics.provider_turns == 6
+    assert outcome.metrics.usage.input_tokens == 60
+    assert outcome.metrics.usage.output_tokens == 12
+    assert isinstance(runtime.opens[0].open, ResumeSession)
+    assert len(dispatch.calls) == 5
+    assert admission.charged_turns == 6
+    assert admission.charged_input_tokens == 60
+    assert admission.charged_output_tokens == 12
+    assert admission.live_slots == 0
+
+
+async def test_absent_invocation_usage_retains_full_admission_token_reservation(
+    tmp_path: Path,
+) -> None:
+    limits = KernelLimits(
+        max_provider_turns=2,
+        max_provider_input_tokens=20,
+        max_provider_output_tokens=10,
+    )
+    definition, plan, _ = _definition(limits=limits)
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    admission = InMemoryAdmissionPort(
+        max_turns=2,
+        max_input_tokens=20,
+        max_output_tokens=10,
+    )
+
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        _Runtime([(_terminal({"type": "say", "text": "done"}),)]),
+        checkpoints,
+        admission=admission,
+    )
+
+    assert outcome.type == "completed"
+    assert outcome.metrics.provider_turns == 1
+    assert outcome.metrics.usage.input_tokens is None
+    assert outcome.metrics.usage.output_tokens is None
+    assert admission.charged_turns == 1
+    assert admission.charged_input_tokens == 20
+    assert admission.charged_output_tokens == 10
+    assert admission.live_slots == 0
 
 
 async def test_diagnostic_transcript_is_opt_in_and_redacted_before_sink(

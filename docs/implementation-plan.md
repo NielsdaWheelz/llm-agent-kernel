@@ -29,6 +29,12 @@ The immutable revision is recorded in the kernel spec and reachable from the
 durable remote; Slice 0 must lock that exact commit rather than import a sibling
 worktree.
 
+The exact provider-runtime pin defines `AgentUsage` as a progressive
+invocation-to-date snapshot and `AgentTerminal.usage` as invocation-local on
+every status. It owns normalization of native cumulative state, including
+resume baselines; the kernel adapter only selects the latest/terminal snapshot
+and sums one invocation-local value per kernel turn.
+
 Then deliver:
 
 - Python 3.12 package skeleton and public typed vocabulary.
@@ -54,6 +60,9 @@ Deliver:
   private cwd lifecycle, and empty environment/MCP/network configuration.
 - Complete stream consumption and event fail-stop for native tool-use or
   permission requests, plus suppression of streaming text delivery.
+- Latest-progressive-snapshot retention, terminal-usage precedence, exactly-once
+  per-turn addition, resumed-history exclusion, and incomplete-usage handling
+  without a second native cumulative-delta implementation.
 - Live continuing-session leases, isolated lifecycle, shutdown close, and typed
   provider terminal mapping.
 - Generation-CAS session-ref port, resume compatibility, speculative-ref
@@ -104,6 +113,8 @@ Deliver:
 - Durable attempt number and pre-I/O no-progress ceiling.
 - Durable pre-I/O admission reservation, clean settlement/refund, and startup
   release of orphaned concurrency without refunding rolling turn/token charge.
+- Conservative retention of token reservations whenever safely attributable
+  invocation usage is unavailable.
 - Circuit-breaker/parking behavior for configuration defects.
 - Multi-run, restart, race, and crash-order fixtures, including ordinary input
   arriving during finalization.

@@ -12,7 +12,9 @@ assigned to exactly one implementation slice.
   certified by the provider revision; ordinary CI never imports mutable sibling
   worktrees or an uncertified transitive Codex release. The `llm-tools` pin
   exposes the revisioned `web.search` whole-operation deadline API and the
-  corrected `web.read` v2 extraction identity.
+  corrected `web.read` v2 extraction identity. The provider pin exposes
+  invocation-local terminal usage and progressive, non-additive invocation
+  snapshots without resumed historical usage.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
@@ -61,7 +63,11 @@ assigned to exactly one implementation slice.
   session, returns no terminal to the loop, dispatches no host tool, and settles
   no model-authored conclusion.
 - **K013** — Streaming model text is never delivered; only a successful terminal
-  structured step can cross the host output boundary.
+  structured step can cross the host output boundary. The adapter retains the
+  latest progressive usage snapshot, prefers invocation-local terminal usage,
+  and adds usage exactly once per started turn. It sums distinct kernel turns,
+  never resumed history; an `Absent` turn makes token usage incomplete on every
+  terminal status.
 - **K014** — Live continuing sessions are acquired/released and may be cached;
   isolated sessions and retired/discarded sessions are always closed, including
   cancellation and failure paths.
@@ -197,8 +203,9 @@ assigned to exactly one implementation slice.
   covered by durable maximum-turn and configured token reservations. Each root
   work epoch reserves one live cognitive slot; a strictly serial child one-shot
   may share it only when its allowance was included in the parent reservation.
-  A clean exit refunds unused capacity; process death retains the full rolling
-  turn/token charge.
+  A clean exit refunds unused turn capacity and, when actual usage is complete,
+  unused token capacity; incomplete usage conservatively retains the token
+  reservation. Process death retains the full rolling turn/token charge.
 - **K044** — Crash recovery increments the durable attempt number on the oldest
   logical input. Exceeding its ceiling stops or parks the input before provider
   I/O. Configuration defects park and trip a host circuit breaker rather than
@@ -238,9 +245,10 @@ assigned to exactly one implementation slice.
 - **K052** — Opt-in live qualification exercises the exact pinned AgentRuntime
   request, streamed event, resume, cancellation, quota, containment, structured
   nested/nullable result, and JSON-string tool-argument behavior without running
-  in ordinary CI or recording private payloads. Compatibility releases qualify
-  both `gpt-5.6-terra` and `gpt-5.4`. A contract test proves that production calls
-  `stream_turn`, never `run_turn`.
+  in ordinary CI or recording private payloads. Provider compatibility releases
+  qualify both `gpt-5.6-terra` and `gpt-5.4`, including same-lease continuation
+  and close/reopen/resume usage accounting without historical recharge. A
+  contract test proves that production calls `stream_turn`, never `run_turn`.
 
 ## Slice assignment
 

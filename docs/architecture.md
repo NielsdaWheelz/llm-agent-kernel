@@ -91,6 +91,17 @@ exact containment request:
 - the Codex `allowed_tools=("*",)` SDK sentinel only where required by the
   pinned runtime.
 
+Provider-runtime projects provider-native cumulative accounting into usage
+attributable only to the current `AgentRuntime` invocation, including after a
+native session is resumed. Within one streamed turn, `AgentUsage` events are
+progressive snapshots rather than deltas. The adapter retains the latest
+snapshot, prefers invocation-local `AgentTerminal.usage` when present, and adds
+one value exactly once to the lease total for that turn. Consecutive kernel
+turns are summed at the lease boundary; restored historical usage is never
+charged. The kernel has no second provider-cumulative delta implementation.
+`Absent` terminal usage means no safely attributable value is available and
+makes the lease usage incomplete even on failure or cancellation.
+
 The sentinel is not application authority. Any native `AgentToolUse` or
 `AgentPermissionRequest` event taints and discards the session and fails the run
 without returning its terminal to the loop, before a host tool or model-authored
@@ -231,7 +242,9 @@ process death, startup under the exclusive host lock releases the orphaned slot
 but preserves the conservative rolling turn/token charge until window expiry.
 Missing or corrupt admission state fails closed. Subscription AgentRuntime is
 not assigned fictional per-token dollar cost; a future priceable lane may add a
-cost dimension.
+cost dimension. When any started provider turn has incomplete (`Absent`) usage,
+settlement retains the full reserved token dimensions rather than treating the
+missing value as zero.
 
 `EventSink` receives bounded metadata. It is observability, not canonical input,
 delivery, or an effect recorder, and its failure is nonfatal.

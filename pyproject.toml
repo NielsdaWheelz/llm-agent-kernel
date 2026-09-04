@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@9e6d155f3b64f03495911435b7cae8b8d131f9a2",
-    "provider-runtime[codex-sdk] @ git+https://github.com/NielsdaWheelz/llm-calling.git@a5d9c8e0c1c851daee0731554e0a4a326d3c2819",
+    "provider-runtime[codex-sdk] @ git+https://github.com/NielsdaWheelz/llm-calling.git@f477dcdcad03c30019576203d4eb8a3581a6d32f",
     "openai-codex==0.144.4",
     "pydantic>=2.11,<3",
 ]

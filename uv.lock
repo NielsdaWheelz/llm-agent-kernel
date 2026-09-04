@@ -624,7 +624,7 @@ dev = [
 requires-dist = [
     { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=9e6d155f3b64f03495911435b7cae8b8d131f9a2" },
     { name = "openai-codex", specifier = "==0.144.4" },
-    { name = "provider-runtime", extras = ["codex-sdk"], git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=a5d9c8e0c1c851daee0731554e0a4a326d3c2819" },
+    { name = "provider-runtime", extras = ["codex-sdk"], git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=f477dcdcad03c30019576203d4eb8a3581a6d32f" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
 
@@ -906,7 +906,7 @@ wheels = [
 [[package]]
 name = "provider-runtime"
 version = "0.1.0"
-source = { git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=a5d9c8e0c1c851daee0731554e0a4a326d3c2819#a5d9c8e0c1c851daee0731554e0a4a326d3c2819" }
+source = { git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=f477dcdcad03c30019576203d4eb8a3581a6d32f#f477dcdcad03c30019576203d4eb8a3581a6d32f" }
 dependencies = [
     { name = "anthropic" },
     { name = "google-genai" },
