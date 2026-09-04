@@ -85,6 +85,13 @@ class Result(BaseModel):
     answer: str
 
 
+class OptionalResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answer: str
+    note: str | None = None
+
+
 class OpenResult(BaseModel):
     answer: str
 
@@ -194,6 +201,24 @@ def test_definition_is_frozen_and_fingerprint_covers_provider_configuration() ->
     assert len(first.fingerprint) == 64
     with pytest.raises(FrozenInstanceError):
         first.fingerprint = "tampered"  # type: ignore[misc]
+
+
+def test_structured_wire_compilation_has_a_deterministic_definition_fingerprint() -> None:
+    first = replace(
+        _definition(),
+        output_contract=StructuredOutput("answer", OptionalResult),
+    )
+    same = replace(
+        _definition(),
+        output_contract=StructuredOutput("answer", OptionalResult),
+    )
+    different = replace(
+        _definition(),
+        output_contract=StructuredOutput("answer", Result),
+    )
+
+    assert first.fingerprint == same.fingerprint
+    assert first.fingerprint != different.fingerprint
 
 
 def test_definition_fingerprint_rotates_for_every_configurable_session_scope() -> None:

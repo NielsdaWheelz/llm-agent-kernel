@@ -8,8 +8,9 @@ assigned to exactly one implementation slice.
 - **K001** — The package supports Python 3.12 or newer, imports as
   `llm_agent_kernel`, and performs no I/O or authority grant on import.
 - **K002** — Runtime locks qualified immutable git revisions of
-  `provider-runtime` and `llm-tools`; ordinary CI never imports mutable sibling
-  worktrees.
+  `provider-runtime` and `llm-tools` plus the exact Codex SDK/runtime version
+  certified by the provider revision; ordinary CI never imports mutable sibling
+  worktrees or an uncertified transitive Codex release.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
@@ -34,9 +35,10 @@ assigned to exactly one implementation slice.
   `provider_runtime.agent_runtime.AgentRuntime` open/stream/close APIs; it does
   not use stateless root generation or the event-discarding `run_turn`
   convenience projection.
-- **K009** — The adapter passes the closed kernel step schema through
-  `JsonSchemaAgentOutput` and independently revalidates the parsed terminal
-  value inside the kernel.
+- **K009** — The adapter passes one Codex-compatible closed-object wire envelope
+  through `JsonSchemaAgentOutput`. Every object is closed and requires every
+  property; inactive and optional values are explicit nulls. The kernel
+  independently decodes the envelope and revalidates the logical terminal value.
 - **K010** — A session request uses subscription Codex with the qualified
   transport, local-account credential reference, private empty absolute cwd,
   read-only filesystem, no additional directories, disabled network, denied
@@ -65,7 +67,9 @@ assigned to exactly one implementation slice.
 - **K017** — A definition freezes role/stable context, session mode, output
   contract, maximum frozen capability profile, exact provider configuration,
   required non-empty owner-controlled session-compatibility revision, and finite
-  `KernelLimits`.
+  `KernelLimits`. A structured result contract is compiled and checked against
+  the Codex strict-schema subset at construction; an unrepresentable contract
+  fails before provider I/O.
 - **K018** — The deterministic fingerprint covers every session-scoped semantic
   and containment value, including `PermissionPolicy`, native options, and the
   owner-controlled session-compatibility revision; changing any covered value
@@ -102,16 +106,22 @@ assigned to exactly one implementation slice.
 
 ## Protocol and tool boundary
 
-- **K025** — The only model variants are closed `say`, `call_tool`, and `finish`.
-  A `call_tool` contains exactly one canonical tool ID and arguments and no
-  model-authored call/effect ID, preview, authority, approval, credential, or
-  delivery field.
+- **K025** — The only logical model variants are closed `say`, `call_tool`, and
+  `finish`. The provider wire is a required, nullable envelope that decodes to
+  exactly one such variant. A logical `call_tool` contains exactly one canonical
+  tool ID and arguments and no model-authored call/effect ID, preview, authority,
+  approval, credential, or delivery field. Its wire arguments are one strict
+  JSON object encoded as a string, never an arbitrary-map schema.
 - **K026** — Conversational definitions allow `say` and resultless `finish`;
   structured definitions forbid `say` and require a closed schema-valid
-  `finish.result`.
-- **K027** — Whole-step, output-contract, frozen-plan, and pure argument
-  validation complete before visible output, position occupation, budget
-  reservation, recorder mutation, or dispatch.
+  `finish.result`. Pydantic omissions/default annotations are compiled to
+  all-properties-required wire objects while the original type independently
+  enforces the exact result semantics.
+- **K027** — Whole-wire-envelope decoding, logical-step, output-contract,
+  frozen-plan, and pure decoded-argument validation complete before visible
+  output, position occupation, budget reservation, recorder mutation, or
+  dispatch. Duplicate-key, non-finite, trailing, and non-object argument strings
+  are protocol-invalid.
 - **K028** — Invalid output produces no partial effect and at most the configured
   number of bounded protocol corrections; exhaustion settles a host-authored
   stopped conclusion and cannot obtain fresh repair budget automatically.
@@ -214,9 +224,11 @@ assigned to exactly one implementation slice.
   startup scanning that releases orphaned concurrency without refunding its
   conservative rolling charge.
 - **K052** — Opt-in live qualification exercises the exact pinned AgentRuntime
-  request, streamed event, resume, cancellation, quota, and containment
-  behavior without running in ordinary CI or recording private payloads. A
-  contract test proves that production calls `stream_turn`, never `run_turn`.
+  request, streamed event, resume, cancellation, quota, containment, structured
+  nested/nullable result, and JSON-string tool-argument behavior without running
+  in ordinary CI or recording private payloads. Compatibility releases qualify
+  both `gpt-5.6-terra` and `gpt-5.4`. A contract test proves that production calls
+  `stream_turn`, never `run_turn`.
 
 ## Slice assignment
 

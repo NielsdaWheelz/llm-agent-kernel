@@ -13,9 +13,10 @@ def test_package_metadata_locks_qualified_git_dependencies() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
 
     assert project["project"]["requires-python"] == ">=3.12"
-    assert project["project"]["dependencies"][:2] == [
+    assert project["project"]["dependencies"][:3] == [
         "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@728f35c0b3a8be91b380ed4258d2b73ad68fc8fa",
         "provider-runtime[codex-sdk] @ git+https://github.com/NielsdaWheelz/llm-calling.git@a5d9c8e0c1c851daee0731554e0a4a326d3c2819",
+        "openai-codex==0.144.4",
     ]
 
 

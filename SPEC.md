@@ -34,10 +34,14 @@ The reviewed dependency baseline is:
 - `provider-runtime` from the `llm-calling` repository:
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
 - `llm-tools`: `728f35c0b3a8be91b380ed4258d2b73ad68fc8fa`
+- The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 
 The provider baseline is usable without modification. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
-root `ProviderRuntime.generate` lane.
+root `ProviderRuntime.generate` lane. The kernel distribution directly pins the
+Codex SDK version certified by that immutable provider revision so a later
+transitive release cannot silently invalidate the native-tool containment
+qualification.
 
 The reviewed `llm-tools` revision exposes and qualifies the public seams this
 kernel needs:
@@ -103,7 +107,8 @@ uncertain position, or decide product authority.
   tool budget.
 - Provider containment requirements and the proof that a run plan tightens the
   definition's maximum profile.
-- The closed structured model-step schema and semantic output-contract
+- The closed logical model-step grammar, its Codex-compatible provider-wire
+  envelope, structured-result schema compilation, and semantic output-contract
   validation.
 - Provider-neutral bootstrap and continuation context choreography.
 - The bounded serial model/tool loop, polling choreography, cancellation, and
@@ -139,7 +144,8 @@ An `AgentDefinition` is immutable configuration containing:
 - Stable definition ID and role instructions.
 - Stable provider-neutral prompt sections.
 - `SessionMode`: `continuing` or `isolated`.
-- `OutputContract`: `conversational` or one closed structured result type.
+- `OutputContract`: `conversational` or one closed, provider-representable
+  structured result type.
 - A maximum frozen `llm-tools` capability profile.
 - Exact session-scoped provider configuration.
 - A required, non-empty, owner-controlled `session_compatibility_revision`.
@@ -245,9 +251,11 @@ production or infer event history from its terminal. The adapter returns a
 terminal to the kernel only after observing a well-formed stream through that
 terminal.
 
-The adapter MUST represent the kernel step schema through
-`JsonSchemaAgentOutput`. Jarvis tools are not provider-native tools and are not
-MCP tools. `mcp_servers` MUST be empty.
+The adapter MUST represent the kernel provider-wire envelope through
+`JsonSchemaAgentOutput`. The root is one closed object, not a discriminated
+union. Every property of every object is required, and inactive/optional values
+are explicit nulls. Jarvis tools are not provider-native tools and are not MCP
+tools. `mcp_servers` MUST be empty.
 
 The Codex request MUST use:
 
@@ -356,18 +364,44 @@ Conversational definitions allow `say` and `finish` without a result.
 Structured definitions forbid `say` and require `finish.result` to validate
 against their closed result type.
 
+The logical variants above are distinct from the provider wire. Codex receives
+one closed envelope object with four required properties: `type`, `say`,
+`call_tool`, and `finish`. Exactly one payload selected by `type` is non-null;
+the other payloads are null. A conversational `finish.reason` is a required
+nullable value. A structured `finish` additionally carries the compiled result
+object, and the `say` payload is constrained to null.
+
+The provider-wire `call_tool.arguments` value is a string containing one strict
+JSON object. This avoids an arbitrary map schema, because Codex Structured
+Outputs does not permit schema-valued `additionalProperties`. Before logical
+tool validation, the kernel rejects duplicate keys, non-finite constants,
+trailing data, and non-object argument values, then supplies the decoded object
+to the unchanged pure `llm-tools` validator. The model still supplies no call
+or effect identity.
+
+At `StructuredOutput` construction, the kernel compiles Pydantic's result
+schema into the supported strict subset: every object stays closed, every
+property becomes required, optional values remain explicit (normally nullable),
+definitions are preserved, and non-validating defaults/generator annotations
+are removed. Map-shaped objects, unsupported semantic keywords, invalid local
+definitions, and supported-subset size/depth violations fail deterministically
+before an `AgentDefinition` can open or run a provider session. The original
+result type remains the authority for independent semantic revalidation.
+
 ### 6.2 Whole-step validation
 
 Before display or dispatch, the kernel MUST:
 
 1. Require `AgentTerminal(status="succeeded")` with structured output.
-2. Revalidate the complete value through the kernel-owned closed step model,
-   even though `provider-runtime` already enforced its JSON schema.
-3. Apply the frozen output contract.
-4. For `call_tool`, resolve the exact binding from the frozen HostTable plan.
-5. Validate its arguments through the qualified pure public `llm-tools`
+2. Revalidate and decode the complete closed provider-wire envelope, including
+   its exactly one selected payload.
+3. Revalidate the decoded value through the kernel-owned closed logical step
+   model, even though `provider-runtime` already enforced the wire schema.
+4. Apply the frozen output contract.
+5. For `call_tool`, resolve the exact binding from the frozen HostTable plan.
+6. Validate its decoded arguments through the qualified pure public `llm-tools`
    validation seam.
-6. Confirm remaining kernel budget. The `llm-tools` executor independently owns
+7. Confirm remaining kernel budget. The `llm-tools` executor independently owns
    and enforces the frozen plan's remaining tool budget at dispatch.
 
 Failure of any check produces no visible model text, no position occupation,
@@ -795,7 +829,12 @@ The release suite covers both single-run interior behavior and composed seams:
    convenience projection.
 2. Native built-ins disabled, empty read-only cwd, disabled network/environment,
    approval deny, no MCP, and fail-stop on any native tool/permission event.
-3. Provider JSON-schema enforcement plus independent kernel semantic validation.
+3. Codex-compatible provider-wire JSON-schema enforcement plus independent
+   envelope decoding, logical-step validation, and output-contract validation.
+   Tests audit conversational and structured schemas for an object root, closed
+   objects, all-properties-required, explicit nullability, JSON-string tool
+   arguments, nested/optional/empty results, unsupported-contract preflight,
+   malformed branch combinations, and deterministic fingerprints.
 4. Pure argument validation performs no recorder/budget/dispatch operation.
 5. Frozen plan/catalog consistency, full-plan tightening, and exact `HostTable`
    exposure are proven before rendering or I/O, including adversarial

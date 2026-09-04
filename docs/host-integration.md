@@ -30,6 +30,24 @@ reuse even though other definition fields remain unchanged. Because it is part
 of the fingerprint and session-store key, rotation cold-bootstraps without
 deleting the older reference namespace.
 
+The Codex provider wire is not the public logical step shape. Provider terminals
+contain a required/nullable envelope and must enter the kernel through
+`validate_provider_step`; `validate_model_step` remains the validator for an
+already-decoded logical `say`, `call_tool`, or `finish`. Wire
+`call_tool.arguments` is a strict JSON object encoded as a string and is decoded
+before the unchanged `llm-tools` input validator runs. `StructuredOutput.schema`
+retains the logical Pydantic schema, while `StructuredOutput.wire_schema` exposes
+the compiled provider result schema for diagnostics and fingerprinting. Hosts
+should not render or parse either wire form themselves.
+
+For this wire compatibility change, a consumer updates its immutable
+`llm-agent-kernel` revision and lock, bumps its owner-controlled
+`session_compatibility_revision`, and removes any prompt or fixture that demands
+the former top-level logical JSON shape from Codex. Logical `SayStep`,
+`CallToolStep`, `FinishStep`, tool definitions, dispatch, and result models do
+not change. The definition fingerprint includes the new wire schema, so the
+upgrade cold-bootstraps rather than resuming an old-schema native session.
+
 The host supplies `ToolBudgetFactoryPort`, not a budget created before claim.
 After `claim` reveals the selected plan and the kernel proves the exact frozen
 plan/catalog relationship, the factory creates that run's `BudgetState` from
@@ -89,10 +107,12 @@ checkpoint, action/recorder, admission, and delivery implementations under
 process termination at each boundary. It must also pin its compatibility-
 revision policy and qualify plan-aware budget construction against every
 selectable plan. Jarvis must run its paid Codex account qualification for the
-exact provider-runtime pin and record only sanitized route, revision, status,
-usage, timing, and trace identifiers. Provider-native transcripts remain
-unredacted third-party data at rest; deleting a local reference does not promise
-provider deletion.
+exact provider-runtime and provider-certified Codex SDK pins, including
+conversational, structured nested/nullable result, and JSON-string argument
+probes on `gpt-5.6-terra` and `gpt-5.4`, and record only sanitized route,
+revision, status, usage, timing, and trace identifiers. Provider-native
+transcripts remain unredacted third-party data at rest; deleting a local
+reference does not promise provider deletion.
 
 The library release commands are:
 

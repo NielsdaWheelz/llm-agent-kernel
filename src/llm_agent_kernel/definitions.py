@@ -31,6 +31,8 @@ from provider_runtime.agent_runtime import (
 )
 from pydantic import TypeAdapter
 
+from ._schema import compile_structured_result_schema
+
 
 class _NonEmptyId(str):
     def __new__(cls, value: str) -> Self:
@@ -86,6 +88,7 @@ class StructuredOutput:
     name: str
     result_type: type[Any]
     schema: FrozenJsonDict = field(init=False, repr=False)
+    wire_schema: FrozenJsonDict = field(init=False, repr=False)
     kind: Literal["structured"] = field(default="structured", init=False)
 
     def __post_init__(self) -> None:
@@ -96,6 +99,14 @@ class StructuredOutput:
             raise ValueError("structured output must have a closed object schema")
         _require_closed_objects(schema)
         object.__setattr__(self, "schema", freeze_json_object(schema, context="output schema"))
+        object.__setattr__(
+            self,
+            "wire_schema",
+            freeze_json_object(
+                compile_structured_result_schema(schema),
+                context="structured output wire schema",
+            ),
+        )
 
 
 type OutputContract = ConversationalOutput | StructuredOutput
@@ -596,7 +607,7 @@ def _require_closed_objects(value: object) -> None:
 
 
 def _definition_fingerprint(definition: AgentDefinition) -> str:
-    from .protocol import MODEL_STEP_OUTPUT_NAME, model_step_schema
+    from .protocol import MODEL_STEP_OUTPUT_NAME, provider_wire_schema
 
     output: dict[str, object]
     if isinstance(definition.output_contract, ConversationalOutput):
@@ -623,7 +634,7 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
         "output_contract": output,
         "provider_output": {
             "name": MODEL_STEP_OUTPUT_NAME,
-            "schema": model_step_schema(definition.output_contract),
+            "schema": provider_wire_schema(definition.output_contract),
         },
         "provider": {
             "additional_dirs": [],

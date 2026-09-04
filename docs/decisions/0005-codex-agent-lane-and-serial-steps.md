@@ -34,6 +34,14 @@ structured host context. The model emits exactly one `call_tool(tool_id,
 arguments)` step. Calls execute serially and the model supplies no call or
 effect identity.
 
+That step is the logical protocol, not the literal Codex transport object. The
+`JsonSchemaAgentOutput` wire uses one closed root envelope with required nullable
+branch payloads because Codex does not accept a root discriminated union or
+omitted object properties. Arbitrary tool arguments cross as a strict JSON
+object encoded in a string, then decode into the unchanged logical `arguments`
+mapping before pure tool validation. Structured result schemas are compiled or
+rejected before provider I/O.
+
 The provider session is a disposable continuation optimization. The host saves
 generation-checked refs, may cache one live session, and can cold-bootstrap from
 canonical context.
@@ -54,6 +62,8 @@ Costs:
 - Serial tools can be slower than safe parallel reads.
 - V1 is not provider-lane-neutral at runtime; future lanes need separate
   qualified adapters and semantics.
+- The wire envelope and JSON-string arguments add tokens and require a separate
+  strict decode before logical validation.
 - No model-authored progress prose appears during long loops.
 
 ## Rejected alternatives

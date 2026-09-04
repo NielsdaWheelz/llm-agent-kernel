@@ -57,6 +57,7 @@ from llm_agent_kernel.definitions import (
     ProviderUsage,
     SessionMode,
 )
+from llm_agent_kernel.protocol import provider_wire_schema
 from llm_agent_kernel.provider import (
     CodexProvider,
     ProviderContainmentViolation,
@@ -225,6 +226,10 @@ async def test_exact_request_mapping_private_cwd_cache_and_shutdown(tmp_path: Pa
     assert request.native == CODEX_NATIVE_OPTIONS
     assert isinstance(request.output, JsonSchemaAgentOutput)
     assert request.output.name == "llm_agent_kernel_step"
+    assert request.output.schema == freeze_json_object(
+        provider_wire_schema(definition.output_contract),
+        context="expected provider wire schema",
+    )
     assert runtime.open_cwd_checks == [(True, True, stat.S_IRUSR | stat.S_IXUSR)]
 
     cwd = lease.cwd

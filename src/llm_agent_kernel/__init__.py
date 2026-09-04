@@ -1,5 +1,6 @@
 """Public API for the bounded agent orchestration kernel."""
 
+from ._schema import UnsupportedStructuredOutputError
 from .cancellation import CancellationToken
 from .context import (
     ContextLimitExceeded,
@@ -136,7 +137,9 @@ from .protocol import (
     ProtocolValidationError,
     ValidatedStep,
     model_step_schema,
+    provider_wire_schema,
     validate_model_step,
+    validate_provider_step,
 )
 from .provider import (
     CodexProvider,
@@ -294,6 +297,7 @@ __all__ = [
     "ToolDispatchPort",
     "ToolObservation",
     "ToolProposalError",
+    "UnsupportedStructuredOutputError",
     "ValidatedStep",
     "ValidatedToolCall",
     "WaitingFor",
@@ -302,6 +306,7 @@ __all__ = [
     "emit_diagnostic",
     "emit_event",
     "model_step_schema",
+    "provider_wire_schema",
     "publish_host_plan",
     "require_host_plan",
     "require_read_only_plan",
@@ -309,5 +314,6 @@ __all__ = [
     "run_one_shot",
     "run_thread",
     "validate_model_step",
+    "validate_provider_step",
     "validate_tool_call",
 ]

@@ -135,7 +135,12 @@ class ScriptedRuntime:
             final_text="scripted provider projection",
             session_ref=self.ref,
             structured_output=freeze_json_object(
-                {"type": "say", "text": "Hello from the bounded kernel."}
+                {
+                    "type": "say",
+                    "say": {"text": "Hello from the bounded kernel."},
+                    "call_tool": None,
+                    "finish": None,
+                }
             ),
             usage=Present(TokenUsage(12, 6, 18, Absent(), Absent(), Absent())),
         )

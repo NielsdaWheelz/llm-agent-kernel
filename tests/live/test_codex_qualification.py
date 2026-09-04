@@ -14,17 +14,30 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
 from llm_tools import (
+    Available,
     CapabilityProfile,
     FrozenToolPlan,
     HostTable,
+    NoDeclaredError,
+    PolicyEpoch,
     ProfileId,
+    PromptDocument,
     PromptSections,
+    ReplayPolicy,
     RunLimits,
+    ToolBinding,
     ToolCatalog,
+    ToolEffect,
+    ToolFamily,
+    ToolGrant,
+    ToolId,
+    ToolLimits,
     ToolPlan,
+    ToolSpec,
 )
 from provider_runtime.agent_runtime import (
     AgentQuotaExhausted,
@@ -34,6 +47,7 @@ from provider_runtime.agent_runtime import (
     TextContent,
     TurnNotStarted,
 )
+from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel.cancellation import CancellationToken
 from llm_agent_kernel.definitions import (
@@ -41,11 +55,15 @@ from llm_agent_kernel.definitions import (
     AgentRole,
     ConversationalOutput,
     DefinitionId,
+    FinishStep,
+    OutputContract,
     ProviderConfiguration,
     SessionMode,
+    StructuredOutput,
 )
-from llm_agent_kernel.protocol import validate_model_step
+from llm_agent_kernel.protocol import validate_provider_step
 from llm_agent_kernel.provider import CodexProvider
+from llm_agent_kernel.tools import ValidatedToolCall
 
 pytestmark = pytest.mark.live
 
@@ -57,7 +75,43 @@ def _required_environment(name: str) -> str:
     return value
 
 
-def _definition(profile_key: str) -> AgentDefinition:
+class LiveNestedResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    note: str | None = None
+
+
+class LiveStructuredResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answer: str
+    count: int | None = None
+    nested: LiveNestedResult
+
+
+class LiveToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str
+
+
+class LiveToolSuccess(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    echoed: str
+
+
+async def _must_not_execute(value: object, context: object) -> object:
+    raise AssertionError(f"live schema qualification dispatched: {value!r}, {context!r}")
+
+
+def _definition(
+    profile_key: str,
+    *,
+    output_contract: OutputContract | None = None,
+    session_mode: SessionMode = SessionMode.continuing,
+) -> AgentDefinition:
     empty_catalog = ToolCatalog.compose(())
     maximum = CapabilityProfile(
         ProfileId("live-empty"),
@@ -68,8 +122,8 @@ def _definition(profile_key: str) -> AgentDefinition:
         DefinitionId("live-codex"),
         AgentRole("probe", PromptSections(())),
         PromptSections(()),
-        SessionMode.continuing,
-        ConversationalOutput(),
+        session_mode,
+        output_contract or ConversationalOutput(),
         maximum,
         ProviderConfiguration(
             CredentialRef("local_account", profile_key),
@@ -94,25 +148,26 @@ async def test_live_codex_stream_continuation_and_cancellation() -> None:
             lease,
             (
                 TextContent(
-                    "Without invoking native tools or requesting permission, return exactly "
-                    '{"type":"say","text":"pong"} under the supplied schema.'
+                    "Without invoking native tools or requesting permission, respond through "
+                    "the say branch with the text pong."
                 ),
             ),
             CancellationToken(),
             timeout_seconds=600.0,
         )
         assert first.status == "succeeded"
-        validate_model_step(first.structured_output, definition.output_contract, _empty_plan())
+        validate_provider_step(first.structured_output, definition.output_contract, _empty_plan())
         await provider.release(lease)
 
         continued = await provider.acquire_continuing(definition, first.session_ref)
         second = await provider.run_observed_turn(
             continued,
-            (TextContent('Return exactly {"type":"finish"}.'),),
+            (TextContent("Respond through the finish branch with no internal reason."),),
             CancellationToken(),
             timeout_seconds=600.0,
         )
         assert second.status == "succeeded"
+        validate_provider_step(second.structured_output, definition.output_contract, _empty_plan())
         assert second.session_ref.native_session_id == first.session_ref.native_session_id
         await provider.release(continued)
 
@@ -147,7 +202,7 @@ async def test_live_in_flight_cancellation() -> None:
                 (
                     TextContent(
                         "Reason carefully for several seconds, then return exactly "
-                        '{"type":"say","text":"cancel probe"}.'
+                        "through the say branch with the text cancel probe."
                     ),
                 ),
                 cancellation,
@@ -157,6 +212,78 @@ async def test_live_in_flight_cancellation() -> None:
             assert error.reason == "cancelled"
         else:
             assert terminal.status == "cancelled"
+    finally:
+        await provider.shutdown()
+        await runtime.close()
+
+
+async def test_live_structured_nested_optional_output() -> None:
+    if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
+        pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
+    state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
+    contract = StructuredOutput("live_structured_result", LiveStructuredResult)
+    definition = _definition(
+        _required_environment("LLM_AGENT_KERNEL_PROFILE"),
+        output_contract=contract,
+        session_mode=SessionMode.isolated,
+    )
+    runtime = AgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
+    provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
+    try:
+        lease = await provider.open_isolated(definition)
+        terminal = await provider.run_observed_turn(
+            lease,
+            (
+                TextContent(
+                    "Respond through the finish branch. Set answer to pong, count to null, "
+                    "nested.label to qualified, nested.note to null, and reason to null."
+                ),
+            ),
+            CancellationToken(),
+            timeout_seconds=600.0,
+        )
+        assert terminal.status == "succeeded"
+        step = validate_provider_step(terminal.structured_output, contract, _empty_plan())
+        assert isinstance(step, FinishStep)
+        assert step.result == {
+            "answer": "pong",
+            "count": None,
+            "nested": {"label": "qualified", "note": None},
+        }
+        await provider.close(lease)
+    finally:
+        await provider.shutdown()
+        await runtime.close()
+
+
+async def test_live_json_encoded_tool_arguments() -> None:
+    if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
+        pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
+    state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
+    definition = _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+    runtime = AgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
+    provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
+    try:
+        lease = await provider.acquire_continuing(definition, None)
+        terminal = await provider.run_observed_turn(
+            lease,
+            (
+                TextContent(
+                    "Respond through the call_tool branch for live.echo. Encode the strict JSON "
+                    "object with text set to pong in the arguments string."
+                ),
+            ),
+            CancellationToken(),
+            timeout_seconds=600.0,
+        )
+        assert terminal.status == "succeeded"
+        step = validate_provider_step(
+            terminal.structured_output, definition.output_contract, _tool_plan()
+        )
+        assert isinstance(step, ValidatedToolCall)
+        assert step.step.tool_id == ToolId("live.echo")
+        assert step.arguments == LiveToolInput(text="pong")
+        await provider.release(lease)
     finally:
         await provider.shutdown()
         await runtime.close()
@@ -173,7 +300,7 @@ async def test_live_quota_exhaustion() -> None:
         lease = await provider.acquire_continuing(definition, None)
         terminal = await provider.run_observed_turn(
             lease,
-            (TextContent('Return exactly {"type":"finish"}.'),),
+            (TextContent("Respond through the finish branch with no internal reason."),),
             CancellationToken(),
             timeout_seconds=600.0,
         )
@@ -189,4 +316,35 @@ def _empty_plan() -> FrozenToolPlan:
     return ToolPlan(definition.maximum_profile.id, HostTable()).freeze(
         ToolCatalog.compose(()),
         definition.maximum_profile,
+    )
+
+
+def _tool_plan() -> FrozenToolPlan:
+    spec = ToolSpec(
+        id=ToolId("live.echo"),
+        summary="Validate one live argument envelope",
+        documentation=PromptDocument("Echo one text value."),
+        input_type=LiveToolInput,
+        success_type=LiveToolSuccess,
+        error_type=NoDeclaredError,
+        effect=ToolEffect.Pure,
+        limits=ToolLimits(4_096, 4_096, 1, 30.0),
+    )
+    binding = ToolBinding(
+        spec=spec,
+        execute=Available(_must_not_execute),
+        replay_policy=ReplayPolicy.ReDispatchable,
+        implementation_revision="live-echo-v1",
+        policy_epoch=PolicyEpoch("v1"),
+        policy_inputs={},
+    )
+    catalog = ToolCatalog.compose((ToolFamily("live", (spec,), (binding,)),))
+    profile = CapabilityProfile(
+        ProfileId("live-tool"),
+        (ToolGrant(spec.id, None),),
+        RunLimits(1, 1, 4_096, 4_096, 1, 600.0),
+    ).freeze(catalog)
+    return cast(
+        FrozenToolPlan,
+        ToolPlan(profile.id, HostTable()).freeze(catalog, profile),
     )

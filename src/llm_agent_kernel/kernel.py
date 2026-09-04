@@ -125,7 +125,7 @@ from .events import (
     emit_diagnostic,
     emit_event,
 )
-from .protocol import ProtocolValidationError, ValidatedToolCall, validate_model_step
+from .protocol import ProtocolValidationError, ValidatedToolCall, validate_provider_step
 from .provider import ProviderDefect, ProviderSessionLease, ProviderSessionPort
 from .sessions import ContinuingSessionState, SessionCoordinator, StaleSessionReference
 from .tools import PlanValidationError, require_host_plan, require_read_only_plan
@@ -735,7 +735,7 @@ async def run_thread(
                         raise ProtocolValidationError(
                             "successful terminal requires one structured object"
                         )
-                    step = validate_model_step(
+                    step = validate_provider_step(
                         terminal.structured_output,
                         definition.output_contract,
                         claim.plan,
@@ -1131,7 +1131,7 @@ async def run_one_shot(
                         raise ProtocolValidationError(
                             "successful terminal requires one structured object"
                         )
-                    step = validate_model_step(
+                    step = validate_provider_step(
                         terminal.structured_output,
                         definition.output_contract,
                         plan,

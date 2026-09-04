@@ -46,6 +46,9 @@ The runtime is organized into the source modules below.
 Defines immutable provider-neutral values:
 
 - `AgentDefinition`, `SessionMode`, `OutputContract`, and `KernelLimits`.
+- `StructuredOutput` retains the logical Pydantic schema and freezes its
+  preflighted Codex `wire_schema`; unsupported result contracts fail during
+  construction.
 - Exact session-scoped provider configuration and deterministic fingerprint.
 - Required owner-controlled session-compatibility revision for deliberate
   saved-session rotation across application/kernel/runtime semantic changes.
@@ -74,10 +77,12 @@ close_session(AgentSession)
 ```
 
 The adapter owns live-session leases, consumes and inspects every streamed
-event, and maps typed runtime terminals. It never uses the convenience
+event, and maps typed runtime terminals. It uses the exact provider-certified
+`openai-codex==0.144.4` SDK/runtime pair and never uses the convenience
 `AgentRuntime.run_turn` projection because that method discards the event
-history required for containment. It publishes the kernel's closed JSON schema
-through `JsonSchemaAgentOutput` and constructs the exact containment request:
+history required for containment. It publishes the kernel's Codex-compatible
+closed-object wire envelope through `JsonSchemaAgentOutput` and constructs the
+exact containment request:
 
 - subscription-backed Codex route;
 - private empty absolute cwd with read-only filesystem policy;
@@ -139,9 +144,20 @@ corrections, and any cold-bootstrap replay. Provider system/developer material,
 output-schema transport overhead, retained native-session history, and provider
 compaction are outside the counter.
 
+### `_schema.py`
+
+Compiles a logical structured result schema into the Codex strict subset before
+an `AgentDefinition` can be built. It closes and requires every object property,
+preserves supported definitions and constraints, removes non-validating schema
+generator annotations, and lowers nested `oneOf` to `anyOf` for later exact host
+revalidation. Map-shaped objects, unsupported semantic keywords, malformed
+schemas, and provider size/depth violations fail deterministically. This is
+model-output schema compilation owned by the kernel, not provider SDK
+integration or `llm-tools` input-schema compilation.
+
 ### `protocol.py`
 
-Owns the closed model grammar:
+Separates the provider wire from the closed logical model grammar:
 
 ```text
 say(text)
@@ -149,15 +165,25 @@ call_tool(tool_id, arguments)
 finish(optional reason, output-contract result)
 ```
 
-It revalidates the complete runtime-parsed value, applies the output contract,
-resolves the exact frozen-plan binding, and invokes the qualified pure
-`llm-tools` argument validator. Before any plan is rendered, the dependency's
-public proof must bind every published tool specification and revision to its
-frozen grant and prove that the complete plan tightens the maximum profile; a
-profile-only comparison is not sufficient. Every binding carries an
-owner-controlled implementation revision covering its handler and transitive
-execution behavior. Validation does not occupy a position, reserve tool budget,
-touch a recorder, or dispatch.
+The wire is one root object with required `type`, `say`, `call_tool`, and
+`finish` properties. Inactive branch payloads and optional reason values are
+explicit nulls. Tool arguments cross the wire as a string containing one strict
+JSON object, avoiding schema-valued `additionalProperties`; duplicate keys,
+non-finite constants, trailing data, and non-object values fail during decode.
+For structured definitions, Pydantic's result schema is compiled before an
+agent definition exists: all objects remain closed, every property is required,
+definitions are preserved, non-validating defaults are removed, and unsupported
+or map-shaped contracts are rejected.
+
+It revalidates and decodes the complete runtime-parsed envelope, revalidates the
+resulting logical step, applies the output contract, resolves the exact
+frozen-plan binding, and invokes the qualified pure `llm-tools` argument
+validator. Before any plan is rendered, the dependency's public proof must bind
+every published tool specification and revision to its frozen grant and prove
+that the complete plan tightens the maximum profile; a profile-only comparison
+is not sufficient. Every binding carries an owner-controlled implementation
+revision covering its handler and transitive execution behavior. Validation
+does not occupy a position, reserve tool budget, touch a recorder, or dispatch.
 
 There is no model-authored preview, call ID, effect ID, authority label,
 approval instruction, or delivery instruction. One malformed value produces no
@@ -173,7 +199,7 @@ Runs one claimed batch under `KernelLimits`. It:
 3. Builds one bootstrap or the unsent continuation delta.
 4. Executes one structured provider turn.
 5. Stores the returned session ref by generation CAS.
-6. Validates exactly one complete step.
+6. Decodes exactly one complete wire envelope and validates its logical step.
 7. Settles `say`/`finish`, or dispatches one `call_tool` serially.
 8. Feeds a bounded completed observation into the next provider turn, or
    settles a durable suspension and returns.

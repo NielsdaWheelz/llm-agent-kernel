@@ -42,7 +42,7 @@ from .definitions import (
     ProviderUsage,
     SessionMode,
 )
-from .protocol import MODEL_STEP_OUTPUT_NAME, model_step_schema
+from .protocol import MODEL_STEP_OUTPUT_NAME, provider_wire_schema
 
 
 class ProviderDefect(RuntimeError):
@@ -380,7 +380,7 @@ class CodexProvider:
             mcp_servers=(),
             output=JsonSchemaAgentOutput(
                 name=MODEL_STEP_OUTPUT_NAME,
-                schema=model_step_schema(definition.output_contract),
+                schema=provider_wire_schema(definition.output_contract),
             ),
             native=provider.native,
         )

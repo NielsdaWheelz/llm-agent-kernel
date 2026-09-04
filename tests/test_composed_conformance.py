@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import deque
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
@@ -243,7 +244,7 @@ class _Runtime:
             failure=None,
             final_text="untrusted projection",
             session_ref=session.ref,
-            structured_output=freeze_json_object(self.steps.popleft()),
+            structured_output=freeze_json_object(_wire_step(self.steps.popleft())),
             usage=Absent(),
         )
 
@@ -252,6 +253,28 @@ class _Runtime:
 
     async def close_session(self, session: AgentSession) -> None:
         self.closed.append(session)
+
+
+def _wire_step(value: dict[str, object]) -> dict[str, object]:
+    step_type = value.get("type")
+    wire: dict[str, object] = {
+        "type": step_type,
+        "say": None,
+        "call_tool": None,
+        "finish": None,
+    }
+    if step_type == "say":
+        wire["say"] = {key: child for key, child in value.items() if key != "type"}
+    elif step_type == "call_tool":
+        payload = {key: child for key, child in value.items() if key != "type"}
+        if "arguments" in payload:
+            payload["arguments"] = json.dumps(payload["arguments"], separators=(",", ":"))
+        wire["call_tool"] = payload
+    elif step_type == "finish":
+        payload = {key: child for key, child in value.items() if key != "type"}
+        payload.setdefault("reason", None)
+        wire["finish"] = payload
+    return wire
 
 
 class _Budgets:

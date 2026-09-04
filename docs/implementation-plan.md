@@ -39,7 +39,9 @@ Deliver:
 
 - The exact `AgentRuntime` open/stream/close adapter, not a synthetic stateless
   provider façade or the event-discarding `run_turn` convenience projection.
-- `JsonSchemaAgentOutput` mapping for the closed kernel step schema.
+- `JsonSchemaAgentOutput` mapping for one Codex-compatible closed-object wire
+  envelope, with the provider-certified Codex SDK/runtime version pinned
+  directly by the distribution.
 - Fully fingerprinted `AgentSessionRequest`, `PermissionPolicy`, native options,
   private cwd lifecycle, and empty environment/MCP/network configuration.
 - Complete stream consumption and event fail-stop for native tool-use or
@@ -60,8 +62,12 @@ the exact pinned dependency APIs.
 
 Deliver:
 
-- Closed `say | call_tool | finish` models and independent semantic validation.
-- Conversational and structured output-contract enforcement.
+- Closed logical `say | call_tool | finish` models, a separate required/nullable
+  provider wire envelope, strict JSON-string argument decoding, and independent
+  semantic validation.
+- Conversational and structured output-contract enforcement, including
+  construction-time compilation/checking of nested, optional, and empty result
+  schemas and deterministic rejection of unsupported/map-shaped contracts.
 - Bounded protocol correction with a terminal poison stop.
 - Pure plan lookup and argument validation before any mutation.
 - Exactly one serial dispatcher call per model step.

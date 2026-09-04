@@ -21,6 +21,7 @@ The reviewed dependency baselines are:
 - `provider-runtime` from `llm-calling` at
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
 - `llm-tools` at `728f35c0b3a8be91b380ed4258d2b73ad68fc8fa`
+- provider-certified `openai-codex==0.144.4`
 
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
@@ -77,8 +78,10 @@ The kernel owns:
 - Immutable definitions and complete containment fingerprints.
 - Exact Codex agent-session request mapping and lifecycle.
 - Provider-neutral cold-bootstrap and continuation context.
-- A closed `say | call_tool | finish` protocol.
-- Whole-step and output-contract validation.
+- A Codex-compatible closed provider-wire envelope that decodes to the closed
+  logical `say | call_tool | finish` protocol.
+- Whole-wire, whole-step, and output-contract validation, including
+  construction-time structured-result schema compatibility checks.
 - Exactly one serial host tool call per model step.
 - Mid-loop input polling, preemption, cancellation, and settlement choreography.
 - Per-run limits and conservative host-issued cross-run admission reservations.
@@ -144,14 +147,14 @@ durable host input
 claim batch + prove plan + construct exact plan budget + reserve admission
         |
         v
-open/resume contained Codex agent session
+open/resume contained Codex agent session with one closed required wire schema
         |
         v
 poll new compatible input --> fully observed structured provider stream
                                   |
                        persist returned session ref
                                   |
-                       validate complete model step
+                       decode wire + validate complete logical model step
                          /                    \
                   call_tool                say / finish
                       |                         |
