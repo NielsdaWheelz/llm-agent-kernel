@@ -8,8 +8,8 @@ claim to prove.
 | Acceptance | Status | Primary evidence or remaining qualification |
 | --- | --- | --- |
 | K001 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies`; `test_import_has_no_filesystem_or_network_side_effect` |
-| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks both exact immutable git revisions and `openai-codex==0.144.4`; `uv.lock` locks the matching SDK/runtime pair. |
-| K003 | Deterministic | `test_slice0_contracts.py::test_dependency_pure_validation_and_host_table_publication`; `test_dependency_rejects_cross_catalog_implementation_substitution`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
+| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks both exact immutable git revisions and `openai-codex==0.144.4`; `uv.lock` locks the matching SDK/runtime pair. `test_slice0_contracts.py::test_dependency_web_search_operation_deadline_api_is_revisioned` compiles against the new public API. |
+| K003 | Deterministic | `test_slice0_contracts.py::test_dependency_pure_validation_and_host_table_publication`; `test_dependency_rejects_cross_catalog_implementation_substitution`; `test_dependency_web_search_operation_deadline_api_is_revisioned`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
 | K004 | Deterministic | `test_tools.py::test_tool_validation_is_pure_strict_and_uses_the_plan_owned_binding`; `test_protocol.py::test_invalid_tool_input_is_one_protocol_failure_before_dispatch` |
 | K005 | Deterministic | `test_slice0_package.py::test_runtime_uses_no_private_dependency_imports`; `test_kernel_does_not_reimplement_llm_tools_owners` |
 | K006 | Deterministic | `test_slice0_package.py::test_package_contains_no_application_infrastructure` |
@@ -36,7 +36,7 @@ claim to prove.
 | K027 | Deterministic | `test_protocol.py::test_provider_tool_envelope_is_rejected_against_an_empty_plan`; `test_call_tool_resolves_exact_binding_and_purely_decodes_owned_input`; `test_invalid_tool_input_is_one_protocol_failure_before_dispatch`; `test_kernel.py::test_whole_step_repair_is_effect_free_and_bounded`; `test_frozen_plan_is_rejected_before_rendering_admission_or_provider` |
 | K028 | Deterministic | `test_kernel.py::test_whole_step_repair_is_effect_free_and_bounded`; `test_protocol_poison_is_consumed_without_rearm`; `test_composed_conformance.py::test_poison_input_is_consumed_and_next_scan_finds_no_work` |
 | K029 | Deterministic | `test_tools.py::test_plan_must_be_host_exposed_and_strictly_serial`; `test_kernel.py::test_serial_dispatch_lineage_includes_mid_loop_input` |
-| K030 | Deterministic | `test_slice0_contracts.py::test_kernel_limits_are_finite_and_bounded`; `test_kernel.py::test_cooperative_limit_stops_before_a_provider_turn`; `test_cooperative_limit_does_not_wrap_write_dispatch`; `test_reported_token_limit_stops_after_cas_before_model_action`; `test_turn_limit_consumes_after_the_reserved_turn`; dependency budget ownership is exercised by `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry`. |
+| K030 | Deterministic | `test_slice0_contracts.py::test_kernel_limits_are_finite_and_bounded`; `test_dependency_web_search_operation_deadline_api_is_revisioned`; `test_kernel.py::test_cooperative_limit_stops_before_a_provider_turn`; `test_cooperative_limit_does_not_wrap_write_dispatch`; `test_reported_token_limit_stops_after_cas_before_model_action`; `test_turn_limit_consumes_after_the_reserved_turn`; dependency budget ownership is exercised by `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry`. |
 | K031 | Contract + consumer qualification | `test_slice0_contracts.py::test_thread_dispatch_lineage_is_complete_and_immutable`; `test_kernel.py::test_pre_dispatch_append_revalidates_before_any_tool_action`; dependency effect-ID equality is exercised in `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry`. The host must crash-qualify durable action creation and stable position/effect identity. |
 | K032 | Deterministic | `test_composed_conformance.py::test_discarded_billed_once_read_can_dispatch_again` |
 | K033 | Deterministic | `test_kernel.py::test_suspension_is_durably_settled_and_returns`; `test_dispatch_and_checkpoint_defects_park_without_fabricated_success`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
@@ -64,3 +64,13 @@ The dependency timeout test specifically proves that `Write` plus
 `ReDispatchable` returns `RecoveryRequired` after timeout and remains blocked
 until explicit host reconciliation supplies recovered-lease evidence. No
 in-memory fake in this repository is evidence of crash durability.
+
+The `llm-tools` propagation from kernel
+`c9eefcb458ee5245010dd5e99b48f7116cd1139a` qualifies dependency revision
+`05f89e238f52fbc69e83d9aacea1bcf2d8e6de88` through the exact-pin package test
+and the public `web.search` deadline API canary above. It does not change
+`provider-runtime`, `openai-codex`, the provider adapter, request containment, or
+the structured-output wire. The paid `gpt-5.6-terra` and `gpt-5.4`
+qualification recorded for that unchanged provider surface therefore remains
+applicable; a change to any of those provider-facing inputs requires both live
+routes to be rerun.

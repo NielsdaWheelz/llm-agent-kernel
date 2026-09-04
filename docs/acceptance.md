@@ -10,13 +10,17 @@ assigned to exactly one implementation slice.
 - **K002** — Runtime locks qualified immutable git revisions of
   `provider-runtime` and `llm-tools` plus the exact Codex SDK/runtime version
   certified by the provider revision; ordinary CI never imports mutable sibling
-  worktrees or an uncertified transitive Codex release.
+  worktrees or an uncertified transitive Codex release. The `llm-tools` pin
+  exposes the revisioned `web.search` whole-operation deadline API.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
   execution/recording. Every binding has a non-empty owner-controlled
   implementation revision. Freezing and publication reject a view whose
   contract, implementation, or policy revision differs from its frozen grant.
+  `web.search` freezes its bounded whole-operation deadline into policy identity
+  and reports every started attempt without weakening cancellation, replay, or
+  uncertainty semantics.
 - **K004** — Pure validation performs no position occupation, budget
   reservation, recorder access, or dispatch.
 - **K005** — The kernel imports no private dependency module and contains no
@@ -132,10 +136,12 @@ assigned to exactly one implementation slice.
   `KernelLimits.max_cooperative_seconds`, and cumulative newly rendered
   model-visible context bytes. The elapsed limit is checked at safe boundaries
   and passed as each provider-turn deadline; it is not a hard timeout over host
-  ports, settlement, cleanup, or tool execution. The frozen
-  `llm_tools.RunLimits` alone own tool calls, attempts, bytes, concurrency, and
-  tool elapsed/deadline limits. The kernel never wraps a `Write` in an outer
-  timeout that bypasses recorder/reconciliation safety.
+  ports, settlement, cleanup, or tool execution. `llm-tools` alone owns tool
+  timing: frozen `llm_tools.RunLimits` own tool calls, attempts, bytes,
+  concurrency, and executor elapsed/deadline limits, while revisioned
+  `web.search` binding policy owns its tighter inner operation deadline. The
+  kernel never wraps a `Write` in an outer timeout that bypasses
+  recorder/reconciliation safety.
 - **K031** — Before `Write` executor entry, the host durably creates or resolves
   an action/effect record and uses its stable ID for both `InvocationPosition`
   and `EffectId`. The dispatch exposes immutable claim ID, through-checkpoint,

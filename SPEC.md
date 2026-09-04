@@ -33,7 +33,7 @@ The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
-- `llm-tools`: `728f35c0b3a8be91b380ed4258d2b73ad68fc8fa`
+- `llm-tools`: `05f89e238f52fbc69e83d9aacea1bcf2d8e6de88`
 - The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 
 The provider baseline is usable without modification. V1 selects only
@@ -66,6 +66,19 @@ adversarial cross-catalog substitution and direct inconsistent-plan tests at
 construction, proof, publication, and execution. The immutable revision is
 fetchable from the configured remote; the package resolver MUST lock that exact
 commit rather than import from a sibling worktree.
+
+That revision also owns the corrected `web.search` whole-operation deadline.
+`bind_brave_web_search` accepts a positive finite
+`operation_deadline_seconds`, defaulting to and capped at 12 seconds inside the
+declared 15-second executor deadline. The inner deadline covers every provider
+attempt and retry delay and is frozen into binding policy identity. A custom
+`WebSearchProvider.search` implementation MUST accept the optional keyword-only
+`attempt_started` callback, invoke it synchronously once immediately before
+each external attempt, and propagate task cancellation unchanged. Expected
+inner expiry becomes the declared `UpstreamUnavailable` result with the actual
+started-attempt count; unexpected outer timeout and cancellation retain the
+existing executor replay and uncertainty semantics. The kernel neither starts
+nor separately accounts this tool deadline.
 
 The kernel MUST NOT import a private dependency module to bypass a missing
 public seam. It MUST NOT duplicate provider SDK integration, tool execution,

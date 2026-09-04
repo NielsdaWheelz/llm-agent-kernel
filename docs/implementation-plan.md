@@ -17,6 +17,9 @@ It is qualified against existing replay, uncertainty, `ToolEffect`,
 cross-catalog effect/schema/handler-implementation/replay-policy/revision
 substitution before publication. Every binding declares an owner-controlled
 implementation revision covering its handler and transitive execution behavior.
+The qualified pin also carries `web.search`'s revisioned whole-operation
+deadline, started-attempt callback contract, cancellation propagation, and
+policy-identity input without moving tool timing or accounting into the kernel.
 The immutable revision is recorded in the kernel spec and reachable from the
 durable remote; Slice 0 must lock that exact commit rather than import a sibling
 worktree.

@@ -20,8 +20,14 @@ The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
   `a5d9c8e0c1c851daee0731554e0a4a326d3c2819`
-- `llm-tools` at `728f35c0b3a8be91b380ed4258d2b73ad68fc8fa`
+- `llm-tools` at `05f89e238f52fbc69e83d9aacea1bcf2d8e6de88`
 - provider-certified `openai-codex==0.144.4`
+
+The `llm-tools` pin includes the revisioned `web.search` whole-operation
+deadline: its Brave binding defaults to a 12-second operation deadline inside
+the tool's 15-second executor deadline, covering every request attempt and
+retry delay. The binding policy and implementation revisions rotate with that
+behavior; kernel limits and orchestration behavior do not change.
 
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless

@@ -257,6 +257,14 @@ elapsed limits. The frozen plan sets `max_in_flight = 1`. `KernelLimits` owns
 provider turns, protocol repairs, reported provider usage, the cooperative
 elapsed limit, and newly rendered model-visible context bytes.
 
+The exact `llm-tools` pin also revision-controls `web.search`'s inner
+whole-operation deadline. The Brave binding's default 12-second deadline covers
+all request attempts and retry delays inside the declared 15-second executor
+deadline, records the deadline in policy identity, and counts attempts through
+the provider callback immediately before dispatch. This remains dependency-owned
+tool execution behavior; the kernel does not add another timer or attempt
+counter.
+
 The cooperative limit is observed at safe boundaries and becomes the remaining
 hard deadline for each provider turn. It is not an outer timeout over host
 ports, settlement, cleanup, or tool dispatch. Tool execution keeps its frozen

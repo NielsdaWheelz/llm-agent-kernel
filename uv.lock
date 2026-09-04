@@ -622,7 +622,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=728f35c0b3a8be91b380ed4258d2b73ad68fc8fa" },
+    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=05f89e238f52fbc69e83d9aacea1bcf2d8e6de88" },
     { name = "openai-codex", specifier = "==0.144.4" },
     { name = "provider-runtime", extras = ["codex-sdk"], git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=a5d9c8e0c1c851daee0731554e0a4a326d3c2819" },
     { name = "pydantic", specifier = ">=2.11,<3" },
@@ -642,7 +642,7 @@ dev = [
 [[package]]
 name = "llm-tools"
 version = "0.1.0"
-source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=728f35c0b3a8be91b380ed4258d2b73ad68fc8fa#728f35c0b3a8be91b380ed4258d2b73ad68fc8fa" }
+source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=05f89e238f52fbc69e83d9aacea1bcf2d8e6de88#05f89e238f52fbc69e83d9aacea1bcf2d8e6de88" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },

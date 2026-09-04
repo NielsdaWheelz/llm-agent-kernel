@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime
 from inspect import signature
 
 import pytest
 from llm_tools import (
+    WEB_SEARCH_SPEC,
     Available,
     CapabilityProfile,
     HostTable,
@@ -29,8 +31,13 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    WebSearchProvider,
+    WebSearchRequest,
+    WebSearchResponse,
+    bind_brave_web_search,
     publish_host_table,
     validate_tool_input,
+    web_family,
 )
 from provider_runtime.agent_runtime import (
     CredentialRef,
@@ -94,6 +101,16 @@ class OptionalResult(BaseModel):
 
 class OpenResult(BaseModel):
     answer: str
+
+
+class CompatibleWebSearchProvider:
+    async def search(
+        self,
+        request: WebSearchRequest,
+        *,
+        attempt_started: Callable[[], None] | None = None,
+    ) -> WebSearchResponse:
+        raise AssertionError(f"contract canary performed Web I/O: {request!r}, {attempt_started!r}")
 
 
 async def _must_not_run(value: object, context: object) -> object:
@@ -181,6 +198,29 @@ def test_dependency_rejects_cross_catalog_implementation_substitution() -> None:
 
     with pytest.raises(ValueError, match="implementation"):
         ToolPlan(profile.id, HostTable()).freeze(substituted_catalog, profile)
+
+
+def test_dependency_web_search_operation_deadline_api_is_revisioned() -> None:
+    public_parameters = signature(WebSearchProvider.search).parameters
+    callback = public_parameters["attempt_started"]
+    assert callback.kind.name == "KEYWORD_ONLY"
+    assert callback.default is None
+
+    default = bind_brave_web_search(CompatibleWebSearchProvider())
+    tightened = bind_brave_web_search(
+        CompatibleWebSearchProvider(), operation_deadline_seconds=11.5
+    )
+    unavailable = web_family().bindings[0]
+
+    assert WEB_SEARCH_SPEC.limits.deadline_seconds == 15.0
+    assert default.implementation_revision == "llm-tools-web-search-v2"
+    assert default.policy_epoch == PolicyEpoch("web-search-v2")
+    assert default.policy_inputs["operation_deadline_seconds"] == 12.0
+    assert unavailable.policy_revision == default.policy_revision
+    assert tightened.policy_inputs["operation_deadline_seconds"] == 11.5
+    assert tightened.policy_revision != default.policy_revision
+    with pytest.raises(ValueError, match="operation_deadline_seconds"):
+        bind_brave_web_search(CompatibleWebSearchProvider(), operation_deadline_seconds=12.001)
 
 
 def test_entry_points_require_the_exported_plan_aware_budget_factory() -> None:

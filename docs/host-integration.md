@@ -48,6 +48,20 @@ the former top-level logical JSON shape from Codex. Logical `SayStep`,
 not change. The definition fingerprint includes the new wire schema, so the
 upgrade cold-bootstraps rather than resuming an old-schema native session.
 
+For the dependency propagation from kernel `c9eefcb458ee5245010dd5e99b48f7116cd1139a`,
+a consumer pins the successor kernel revision, regenerates its lock, records the
+new kernel and `llm-tools` revisions in its compatibility manifest, and bumps
+its owner-controlled session-contract revision. It must rebuild frozen profiles
+and plans because `web.search` now carries implementation revision
+`llm-tools-web-search-v2`, policy epoch `web-search-v2`, and the
+`operation_deadline_seconds` policy input. A host using the shipped
+`BraveSearchProvider` needs no adapter change and may accept the 12-second
+default or explicitly tighten it. A custom `WebSearchProvider` must accept the
+optional keyword-only `attempt_started` callback, call it synchronously once
+before every external attempt, and propagate cancellation unchanged. This is a
+revisioned `Read + BilledOnce` execution change; it requires no kernel API,
+authority, effect-ID, action-schema, or provider-session change.
+
 The host supplies `ToolBudgetFactoryPort`, not a budget created before claim.
 After `claim` reveals the selected plan and the kernel proves the exact frozen
 plan/catalog relationship, the factory creates that run's `BudgetState` from
@@ -113,6 +127,13 @@ probes on `gpt-5.6-terra` and `gpt-5.4`, and record only sanitized route,
 revision, status, usage, timing, and trace identifiers. Provider-native
 transcripts remain unredacted third-party data at rest; deleting a local
 reference does not promise provider deletion.
+
+A dependency-only `llm-tools` propagation may carry that paid provider
+qualification forward only when the exact `provider-runtime` and Codex SDK
+pins, kernel provider adapter, containment request, and structured-output wire
+are unchanged and the complete deterministic suite still passes. The
+`web.search` deadline propagation meets those conditions. Any provider-facing
+change requires the paid matrix to run again.
 
 The library release commands are:
 
