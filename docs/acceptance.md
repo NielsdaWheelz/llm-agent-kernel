@@ -14,7 +14,9 @@ assigned to exactly one implementation slice.
   exposes the revisioned `web.search` whole-operation deadline API and the
   corrected `web.read` v2 extraction identity. The provider pin exposes
   invocation-local terminal usage and progressive, non-additive invocation
-  snapshots without resumed historical usage.
+  snapshots without resumed historical usage. It also exposes authoritative
+  terminal assistant-message selection that excludes commentary from
+  structured output.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
@@ -63,11 +65,13 @@ assigned to exactly one implementation slice.
   session, returns no terminal to the loop, dispatches no host tool, and settles
   no model-authored conclusion.
 - **K013** — Streaming model text is never delivered; only a successful terminal
-  structured step can cross the host output boundary. The adapter retains the
-  latest progressive usage snapshot, prefers invocation-local terminal usage,
-  and adds usage exactly once per started turn. It sums distinct kernel turns,
-  never resumed history; an `Absent` turn makes token usage incomplete on every
-  terminal status.
+  structured step can cross the host output boundary. `AgentText` observations
+  need not concatenate to authoritative `AgentTerminal.final_text`, never enter
+  logical validation, and cannot become executable commentary. The adapter
+  retains the latest progressive usage snapshot, prefers invocation-local
+  terminal usage, and adds usage exactly once per started turn. It sums distinct
+  kernel turns, never resumed history; an `Absent` turn makes token usage
+  incomplete on every terminal status.
 - **K014** — Live continuing sessions are acquired/released and may be cached;
   isolated sessions and retired/discarded sessions are always closed, including
   cancellation and failure paths.
@@ -246,9 +250,13 @@ assigned to exactly one implementation slice.
   request, streamed event, resume, cancellation, quota, containment, structured
   nested/nullable result, and JSON-string tool-argument behavior without running
   in ordinary CI or recording private payloads. Provider compatibility releases
-  qualify both `gpt-5.6-terra` and `gpt-5.4`, including same-lease continuation
-  and close/reopen/resume usage accounting without historical recharge. A
-  contract test proves that production calls `stream_turn`, never `run_turn`.
+  qualify at least one currently supported local-account route; the current
+  route is `gpt-5.6-terra`, and retired `gpt-5.4` is not invoked through
+  `local_account`. Qualification includes commentary plus final-answer behavior
+  when observed, same-lease continuation, close/reopen/resume usage accounting
+  without historical recharge, and in-flight cancellation. Contract and
+  consumer tests prove that production calls `stream_turn`, never `run_turn`,
+  and validates only terminal structured output.
 
 ## Slice assignment
 

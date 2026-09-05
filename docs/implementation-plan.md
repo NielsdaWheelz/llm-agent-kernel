@@ -34,6 +34,11 @@ invocation-to-date snapshot and `AgentTerminal.usage` as invocation-local on
 every status. It owns normalization of native cumulative state, including
 resume baselines; the kernel adapter only selects the latest/terminal snapshot
 and sums one invocation-local value per kernel turn.
+It also defines `AgentTerminal.final_text` as the provider-selected
+authoritative assistant response. `AgentText` is observational, the last
+completed Codex `final_answer` wins, the last phase-unknown completion is the
+fallback, and commentary is never executable. Provider-runtime owns that
+selection; the kernel does not concatenate or select messages.
 
 Then deliver:
 
@@ -60,6 +65,8 @@ Deliver:
   private cwd lifecycle, and empty environment/MCP/network configuration.
 - Complete stream consumption and event fail-stop for native tool-use or
   permission requests, plus suppression of streaming text delivery.
+- Terminal-only logical validation, with a consumer regression proving that
+  commentary `AgentText` cannot become a model step or dispatch a tool.
 - Latest-progressive-snapshot retention, terminal-usage precedence, exactly-once
   per-turn addition, resumed-history exclusion, and incomplete-usage handling
   without a second native cumulative-delta implementation.

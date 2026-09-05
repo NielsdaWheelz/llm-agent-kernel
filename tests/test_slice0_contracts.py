@@ -49,6 +49,7 @@ from llm_tools import (
 )
 from provider_runtime.agent_runtime import (
     AgentTerminal,
+    AgentText,
     AgentUsage,
     CredentialRef,
     PermissionPolicy,
@@ -113,16 +114,23 @@ class OpenResult(BaseModel):
     answer: str
 
 
-def test_dependency_usage_contract_is_invocation_local_and_progressive() -> None:
+def test_dependency_provider_event_contracts_are_exact() -> None:
+    text_contract = AgentText.__doc__ or ""
     usage_contract = AgentUsage.__doc__ or ""
     terminal_contract = AgentTerminal.__doc__ or ""
 
+    assert "assistant's visible output text" in text_contract
+    assert "authoritative selected assistant response" in terminal_contract
+    assert "not a concatenation" in terminal_contract
+    assert "commentary may remain visible" in terminal_contract
+    assert "without becoming terminal text" in terminal_contract
     assert "invocation-to-date usage snapshot" in usage_contract
     assert "Snapshots within a turn are not additive" in usage_contract
     assert "only usage attributable" in usage_contract
     assert "usage`` is invocation-local on every status" in terminal_contract
     assert "never includes historical" in terminal_contract
     assert "Absent`` means the provider supplied no safely attributable usage" in terminal_contract
+    assert [field.name for field in fields(AgentText)] == ["text"]
     assert [field.name for field in fields(AgentUsage)] == ["usage"]
     assert [field.name for field in fields(AgentTerminal)] == [
         "status",

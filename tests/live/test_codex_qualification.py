@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import cast
 
@@ -40,14 +41,19 @@ from llm_tools import (
     ToolSpec,
 )
 from provider_runtime.agent_runtime import (
+    AgentEvent,
     AgentQuotaExhausted,
     AgentRuntime,
     AgentRuntimeConfig,
+    AgentSession,
+    AgentText,
+    ApprovalHandler,
     CredentialRef,
     TextContent,
     TurnNotStarted,
+    TurnRequest,
 )
-from provider_runtime.types import Absent, Present
+from provider_runtime.types import Absent, CancelSignal, Present
 from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel.cancellation import CancellationToken
@@ -75,6 +81,32 @@ def _required_environment(name: str) -> str:
     if not value:
         pytest.fail(f"live qualification requires {name}", pytrace=False)
     return value
+
+
+class _ObservingAgentRuntime(AgentRuntime):
+    """Live-only witness proving the kernel ignores streamed assistant text."""
+
+    def __init__(self, config: AgentRuntimeConfig) -> None:
+        super().__init__(config)
+        self.observed_text: list[str] = []
+
+    async def stream_turn(
+        self,
+        session: AgentSession,
+        request: TurnRequest,
+        *,
+        approvals: ApprovalHandler | None = None,
+        cancel: CancelSignal | None = None,
+    ) -> AsyncGenerator[AgentEvent, None]:
+        async for event in super().stream_turn(
+            session,
+            request,
+            approvals=approvals,
+            cancel=cancel,
+        ):
+            if isinstance(event, AgentText):
+                self.observed_text.append(event.text)
+            yield event
 
 
 class LiveNestedResult(BaseModel):
@@ -246,7 +278,7 @@ async def test_live_in_flight_cancellation() -> None:
         await runtime.close()
 
 
-async def test_live_structured_nested_optional_output() -> None:
+async def test_live_structured_nested_optional_output_and_commentary_selection() -> None:
     if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
         pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
@@ -256,7 +288,7 @@ async def test_live_structured_nested_optional_output() -> None:
         output_contract=contract,
         session_mode=SessionMode.isolated,
     )
-    runtime = AgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
+    runtime = _ObservingAgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
     provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
     try:
         lease = await provider.open_isolated(definition)
@@ -264,8 +296,10 @@ async def test_live_structured_nested_optional_output() -> None:
             lease,
             (
                 TextContent(
-                    "Respond through the finish branch. Set answer to pong, count to null, "
-                    "nested.label to qualified, nested.note to null, and reason to null."
+                    "Without invoking tools, first send a brief progress update on the "
+                    "commentary channel. Then respond through the finish branch. Set answer "
+                    "to pong, count to null, nested.label to qualified, nested.note to null, "
+                    "and reason to null."
                 ),
             ),
             CancellationToken(),
@@ -279,6 +313,11 @@ async def test_live_structured_nested_optional_output() -> None:
             "count": None,
             "nested": {"label": "qualified", "note": None},
         }
+        observed_text = "".join(runtime.observed_text)
+        assert terminal.final_text in observed_text
+        assert observed_text != terminal.final_text, (
+            "the dual-phase qualification did not observe commentary before the final answer"
+        )
         await provider.close(lease)
     finally:
         await provider.shutdown()

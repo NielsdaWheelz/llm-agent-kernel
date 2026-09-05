@@ -48,7 +48,7 @@ the former top-level logical JSON shape from Codex. Logical `SayStep`,
 not change. The definition fingerprint includes the new wire schema, so the
 upgrade cold-bootstraps rather than resuming an old-schema native session.
 
-For the provider-runtime propagation from kernel
+For the historical provider-runtime usage propagation from kernel
 `c9dac7a610636a668bbf932cc2f961c0904f9157`, a consumer pins the successor
 kernel revision and regenerates its lock to exact provider-runtime revision
 `f477dcdcad03c30019576203d4eb8a3581a6d32f`. It keeps `llm-tools` at
@@ -67,6 +67,28 @@ and sums those invocation-local values across kernel turns. A host MUST NOT add
 another cumulative-delta layer. `Absent` means usage is incomplete, not zero;
 the admission implementation must retain the run's reserved token dimensions
 when settling incomplete usage.
+
+For the provider-runtime assistant-message propagation from kernel
+`09f08df2970121ababe973b0e92d6901dd40da9e`, a consumer pins the successor
+kernel revision and regenerates its lock to exact provider-runtime revision
+`2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`. It keeps `llm-tools` at
+`9e6d155f3b64f03495911435b7cae8b8d131f9a2` and `openai-codex` at `0.144.4`,
+and records all three immutable revisions in its compatibility manifest. No
+kernel API, provider request, provider wire schema, persistence schema, or
+session-reference format changes. Existing native sessions remain compatible,
+so a host MUST NOT rotate `session_compatibility_revision` solely for this
+correction.
+
+The revised provider contract makes `AgentTerminal.final_text` the
+provider-selected authoritative assistant response. `AgentText` events are
+observations and need not concatenate to that terminal value. For Codex, the
+last completed `phase=final_answer` message wins; if none exists, the last
+completed phase-unknown message is the compatibility fallback. Commentary is
+never executable structured output. Provider-runtime owns selection and
+concatenation rules; hosts and the kernel MUST NOT add another selection layer.
+The kernel continues to validate only `AgentTerminal.structured_output`, so a
+Jarvis consumer needs no application-code, plan, HostTable, persistence, or
+session migration for this release.
 
 For the dependency propagation from kernel `b53e4329d6a8fc8af622747c9670cf586cf9e1ff`,
 a consumer pins the successor kernel revision, regenerates its lock to exact
@@ -148,10 +170,14 @@ checkpoint, action/recorder, admission, and delivery implementations under
 process termination at each boundary. It must also pin its compatibility-
 revision policy and qualify plan-aware budget construction against every
 selectable plan. Jarvis must run its paid Codex account qualification for the
-exact provider-runtime and provider-certified Codex SDK pins, including
-conversational, structured nested/nullable result, and JSON-string argument
-probes on `gpt-5.6-terra` and `gpt-5.4`, and record only sanitized route,
-revision, status, usage, timing, and trace identifiers. Provider-native
+exact provider-runtime and provider-certified Codex SDK pins on at least one
+currently supported local-account route, including conversational, structured
+nested/nullable result, commentary-plus-final-answer behavior when observed,
+JSON-string arguments, continuation, close/reopen/resume, invocation-local
+usage, and in-flight cancellation. The current qualified route is
+`gpt-5.6-terra`; retired `gpt-5.4` MUST NOT be invoked through `local_account`.
+Qualification records contain only sanitized route, revision, status, usage,
+timing, and trace identifiers. Provider-native
 transcripts remain unredacted third-party data at rest; deleting a local
 reference does not promise provider deletion.
 
@@ -163,11 +189,14 @@ are unchanged and the complete deterministic suite still passes. The
 change requires the paid matrix to run again.
 
 This provider-runtime propagation changes a provider-facing input and therefore
-requires the paid matrix on both qualified models. The continuation probe must
-prove same-lease per-turn addition and close/reopen/resume without historical
-recharge; the separately gated in-flight cancellation probe must also run.
+requires the paid matrix on the currently supported `gpt-5.6-terra`
+local-account route. The continuation probe must prove same-lease per-turn
+addition and close/reopen/resume without historical recharge; the structured
+probe must exercise authoritative final-answer selection when commentary is
+observed; and the separately gated in-flight cancellation probe must also run.
 Quota exhaustion runs only against a qualification profile that is already
-exhausted and MUST NOT be induced for release testing.
+exhausted and MUST NOT be induced for release testing. The retired `gpt-5.4`
+local-account route is neither a release gate nor a permitted probe.
 
 The library release commands are:
 

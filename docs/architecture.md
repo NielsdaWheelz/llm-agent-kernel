@@ -102,12 +102,22 @@ charged. The kernel has no second provider-cumulative delta implementation.
 `Absent` terminal usage means no safely attributable value is available and
 makes the lease usage incomplete even on failure or cancellation.
 
+Provider-runtime also owns authoritative assistant-message selection.
+`AgentTerminal.final_text` is the selected response, not the concatenation of
+`AgentText` observations. For Codex, the last completed
+`phase=final_answer` message wins; otherwise the last completed phase-unknown
+message is the pinned-SDK compatibility fallback. Commentary is never eligible
+for terminal selection or structured execution. The kernel adds no selection
+or concatenation layer: it ignores `AgentText` for logical validation and uses
+only the successful terminal's independently validated structured value.
+
 The sentinel is not application authority. Any native `AgentToolUse` or
 `AgentPermissionRequest` event taints and discards the session and fails the run
 without returning its terminal to the loop, before a host tool or model-authored
 conclusion can cross the boundary. Streaming text is not delivered; only
 terminal structured output from a fully inspected clean stream enters the
-kernel protocol.
+kernel protocol. Streaming observations are neither concatenated nor parsed as
+logical steps.
 
 ### `sessions.py`
 

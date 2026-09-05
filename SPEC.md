@@ -32,7 +32,7 @@ The distribution is `llm-agent-kernel`; applications import
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `f477dcdcad03c30019576203d4eb8a3581a6d32f`
+  `2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 
@@ -44,6 +44,15 @@ root `ProviderRuntime.generate` lane. The kernel distribution directly pins the
 Codex SDK version certified by that immutable provider revision so a later
 transitive release cannot silently invalidate the native-tool containment
 qualification.
+
+The same provider baseline defines `AgentTerminal.final_text` as the
+provider-selected authoritative assistant response rather than the
+concatenation of `AgentText` observations. For Codex, the last completed
+`phase=final_answer` message wins. If none exists, the last completed message
+with unknown phase is the compatibility fallback for the pinned SDK.
+Commentary is ineligible for terminal selection and MUST NOT be interpreted as
+executable structured output. Provider-runtime owns this message selection;
+the kernel MUST NOT duplicate it.
 
 The reviewed `llm-tools` revision exposes and qualifies the public seams this
 kernel needs:
@@ -110,6 +119,8 @@ schema compilation, prompt-section rendering, or recorder semantics.
 - Session-scoped `PermissionPolicy`, native options, model, reasoning, cwd, and
   structured-output lowering.
 - Strict parsing of the provider's declared JSON-schema output.
+- Authoritative assistant-message selection for terminal text and structured
+  output; streaming text remains observational.
 - Normalized events, usage when available, quota exhaustion, and typed provider
   failures.
 - Projection of provider-native cumulative accounting into progressive,
@@ -260,6 +271,11 @@ its successful terminal event. The convenience `AgentRuntime.run_turn` method
 MUST NOT be used: it consumes and discards the intermediate events that the
 kernel must inspect to enforce containment.
 
+`AgentText` events are observations and need not concatenate to
+`AgentTerminal.final_text`. They are inspected only as part of the complete
+stream and are never supplied to logical-step validation. The kernel consumes
+only the successful terminal's structured value for execution.
+
 An isolated one-shot has explicit host input, no application claim/checkpoint or
 saved session reference, a fresh native session, a structured output contract,
 and no `Write` tool. Its result is not durable until its caller commits it.
@@ -310,7 +326,15 @@ accept native tool activity.
 Any `AgentToolUse` or `AgentPermissionRequest` event fails the provider turn,
 discards its session, dispatches no host tool, and commits no model-authored
 conclusion. `AgentText` chunks are never delivered as conversational output;
-only a validated terminal structured step may be displayed.
+only a validated terminal structured step may be displayed or executed.
+
+`AgentTerminal.final_text` is the provider-selected authoritative assistant
+response. `AgentText` observations can contain commentary, drafts, or final
+answer chunks and need not concatenate to that terminal value. The Codex
+adapter in provider-runtime selects the last completed `phase=final_answer`
+message, or otherwise the last completed phase-unknown message as the pinned
+SDK compatibility fallback. Commentary is never eligible. The kernel MUST NOT
+concatenate observations or implement another message-selection algorithm.
 
 ### 5.2 ProviderSessionPort
 
@@ -328,7 +352,9 @@ close(lease) -> close isolated or retired session
 
 `run_observed_turn` is a kernel port operation, not a wrapper around
 `AgentRuntime.run_turn`: its implementation drives `AgentRuntime.stream_turn`,
-suppresses text chunks, accumulates usage, and inspects every event. Each
+suppresses `AgentText` from logical-step execution, accumulates usage, and
+inspects every event. It returns the provider-selected terminal unchanged; only
+that terminal's structured value enters logical validation. Each
 `AgentUsage` is a progressive invocation-to-date snapshot, so snapshots within
 one turn are non-additive. The adapter retains the latest snapshot rather than
 summing snapshots, prefers `AgentTerminal.usage` when present, and adds exactly
@@ -875,7 +901,9 @@ The release suite covers both single-run interior behavior and composed seams:
 
 1. Exact `AgentRuntime` request mapping and open/stream/close lifecycle against
    the pinned route; production never calls the event-discarding `run_turn`
-   convenience projection.
+   convenience projection. A consumer regression proves commentary
+   `AgentText` cannot reach logical validation or dispatch and that only the
+   terminal structured value can execute.
 2. Native built-ins disabled, empty read-only cwd, disabled network/environment,
    approval deny, no MCP, and fail-stop on any native tool/permission event.
 3. Codex-compatible provider-wire JSON-schema enforcement plus independent

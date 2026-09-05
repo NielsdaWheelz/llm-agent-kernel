@@ -8,18 +8,18 @@ claim to prove.
 | Acceptance | Status | Primary evidence or remaining qualification |
 | --- | --- | --- |
 | K001 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies`; `test_import_has_no_filesystem_or_network_side_effect` |
-| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks both exact immutable git revisions and `openai-codex==0.144.4`; `uv.lock` locks the matching SDK/runtime pair. `test_slice0_contracts.py::test_dependency_usage_contract_is_invocation_local_and_progressive`, `test_dependency_web_search_operation_deadline_api_is_revisioned`, `test_dependency_web_read_revision_refreezes_exact_host_table_plan`, and `test_dependency_web_read_v2_extraction_locators_are_exact` exercise the exact public provider and Web APIs and identities. |
+| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks both exact immutable git revisions and `openai-codex==0.144.4`; `uv.lock` locks the matching SDK/runtime pair. `test_slice0_contracts.py::test_dependency_provider_event_contracts_are_exact`, `test_dependency_web_search_operation_deadline_api_is_revisioned`, `test_dependency_web_read_revision_refreezes_exact_host_table_plan`, and `test_dependency_web_read_v2_extraction_locators_are_exact` exercise the exact public provider and Web APIs and identities. |
 | K003 | Deterministic | `test_slice0_contracts.py::test_dependency_pure_validation_and_host_table_publication`; `test_dependency_rejects_cross_catalog_implementation_substitution`; `test_dependency_web_search_operation_deadline_api_is_revisioned`; `test_dependency_web_read_revision_refreezes_exact_host_table_plan`; `test_dependency_web_read_v2_extraction_locators_are_exact`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
 | K004 | Deterministic | `test_tools.py::test_tool_validation_is_pure_strict_and_uses_the_plan_owned_binding`; `test_protocol.py::test_invalid_tool_input_is_one_protocol_failure_before_dispatch` |
 | K005 | Deterministic | `test_slice0_package.py::test_runtime_uses_no_private_dependency_imports`; `test_kernel_does_not_reimplement_llm_tools_owners` |
 | K006 | Deterministic | `test_slice0_package.py::test_package_contains_no_application_infrastructure` |
 | K007 | Contract + consumer qualification | The fakes identify themselves as process-local test doubles; `docs/host-integration.md` enumerates the durable host facts. A real consumer must qualify its stores. |
-| K008 | Deterministic | `test_slice0_package.py::test_production_never_calls_event_discarding_run_turn_projection`; `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn` |
+| K008 | Deterministic | `test_slice0_package.py::test_production_never_calls_event_discarding_run_turn_projection`; `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn`; `test_kernel.py::test_commentary_agent_text_never_reaches_logical_validation_or_dispatch` |
 | K009 | Deterministic | `test_protocol.py::test_conversational_provider_schema_is_one_closed_required_object`; `test_structured_provider_schema_requires_optional_and_nested_fields`; `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown`; `test_kernel.py::test_whole_step_repair_is_effect_free_and_bounded` |
 | K010 | Deterministic | `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown` checks the complete request and private cwd posture. |
 | K011 | Deterministic | `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown` checks the pinned sentinel while `test_tools.py::test_host_plan_proof_precedes_exact_dependency_publication` proves application authority comes from the plan. |
 | K012 | Deterministic | `test_provider.py::test_native_authority_event_discards_without_returning_terminal`; `test_kernel.py::test_native_authority_event_fail_stops_without_host_action` |
-| K013 | Deterministic | `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn`; `test_observed_turn_uses_latest_progressive_snapshot_when_terminal_usage_is_absent`; `test_resumed_session_charges_only_invocation_local_usage`; `test_missing_later_turn_usage_makes_the_run_total_unavailable`; `test_typed_non_success_terminal_is_preserved_and_session_is_closed`; `test_kernel.py::test_six_turn_resumed_session_settles_invocation_local_usage_once_per_turn` |
+| K013 | Deterministic | `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn`; `test_observed_turn_uses_latest_progressive_snapshot_when_terminal_usage_is_absent`; `test_resumed_session_charges_only_invocation_local_usage`; `test_missing_later_turn_usage_makes_the_run_total_unavailable`; `test_typed_non_success_terminal_is_preserved_and_session_is_closed`; `test_kernel.py::test_commentary_agent_text_never_reaches_logical_validation_or_dispatch`; `test_six_turn_resumed_session_settles_invocation_local_usage_once_per_turn` |
 | K014 | Deterministic | `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown`; `test_typed_non_success_terminal_is_preserved_and_session_is_closed`; `test_isolated_session_is_never_cached` |
 | K015 | Deterministic | `test_provider.py::test_resume_incompatibility_gets_exactly_one_cold_open`; `test_runtime_error_kinds_remain_distinct_and_close_the_session`; `test_sessions.py::test_successful_terminal_disables_cold_fallback_before_step_action`; `test_kernel.py::test_provider_stop_kinds_consume_without_automatic_retry` |
 | K016 | Contract | Public construction is exercised throughout `test_slice0_contracts.py`; `test_thread_dispatch_lineage_is_complete_and_immutable` specifically distinguishes and freezes claim/checkpoint/input/model-step identity. |
@@ -42,7 +42,7 @@ claim to prove.
 | K033 | Deterministic | `test_kernel.py::test_suspension_is_durably_settled_and_returns`; `test_dispatch_and_checkpoint_defects_park_without_fabricated_success`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
 | K034 | Deterministic library seam + consumer qualification | `test_kernel.py::test_suspension_is_durably_settled_and_returns`; `test_composed_conformance.py::test_suspension_resolution_cold_bootstraps_from_host_evidence`. Durable resolution storage and evidence safety remain host qualifications. |
 | K035 | Deterministic | `test_context.py::test_old_recomputable_read_is_replaced_by_explicit_reference_preserving_marker`; `test_read_without_a_stable_source_reference_is_not_omittable`; `test_write_and_required_context_are_never_silently_truncated`; `test_cumulative_bound_accounts_for_material_sent_on_prior_turns`; `test_new_context_counter_excludes_provider_material_and_output_schema` |
-| K036 | Deterministic | `test_protocol.py::test_conversational_validation_rejects_empty_mixed_unknown_and_extra_values` rejects the progress variant; streamed text suppression is covered by `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn`. |
+| K036 | Deterministic | `test_protocol.py::test_conversational_validation_rejects_empty_mixed_unknown_and_extra_values` rejects the progress variant; streamed text suppression is covered by `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn` and `test_kernel.py::test_commentary_agent_text_never_reaches_logical_validation_or_dispatch`. |
 | K037 | Deterministic seam + consumer qualification | `test_slice0_contracts.py::test_claim_and_append_batches_are_non_empty`; `test_slice0_fakes.py::test_empty_checkpoint_fake_does_not_invent_work`; `test_kernel.py::test_no_work_and_deferred_admission_call_no_provider`. Exclusive production claim ownership must be qualified in the host checkpoint store. |
 | K038 | Deterministic | `test_kernel.py::test_serial_dispatch_lineage_includes_mid_loop_input`; `test_pre_dispatch_append_revalidates_before_any_tool_action`; `test_append_at_final_check_retains_paid_answer_for_old_checkpoint` |
 | K039 | Deterministic | `test_slice0_fakes.py::test_cancellation_token_matches_provider_and_tool_shapes`; `test_kernel.py::test_preempt_releases_without_settlement_or_automatic_rearm`; `test_preempt_while_stopping_discards_one_speculative_generation`; `test_isolated_cancellation_before_dispatch_closes_without_tool_action`; `test_cancelled_before_provider_consumes_only_under_declared_rule` |
@@ -58,7 +58,7 @@ claim to prove.
 | K049 | Contract | `docs/host-integration.md` explicitly states both third-party transcript and deletion limitations. |
 | K050 | Deterministic library injection + consumer qualification | `test_kernel.py::test_claim_reservation_and_release_defects_never_reach_provider`; `test_mismatched_claimed_plan_budget_parks_before_rendering_or_io`; `test_checkpoint_boundary_rejects_unknown_closed_results`; `test_stale_session_cas_permits_no_dispatch_or_settlement`; `test_dispatch_and_checkpoint_defects_park_without_fabricated_success`; `test_usage_settlement_defect_is_not_hidden_after_canonical_conclusion`; `test_sessions.py::test_unknown_session_ref_results_fail_closed_before_semantic_action`; provider terminal/native failures and suspension are separately injected. Recorder/effect-commit and durable-store process-death injection must be repeated against the consumer implementations. |
 | K051 | Deterministic library seam + consumer qualification | `test_composed_conformance.py` covers suspension/resolution, billed-once rerun, poison/no-rearm, orphan recovery/attempt two, finalization/follow-up, post-terminal preemption/recovery, appended steering followed by no-work, and an explicit three-claim progression through the attempt ceiling. Production durable-store process-death races remain consumer qualifications. |
-| K052 | Deterministic contract + opt-in paid probes | `test_slice0_package.py::test_production_never_calls_event_discarding_run_turn_projection`; opt-in `tests/live/test_codex_qualification.py::test_live_codex_stream_continuation_and_cancellation`; `test_live_structured_nested_optional_output`; `test_live_json_encoded_tool_arguments`; `test_live_in_flight_cancellation`; `test_live_quota_exhaustion`. Provider compatibility qualification runs the first three against both `gpt-5.6-terra` and `gpt-5.4`; continuation proves same-lease addition and close/reopen/resume without historical recharge. Ordinary CI neither runs paid probes nor records private payloads; cancellation/quota probes require their additional gates and suitable account state. |
+| K052 | Deterministic contract + opt-in paid probes | `test_slice0_package.py::test_production_never_calls_event_discarding_run_turn_projection`; opt-in `tests/live/test_codex_qualification.py::test_live_codex_stream_continuation_and_cancellation`; `test_live_structured_nested_optional_output_and_commentary_selection`; `test_live_json_encoded_tool_arguments`; `test_live_in_flight_cancellation`; `test_live_quota_exhaustion`. Provider compatibility qualification runs the first three plus in-flight cancellation against at least one currently supported local-account route. The current route is `gpt-5.6-terra`; retired `gpt-5.4` is not invoked through `local_account`. Continuation proves same-lease addition and close/reopen/resume without historical recharge; the structured probe checks terminal selection when commentary is observed. Ordinary CI neither runs paid probes nor records private payloads; quota requires its additional gate and an already-exhausted profile. |
 
 The dependency timeout test specifically proves that `Write` plus
 `ReDispatchable` returns `RecoveryRequired` after timeout and remains blocked
@@ -74,11 +74,10 @@ extraction locator identities rotate, while its contract and policy identities
 and all `web-search-v2` identities remain unchanged. No kernel source,
 `provider-runtime`, `openai-codex`, provider adapter, request containment, or
 structured-output wire changes. The paid `gpt-5.6-terra` and `gpt-5.4`
-qualification recorded for that unchanged provider surface therefore remains
-applicable; a change to any of those provider-facing inputs requires both live
-routes to be rerun.
+qualification recorded for that unchanged provider surface was applicable to
+that historical release. Current route requirements are governed by K052.
 
-The provider-runtime propagation from kernel
+The historical provider-runtime usage propagation from kernel
 `c9dac7a610636a668bbf932cc2f961c0904f9157` qualifies dependency revision
 `f477dcdcad03c30019576203d4eb8a3581a6d32f` through the exact-pin package test,
 the invocation-local public API canary, provider adapter regressions, and the
@@ -100,3 +99,26 @@ on `gpt-5.6-terra`. A resumed terminal exercised the permitted `Absent` usage
 case and the new lease remained incomplete rather than charging historical
 tokens. No already-exhausted qualification profile was configured, so quota
 exhaustion was not run and no account was deliberately exhausted.
+
+The provider-runtime propagation from kernel
+`09f08df2970121ababe973b0e92d6901dd40da9e` qualifies dependency revision
+`2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd` through the exact-pin package test,
+the public event-contract canary, the terminal-only consumer regression, and
+the fetched dependency suite. Provider-runtime owns authoritative assistant
+message selection: the last completed Codex `final_answer` wins, the last
+phase-unknown completion is the fallback, and commentary is never executable.
+The unchanged kernel adapter neither concatenates nor selects `AgentText`; only
+the independently validated terminal structured value can become a model step.
+No kernel runtime, provider wire, authority, containment, usage, recovery,
+persistence, session-reference, `llm-tools`, or Codex SDK change is introduced,
+and existing native sessions remain compatible without a kernel compatibility
+rotation.
+
+Paid release qualification on 2026-09-05 passed the conversational
+continuation/close/reopen/resume and invocation-local usage probe, the nested
+nullable structured-output plus observed commentary/final-answer selection
+probe, and the JSON-string tool-argument probe on the currently supported
+`gpt-5.6-terra` local-account route (3 passed). The separately gated in-flight
+cancellation probe also passed (1 passed). Retired `gpt-5.4` was not invoked.
+No already-exhausted qualification profile was configured, so quota exhaustion
+was not run and no account was deliberately exhausted.

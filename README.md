@@ -19,7 +19,7 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `f477dcdcad03c30019576203d4eb8a3581a6d32f`
+  `2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - provider-certified `openai-codex==0.144.4`
 
@@ -41,6 +41,15 @@ adapter retains the latest event snapshot, prefers terminal usage, and adds one
 usage value exactly once per provider turn. Resumed historical usage is never
 charged; unavailable safely attributable usage remains unknown so admission
 settlement conservatively retains its token reservation.
+
+`AgentTerminal.final_text` is the provider-selected authoritative assistant
+response, not a concatenation of streamed `AgentText` observations. For the
+pinned Codex route, the last completed `phase=final_answer` message wins; when
+there is no such message, the last completed phase-unknown message is the
+compatibility fallback. Commentary remains observable provider output but is
+never executable structured output. The kernel continues to ignore
+`AgentText` for logical-step execution and independently validates only the
+terminal structured value.
 
 ## Install and verify
 

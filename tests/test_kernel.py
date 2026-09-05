@@ -691,6 +691,48 @@ async def test_thread_streams_stores_ref_then_settles_valid_say(tmp_path: Path) 
     assert await refs.load(ThreadId("thread-1"), definition.fingerprint) is not None
 
 
+async def test_commentary_agent_text_never_reaches_logical_validation_or_dispatch(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(effect=ToolEffect.Read)
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    dispatch = ScriptedToolDispatchPort(())
+    commentary = json.dumps(
+        _wire_step(
+            {
+                "type": "call_tool",
+                "tool_id": "test.observe",
+                "arguments": {"value": "commentary must not execute"},
+            }
+        ),
+        separators=(",", ":"),
+    )
+    runtime = _Runtime(
+        [
+            (
+                AgentText(commentary),
+                _terminal({"type": "say", "text": "terminal answer"}),
+            )
+        ]
+    )
+
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        runtime,
+        checkpoints,
+        dispatch,
+    )
+
+    assert outcome.type == "completed"
+    assert dispatch.calls == []
+    assert [record.conclusion for record in checkpoints.settlements] == [
+        ConversationConclusion("terminal answer")
+    ]
+
+
 async def test_six_turn_resumed_session_settles_invocation_local_usage_once_per_turn(
     tmp_path: Path,
 ) -> None:
