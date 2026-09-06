@@ -139,6 +139,11 @@ Exit: K037–K045 pass.
 Deliver:
 
 - Isolated structured one-shot façade rejecting every `Write` plan.
+- Optional single initial Read with exact plan/binding/input preflight, normal
+  dispatcher execution before provider open, one shared plan-aware budget,
+  deterministic disjoint isolated positions, and typed first-turn observation.
+- Adversarial proof that the prelude is neither a model step nor executable
+  commentary and adds no list, retry, hook, dependency graph, or workflow.
 - Fresh-session/finally-close behavior with no thread-state port access.
 - Default-private tracing and opt-in redacted diagnostics.
 - Full deterministic seam matrix and an opt-in paid live qualification suite.

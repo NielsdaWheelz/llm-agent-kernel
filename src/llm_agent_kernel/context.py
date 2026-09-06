@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 from llm_tools import (
     FrozenToolPlan,
+    InvocationPosition,
     PromptAttribute,
     PromptAttributeName,
     PromptJson,
@@ -33,17 +34,27 @@ class ContextLimitExceeded(ValueError):
 class ToolObservation:
     binding: ToolBinding[Any, Any, Any]
     result: ToolResult
-    model_step_ordinal: int
+    model_step_ordinal: int | None
     recomputable: bool = False
     source_references: tuple[str, ...] = ()
+    initial_read_position: InvocationPosition | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.binding, ToolBinding):
             raise TypeError("an observation requires its exact tool binding")
         if not isinstance(self.result, dict):
             raise TypeError("an observation result must be an llm-tools ToolResult")
-        if type(self.model_step_ordinal) is not int or self.model_step_ordinal <= 0:
-            raise ValueError("observation model-step ordinal must be positive")
+        if self.initial_read_position is None:
+            if type(self.model_step_ordinal) is not int or self.model_step_ordinal <= 0:
+                raise ValueError("observation model-step ordinal must be positive")
+        elif not isinstance(self.initial_read_position, InvocationPosition):
+            raise TypeError("initial Read observation position must be InvocationPosition")
+        elif self.model_step_ordinal is not None:
+            raise ValueError("an initial Read observation is not a model step")
         if type(self.recomputable) is not bool:
             raise TypeError("observation recomputable must be bool")
         if self.recomputable and self.binding.spec.effect is not ToolEffect.Read:
@@ -54,6 +65,8 @@ class ToolObservation:
             raise ValueError("observation source references must be non-empty strings")
         if self.recomputable and not self.source_references:
             raise ValueError("a recomputable Read requires a stable source reference")
+        if self.initial_read_position is not None and self.recomputable:
+            raise ValueError("an initial Read observation is required initial context")
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,13 +309,25 @@ def _input_batch(
 
 
 def _observation(observation: ToolObservation) -> PromptSection:
-    return PromptSection(
-        kind=PromptSectionKind("tool_observation"),
-        attributes=(
+    if observation.initial_read_position is not None:
+        lineage_attributes = (
+            PromptAttribute(
+                PromptAttributeName("origin"),
+                "initial_read",
+            ),
+        )
+    else:
+        assert observation.model_step_ordinal is not None
+        lineage_attributes = (
             PromptAttribute(
                 PromptAttributeName("model_step_ordinal"),
                 observation.model_step_ordinal,
             ),
+        )
+    return PromptSection(
+        kind=PromptSectionKind("tool_observation"),
+        attributes=(
+            *lineage_attributes,
             PromptAttribute(
                 PromptAttributeName("tool_id"),
                 str(observation.binding.spec.id),

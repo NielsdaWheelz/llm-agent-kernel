@@ -55,6 +55,8 @@ Defines immutable provider-neutral values:
 - Public `InputProjectionPolicy`, `BatchAsOfMode`, and invocation-local
   `InputProjectionRequest` values controlling only model-visible input timing
   metadata.
+- Public `InitialReadCall` and immutable isolated initial/model dispatch
+  lineages carrying deterministic, disjoint `InvocationPosition` values.
 - Frozen maximum profile and host-selected frozen run plan, with the exact
   catalog view covered by the plan's consistency/tightening proof.
 - `InputClaim`, host inputs, checkpoints, `DispatchLineage`, conclusions, and
@@ -68,6 +70,8 @@ instructions, output schema, policy, cwd, directories, MCP configuration,
 native options, the complete input projection policy, and the owner-controlled
 session-compatibility revision. Secret bytes, dynamic input, and an invocation's
 policy-bounded projection request are excluded.
+An invocation's optional initial Read is also excluded: it is dynamic context
+for a fresh isolated session and cannot affect a saved-session namespace.
 
 ### `provider.py`
 
@@ -169,6 +173,12 @@ removed from host-owned values. The resolved projection is reused for initial,
 appended, and cold-reconstructed input; the kernel exposes no post-render prompt
 mutation hook.
 
+For an opted-in isolated initial Read, context construction occurs only after
+the normal dispatcher returns a completed typed result. The observation is
+marked `origin="initial_read"`, is never labelled with a model-step ordinal, and
+is included in the first provider submission. Required initial observations
+are not silently omitted.
+
 XML-like rendering preserves structure and provenance but does not neutralize
 prompt injection. Untrusted human, connector, memory, and Web content remains
 untrusted data.
@@ -250,6 +260,15 @@ discard a paid valid answer that has already reached finalization.
 V1 has no parallel calls and no nonterminal model-authored narration. The host
 may expose typing/activity state.
 
+`run_one_shot` additionally accepts zero or one `InitialReadCall`. That path
+proves the frozen plan and exact Read binding/input, completes admission and
+cancellation checks, creates one plan-aware budget, and dispatches through the
+ordinary host port before opening the isolated provider session. The returned
+typed observation is projected into first-turn context. Every later
+model-proposed call uses that same budget. `Pure`, `Write`, suspension,
+recovery/configuration defects, cancellation, and required-context overflow
+fail closed; no initial call leaves the prior one-shot path unchanged.
+
 ### `coordination.py`
 
 Defines the host coordination protocols.
@@ -288,8 +307,12 @@ implements a second executor or tool budget.
 
 Every thread dispatch carries immutable claim ID, current checkpoint, ordered
 admitted input IDs, and model-step ordinal. An isolated dispatch carries only
-its run ID and ordinal. The host may persist lineage with an effect; the kernel
-treats it as opaque coordination metadata.
+its run ID, ordinal, and kernel-derived position. An isolated initial Read
+carries its run ID and a position derived from a separate `initial_read` domain,
+with no fabricated model step. The host must pass these isolated positions
+unchanged into `llm-tools`; they are deterministic and non-colliding within one
+run. The host may persist lineage with an effect; the kernel otherwise treats
+it as opaque coordination metadata.
 
 `llm_tools.RunLimits` alone owns tool-call, attempt, byte, concurrency, and tool
 elapsed limits. The frozen plan sets `max_in_flight = 1`. `KernelLimits` owns
@@ -374,6 +397,16 @@ VALIDATE -- say/finish --> POLL FOR PREEMPTION --> SETTLE --> RETURN
 deterministic exhaustion/quota/stop --> host-authored stopped conclusion
 process interruption/invariant defect --> release or park; never auto-rearm
 ```
+
+The isolated opt-in prelude is narrower:
+
+```text
+PROVE PLAN + INITIAL READ --> ADMIT/CANCEL --> BUILD EXACT BUDGET
+  --> SERIAL READ DISPATCH --> TYPED OBSERVATION + CONTEXT --> OPEN --> MODEL TURN
+```
+
+It adds no call list, retry, hook, dependency graph, workflow, or authority
+mechanism.
 
 No database transaction remains open across provider or connector I/O.
 

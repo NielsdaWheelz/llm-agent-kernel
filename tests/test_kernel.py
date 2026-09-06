@@ -14,6 +14,7 @@ from llm_tools import (
     BudgetState,
     CapabilityProfile,
     HostTable,
+    InvocationPosition,
     NoDeclaredError,
     PolicyEpoch,
     ProfileId,
@@ -22,6 +23,7 @@ from llm_tools import (
     PromptSectionKind,
     PromptSections,
     PromptText,
+    RecoveryRequired,
     ReplayPolicy,
     RunLimits,
     ToolBinding,
@@ -59,6 +61,7 @@ from provider_runtime.types import Absent, CancelSignal, Present, TokenUsage
 from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel.cancellation import CancellationToken
+from llm_agent_kernel.context import bootstrap_context
 from llm_agent_kernel.coordination import (
     AdmissionDeferred,
     AdmissionGranted,
@@ -88,10 +91,13 @@ from llm_agent_kernel.definitions import (
     DispatchSuspended,
     HostInput,
     HostRef,
+    InitialReadCall,
+    InitialReadDispatchLineage,
     InputClaim,
     InputId,
     InputProjectionPolicy,
     InputProjectionRequest,
+    IsolatedDispatchLineage,
     KernelLimits,
     OneShotCompleted,
     OwnerToken,
@@ -415,10 +421,13 @@ class _BudgetFactory:
     def __init__(self, limits: RunLimits | None = None) -> None:
         self.limits = limits
         self.plans: list[Any] = []
+        self.budgets: list[BudgetState] = []
 
     def create(self, plan: Any) -> BudgetState:
         self.plans.append(plan)
-        return cast(BudgetState, _Budgets(self.limits or plan.profile.run_limits))
+        budgets = cast(BudgetState, _Budgets(self.limits or plan.profile.run_limits))
+        self.budgets.append(budgets)
+        return budgets
 
 
 def _budget_factory(limits: RunLimits | None = None) -> _BudgetFactory:
@@ -1397,6 +1406,7 @@ async def test_pre_dispatch_append_revalidates_before_any_tool_action(tmp_path: 
     assert len(runtime.turns) == 2
     assert "steer before action" in cast(TextContent, runtime.turns[1].input[0]).text
     assert len(dispatch.calls) == 1
+    assert isinstance(dispatch.calls[0].lineage, DispatchLineage)
     assert dispatch.calls[0].lineage.model_step_ordinal == 2
 
 
@@ -1825,6 +1835,652 @@ async def test_isolated_structured_run_is_fresh_closed_and_uses_no_saved_state(
     assert len(runtime.opens) == 1
     assert not isinstance(runtime.opens[0].open, ResumeSession)
     assert len(runtime.closed) == 1
+    assert admission.live_slots == 0
+
+
+async def test_one_shot_without_initial_read_is_exactly_unchanged(tmp_path: Path) -> None:
+    definition, plan, _ = _definition(mode=SessionMode.isolated, structured=True)
+    inputs = (_input(),)
+    as_of = datetime(2026, 9, 6, 10, 0, tzinfo=UTC)
+    source_sections = _sections("canonical")
+    expected = bootstrap_context(
+        definition,
+        inputs,
+        as_of,
+        plan,
+        source_sections,
+    ).rendered
+    runtimes = [
+        _Runtime([(_terminal({"type": "finish", "result": {"answer": "yes"}}),)]),
+        _Runtime([(_terminal({"type": "finish", "result": {"answer": "yes"}}),)]),
+    ]
+    submissions: list[tuple[TextContent, ...]] = []
+    variants: tuple[dict[str, Any], ...] = ({}, {"initial_read": None})
+
+    for runtime, kwargs in zip(runtimes, variants, strict=True):
+        provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+        dispatcher = ScriptedToolDispatchPort(())
+        outcome = await run_one_shot(
+            run_id=RunId("no-initial-read"),
+            definition=definition,
+            inputs=inputs,
+            as_of=as_of,
+            plan=plan,
+            source_sections=source_sections,
+            admission=InMemoryAdmissionPort(),
+            provider=provider,
+            dispatcher=dispatcher,
+            budget_factory=_budget_factory(),
+            **kwargs,
+        )
+        assert isinstance(outcome, OneShotCompleted)
+        assert dispatcher.calls == []
+        submissions.append(cast(tuple[TextContent, ...], runtime.turns[0].input))
+
+    assert submissions[0] == submissions[1]
+    assert submissions[0] == (TextContent(expected),)
+
+
+async def test_initial_read_precedes_provider_and_shares_budget_with_model_calls(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    runtime = _Runtime(
+        [
+            (
+                _terminal(
+                    {
+                        "type": "call_tool",
+                        "tool_id": "test.observe",
+                        "arguments": {"value": "model-call"},
+                    }
+                ),
+            ),
+            (_terminal({"type": "finish", "result": {"answer": "used observation"}}),),
+        ]
+    )
+
+    class OrderingDispatcher(ScriptedToolDispatchPort):
+        async def dispatch(self, **kwargs: Any):
+            if not self.calls:
+                assert runtime.opens == []
+                assert runtime.turns == []
+            return await super().dispatch(**kwargs)
+
+    dispatcher = OrderingDispatcher(
+        (
+            DispatchCompleted({"type": "Success", "value": {"value": "memory-value"}}),
+            DispatchCompleted({"type": "Success", "value": {"value": "model-value"}}),
+        )
+    )
+    admission = InMemoryAdmissionPort()
+
+    class OrderedBudgetFactory(_BudgetFactory):
+        def create(self, plan: Any) -> BudgetState:
+            assert admission.live_slots == 1
+            return super().create(plan)
+
+    factory = OrderedBudgetFactory()
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+
+    outcome = await run_one_shot(
+        run_id=RunId("initial-read-order"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=admission,
+        provider=provider,
+        dispatcher=dispatcher,
+        budget_factory=factory,
+        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "memory-query"}),
+    )
+
+    assert isinstance(outcome, OneShotCompleted)
+    assert cast(FrozenJsonDict, outcome.result)["answer"] == "used observation"
+    assert factory.plans == [plan]
+    assert len(factory.budgets) == 1
+    assert len(dispatcher.calls) == 2
+    assert dispatcher.calls[0].budgets is dispatcher.calls[1].budgets is factory.budgets[0]
+    initial_lineage = dispatcher.calls[0].lineage
+    model_lineage = dispatcher.calls[1].lineage
+    assert isinstance(initial_lineage, InitialReadDispatchLineage)
+    assert isinstance(model_lineage, IsolatedDispatchLineage)
+    assert isinstance(initial_lineage.position, InvocationPosition)
+    assert isinstance(model_lineage.position, InvocationPosition)
+    assert initial_lineage.position != model_lineage.position
+    assert model_lineage.model_step_ordinal == 1
+    first_provider_input = cast(TextContent, runtime.turns[0].input[0]).text
+    assert "memory-value" in first_provider_input
+    assert 'origin="initial_read"' in first_provider_input
+    assert "initial_read_position=" not in first_provider_input
+    assert "model_step_ordinal=" not in first_provider_input
+
+
+async def test_declared_initial_read_failure_is_a_typed_first_turn_observation(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    runtime = _Runtime([(_terminal({"type": "finish", "result": {"answer": "no memory"}}),)])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    dispatcher = ScriptedToolDispatchPort(
+        (DispatchCompleted({"type": "Failure", "error": {"reason": "not-found"}}),)
+    )
+
+    outcome = await run_one_shot(
+        run_id=RunId("initial-read-failure"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=InMemoryAdmissionPort(),
+        provider=provider,
+        dispatcher=dispatcher,
+        budget_factory=_budget_factory(),
+        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "missing"}),
+    )
+
+    assert isinstance(outcome, OneShotCompleted)
+    submitted = cast(TextContent, runtime.turns[0].input[0]).text
+    assert '"type":"Failure"' in submitted
+    assert '"reason":"not-found"' in submitted
+
+
+@pytest.mark.parametrize("effect", [ToolEffect.Pure, ToolEffect.Write])
+async def test_initial_read_rejects_non_read_effects_before_io(
+    tmp_path: Path,
+    effect: ToolEffect,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=effect,
+    )
+    runtime = _Runtime([])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    admission = InMemoryAdmissionPort()
+    dispatcher = ScriptedToolDispatchPort(())
+    factory = _BudgetFactory()
+
+    with pytest.raises(ValueError, match="Read|Write"):
+        await run_one_shot(
+            run_id=RunId(f"reject-{effect.value}"),
+            definition=definition,
+            inputs=(_input(),),
+            as_of=datetime.now(UTC),
+            plan=plan,
+            source_sections=_sections("canonical"),
+            admission=admission,
+            provider=provider,
+            dispatcher=dispatcher,
+            budget_factory=factory,
+            initial_read=InitialReadCall(ToolId("test.observe"), {"value": "x"}),
+        )
+
+    assert factory.plans == []
+    assert admission.charged_turns == 0
+    assert dispatcher.calls == []
+    assert runtime.opens == []
+
+
+@pytest.mark.parametrize(
+    "initial_read",
+    [
+        InitialReadCall(ToolId("test.missing"), {"value": "x"}),
+        InitialReadCall(ToolId("test.observe"), {"value": 7}),
+    ],
+)
+async def test_invalid_initial_read_fails_before_admission_tool_or_provider_io(
+    tmp_path: Path,
+    initial_read: InitialReadCall,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    runtime = _Runtime([])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    admission = InMemoryAdmissionPort()
+    dispatcher = ScriptedToolDispatchPort(())
+    factory = _BudgetFactory()
+
+    with pytest.raises(ValueError):
+        await run_one_shot(
+            run_id=RunId("invalid-initial-read"),
+            definition=definition,
+            inputs=(_input(),),
+            as_of=datetime.now(UTC),
+            plan=plan,
+            source_sections=_sections("canonical"),
+            admission=admission,
+            provider=provider,
+            dispatcher=dispatcher,
+            budget_factory=factory,
+            initial_read=initial_read,
+        )
+
+    assert factory.plans == []
+    assert admission.charged_turns == 0
+    assert dispatcher.calls == []
+    assert runtime.opens == []
+
+
+async def test_initial_read_tool_in_maximum_but_not_selected_plan_is_ungranted(
+    tmp_path: Path,
+) -> None:
+    first_maximum, _first_plan, first = _authority(ToolEffect.Read)
+    assert first is not None
+    second_spec = ToolSpec(
+        id=ToolId("test.ungranted"),
+        summary="Ungrantable observation",
+        documentation=PromptDocument("Not selected for this run."),
+        input_type=ToolInput,
+        success_type=ToolSuccess,
+        error_type=NoDeclaredError,
+        effect=ToolEffect.Read,
+        limits=ToolLimits(1_024, 4_096, 1, 5.0),
+    )
+    second = ToolBinding(
+        spec=second_spec,
+        execute=Available(_must_not_execute),
+        replay_policy=ReplayPolicy.ReDispatchable,
+        implementation_revision="ungranted-v1",
+        policy_epoch=PolicyEpoch("v1"),
+        policy_inputs={},
+    )
+    catalog = ToolCatalog.compose((ToolFamily("test", (first.spec, second.spec), (first, second)),))
+    maximum = CapabilityProfile(
+        ProfileId("maximum-two"),
+        (ToolGrant(first.spec.id, None), ToolGrant(second.spec.id, None)),
+        first_maximum.run_limits,
+    ).freeze(catalog)
+    selected = CapabilityProfile(
+        ProfileId("selected-one"),
+        (ToolGrant(first.spec.id, None),),
+        first_maximum.run_limits,
+    ).freeze(catalog)
+    plan = ToolPlan(selected.id, HostTable()).freeze(catalog, selected)
+    definition = AgentDefinition(
+        DefinitionId("isolated-ungranted"),
+        AgentRole("assistant", _sections("role")),
+        _sections("stable"),
+        SessionMode.isolated,
+        StructuredOutput("answer", StructuredResult),
+        maximum,
+        ProviderConfiguration(CredentialRef("local_account", "test"), "gpt-5"),
+        "ungranted-test-v1",
+    )
+    runtime = _Runtime([])
+    admission = InMemoryAdmissionPort()
+    dispatcher = ScriptedToolDispatchPort(())
+
+    with pytest.raises(ValueError, match="not granted"):
+        await run_one_shot(
+            run_id=RunId("ungranted-initial-read"),
+            definition=definition,
+            inputs=(_input(),),
+            as_of=datetime.now(UTC),
+            plan=plan,
+            source_sections=_sections("canonical"),
+            admission=admission,
+            provider=CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path),
+            dispatcher=dispatcher,
+            budget_factory=_budget_factory(),
+            initial_read=InitialReadCall(second.spec.id, {"value": "x"}),
+        )
+
+    assert admission.charged_turns == 0
+    assert dispatcher.calls == []
+    assert runtime.opens == []
+
+
+async def test_stale_initial_read_plan_fails_before_any_external_boundary(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    stale = replace(plan, plan_revision="0" * 64)
+    runtime = _Runtime([])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    admission = InMemoryAdmissionPort()
+    dispatcher = ScriptedToolDispatchPort(())
+    factory = _BudgetFactory()
+
+    with pytest.raises(ValueError):
+        await run_one_shot(
+            run_id=RunId("stale-initial-read"),
+            definition=definition,
+            inputs=(_input(),),
+            as_of=datetime.now(UTC),
+            plan=stale,
+            source_sections=_sections("canonical"),
+            admission=admission,
+            provider=provider,
+            dispatcher=dispatcher,
+            budget_factory=factory,
+            initial_read=InitialReadCall(ToolId("test.observe"), {"value": "x"}),
+        )
+
+    assert factory.plans == []
+    assert admission.charged_turns == 0
+    assert dispatcher.calls == []
+    assert runtime.opens == []
+
+
+async def test_initial_read_admission_and_budget_failures_precede_dispatch(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    initial_read = InitialReadCall(ToolId("test.observe"), {"value": "x"})
+
+    denied_runtime = _Runtime([])
+    denied_dispatcher = ScriptedToolDispatchPort(())
+    denied_factory = _BudgetFactory()
+    denied = await run_one_shot(
+        run_id=RunId("initial-read-admission-denied"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=InMemoryAdmissionPort(max_turns=1),
+        provider=CodexProvider(cast(AgentRuntime, denied_runtime), cwd_parent=tmp_path),
+        dispatcher=denied_dispatcher,
+        budget_factory=denied_factory,
+        initial_read=initial_read,
+    )
+    assert denied.type is ThreadStopKind.budget_exhausted
+    assert denied_factory.plans == []
+    assert denied_dispatcher.calls == []
+    assert denied_runtime.opens == []
+
+    admitted_runtime = _Runtime([])
+    admitted_dispatcher = ScriptedToolDispatchPort(())
+    admission = InMemoryAdmissionPort()
+    wrong_factory = _BudgetFactory(RunLimits(7, 8, 32_768, 32_768, 1, 30.0))
+    mismatch = await run_one_shot(
+        run_id=RunId("initial-read-budget-mismatch"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=admission,
+        provider=CodexProvider(cast(AgentRuntime, admitted_runtime), cwd_parent=tmp_path),
+        dispatcher=admitted_dispatcher,
+        budget_factory=wrong_factory,
+        initial_read=initial_read,
+    )
+    assert mismatch.type is ThreadStopKind.configuration_error
+    assert wrong_factory.plans == [plan]
+    assert admitted_dispatcher.calls == []
+    assert admitted_runtime.opens == []
+    assert admission.live_slots == 0
+
+
+async def test_initial_read_budget_boundary_is_rendered_without_external_work(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    runtime = _Runtime([(_terminal({"type": "finish", "result": {"answer": "budget closed"}}),)])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    dispatcher = ScriptedToolDispatchPort((DispatchCompleted({"type": "BudgetExceeded"}),))
+
+    outcome = await run_one_shot(
+        run_id=RunId("initial-read-over-budget"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=InMemoryAdmissionPort(),
+        provider=provider,
+        dispatcher=dispatcher,
+        budget_factory=_budget_factory(),
+        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "x"}),
+    )
+
+    assert isinstance(outcome, OneShotCompleted)
+    assert len(dispatcher.calls) == 1
+    assert '"type":"BudgetExceeded"' in cast(TextContent, runtime.turns[0].input[0]).text
+
+
+async def test_initial_read_cancellation_before_dispatch_and_after_completion(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    initial_read = InitialReadCall(ToolId("test.observe"), {"value": "x"})
+
+    cancelled_before = CancellationToken()
+    cancelled_before.cancel()
+    before_runtime = _Runtime([])
+    before_dispatcher = ScriptedToolDispatchPort(())
+    before = await run_one_shot(
+        run_id=RunId("initial-read-cancelled-before"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=InMemoryAdmissionPort(),
+        provider=CodexProvider(cast(AgentRuntime, before_runtime), cwd_parent=tmp_path),
+        dispatcher=before_dispatcher,
+        budget_factory=_budget_factory(),
+        initial_read=initial_read,
+        cancellation=cancelled_before,
+    )
+    assert before.type is ThreadStopKind.cancelled
+    assert before_dispatcher.calls == []
+    assert before_runtime.opens == []
+
+    cancelled_after = CancellationToken()
+    after_runtime = _Runtime([])
+
+    class CancellingDispatcher(ScriptedToolDispatchPort):
+        async def dispatch(self, **kwargs: Any):
+            result = await super().dispatch(**kwargs)
+            cancelled_after.cancel()
+            return result
+
+    after_dispatcher = CancellingDispatcher(
+        (DispatchCompleted({"type": "Success", "value": {"value": "seen"}}),)
+    )
+    after = await run_one_shot(
+        run_id=RunId("initial-read-cancelled-after"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=InMemoryAdmissionPort(),
+        provider=CodexProvider(cast(AgentRuntime, after_runtime), cwd_parent=tmp_path),
+        dispatcher=after_dispatcher,
+        budget_factory=_budget_factory(),
+        initial_read=initial_read,
+        cancellation=cancelled_after,
+    )
+    assert after.type is ThreadStopKind.cancelled
+    assert len(after_dispatcher.calls) == 1
+    assert after_runtime.opens == []
+
+
+async def test_initial_read_observation_context_limit_stops_before_provider(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+        limits=KernelLimits(max_new_context_bytes=5_000),
+    )
+    runtime = _Runtime([])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    dispatcher = ScriptedToolDispatchPort(
+        (DispatchCompleted({"type": "Success", "value": {"value": "x" * 10_000}}),)
+    )
+    admission = InMemoryAdmissionPort()
+
+    outcome = await run_one_shot(
+        run_id=RunId("initial-read-context-limit"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=admission,
+        provider=provider,
+        dispatcher=dispatcher,
+        budget_factory=_budget_factory(),
+        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "x"}),
+    )
+
+    assert outcome.type is ThreadStopKind.configuration_error
+    assert len(dispatcher.calls) == 1
+    assert runtime.opens == []
+    assert admission.live_slots == 0
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ToolDispatchDefect("initial dispatch configuration defect"),
+        RecoveryRequired("initial Read requires recovery"),
+    ],
+)
+async def test_initial_read_dispatch_defects_settle_admission_and_open_no_provider(
+    tmp_path: Path,
+    error: Exception,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+    )
+    runtime = _Runtime([])
+
+    class DefectiveDispatcher(ScriptedToolDispatchPort):
+        async def dispatch(self, **kwargs: Any):
+            await super().dispatch(**kwargs)
+            raise error
+
+    dispatcher = DefectiveDispatcher(
+        (DispatchCompleted({"type": "Success", "value": {"value": "unused"}}),)
+    )
+    admission = InMemoryAdmissionPort()
+
+    outcome = await run_one_shot(
+        run_id=RunId("initial-read-defect"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=admission,
+        provider=CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path),
+        dispatcher=dispatcher,
+        budget_factory=_budget_factory(),
+        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "x"}),
+    )
+
+    assert outcome.type is ThreadStopKind.configuration_error
+    assert len(dispatcher.calls) == 1
+    assert runtime.opens == []
+    assert admission.live_slots == 0
+
+
+async def test_initial_read_commentary_call_is_non_executable_and_usage_settles(
+    tmp_path: Path,
+) -> None:
+    limits = KernelLimits(
+        max_provider_turns=1,
+        max_provider_input_tokens=10,
+        max_provider_output_tokens=2,
+    )
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        effect=ToolEffect.Read,
+        limits=limits,
+    )
+    commentary = json.dumps(
+        _wire_step(
+            {
+                "type": "call_tool",
+                "tool_id": "test.observe",
+                "arguments": {"value": "commentary must not execute"},
+            }
+        ),
+        separators=(",", ":"),
+    )
+    usage = _usage(10, 2)
+    runtime = _Runtime(
+        [
+            (
+                AgentText(commentary),
+                _terminal(
+                    {"type": "finish", "result": {"answer": "terminal only"}},
+                    usage=usage,
+                ),
+            )
+        ]
+    )
+    dispatcher = ScriptedToolDispatchPort(
+        (DispatchCompleted({"type": "Success", "value": {"value": "memory"}}),)
+    )
+    admission = InMemoryAdmissionPort(
+        max_turns=1,
+        max_input_tokens=10,
+        max_output_tokens=2,
+    )
+
+    outcome = await run_one_shot(
+        run_id=RunId("initial-read-commentary"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=admission,
+        provider=CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path),
+        dispatcher=dispatcher,
+        budget_factory=_budget_factory(),
+        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "memory-query"}),
+    )
+
+    assert isinstance(outcome, OneShotCompleted)
+    assert len(dispatcher.calls) == 1
+    assert outcome.metrics.provider_turns == 1
+    assert outcome.metrics.usage.input_tokens == 10
+    assert outcome.metrics.usage.output_tokens == 2
+    assert admission.charged_turns == 1
+    assert admission.charged_input_tokens == 10
+    assert admission.charged_output_tokens == 2
     assert admission.live_slots == 0
 
 

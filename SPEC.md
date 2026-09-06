@@ -158,6 +158,8 @@ uncertain position, or decide product authority.
   kernel-level limits.
 - Provider-session and host input/checkpoint ports.
 - Run outcomes, accumulated provider usage, and conformance tests.
+- Opt-in dispatch of one host-selected initial `Read` for isolated one-shot
+  context, without synthesizing a model step or bypassing the host dispatcher.
 
 ### 3.4 The host application owns
 
@@ -213,9 +215,10 @@ projection policy and exact `session_compatibility_revision`. The owner MUST
 rotate that revision when an application, kernel, or provider-runtime semantic
 change makes saved sessions incompatible even if no other serialized definition
 field changed. It excludes credential secret bytes, current input, the
-invocation's projection request, other dynamic context, the per-run plan, and
-host time. Any change to a covered value rotates the session and forces
-bootstrap.
+invocation's projection request or initial Read, other dynamic context, the
+per-run plan, and host time. Any change to a covered value rotates the session
+and forces bootstrap. Initial Reads are isolated-only and therefore never
+resume or store a native session reference.
 
 ### 4.2 RunPlan
 
@@ -245,10 +248,13 @@ The caller supplies a `ToolBudgetFactoryPort`, not a `BudgetState` constructed
 from out-of-band plan knowledge. After `claim` returns and the kernel validates
 the exact selected plan, the kernel calls `create(plan)` once for a run that can
 proceed. The returned `BudgetState.limits` MUST equal the claimed plan's
-`profile.run_limits`; a mismatch parks thread input or rejects an isolated run
-before context rendering, admission, provider I/O, or tool I/O. The factory
-does not transfer ownership of tool accounting to the kernel: the returned
-state and `llm-tools` executor retain that responsibility.
+`profile.run_limits`. A mismatch parks thread input or rejects an ordinary
+isolated run before context rendering, admission, provider I/O, or tool I/O. An
+isolated run with an initial Read first completes child admission and
+cancellation checks, then creates and verifies that same one budget before the
+initial dispatch, observation rendering, or provider I/O. The factory does not
+transfer ownership of tool accounting to the kernel: the returned state and
+`llm-tools` executor retain that responsibility.
 
 ### 4.3 ApplicationThread and InputClaim
 
@@ -289,7 +295,10 @@ only the successful terminal's structured value for execution.
 
 An isolated one-shot has explicit host input, no application claim/checkpoint or
 saved session reference, a fresh native session, a structured output contract,
-and no `Write` tool. Its result is not durable until its caller commits it.
+and no `Write` tool. It MAY carry one invocation-local `InitialReadCall` naming
+a canonical `ToolId` plus JSON-compatible arguments. The call is host-selected
+input to orchestration, not a model step or an authority grant. Its result is
+not durable until its caller commits it.
 
 ## 5. Exact provider surface and containment
 
@@ -524,12 +533,17 @@ dispatch lineage. A thread
 - The ordered `input_id` values admitted through that checkpoint.
 - The model-step ordinal within the claim.
 
-An isolated one-shot instead carries its run ID and model-step ordinal; it has
-no application claim, checkpoint, or input identities. The kernel does not
-interpret or persist lineage. It supplies the lineage that was true immediately
-before dispatch so the host can bind a durable effect to every thread input
-that preceded it, including input appended mid-loop. The host supplies
-`llm-tools` with an `InvocationPosition`:
+An isolated model-proposed call instead carries its run ID, model-step ordinal,
+and a deterministic kernel-derived `InvocationPosition`; it has no application
+claim, checkpoint, or input identities. An isolated initial Read carries its
+run ID and a position from a disjoint `initial_read` domain, with no fictitious
+model-step ordinal. The positions are stable for the invocation and cannot
+collide with each other or with any model-step position for that run. The host
+MUST pass the lineage's exact isolated position to `llm-tools`. The kernel does
+not persist lineage. It supplies the lineage that was true immediately before
+dispatch so the host can bind a durable effect to every thread input that
+preceded it, including input appended mid-loop. For thread dispatch, the host
+supplies `llm-tools` with an `InvocationPosition`:
 
 - For a `Write`, host code first creates or resolves its durable effect/action
   record and uses that stable record ID for both `InvocationPosition` and
@@ -589,6 +603,14 @@ truncate an action outcome, approval payload, or uncertainty evidence.
 A generic durable observed-value store is not a v1 kernel requirement. It may be
 added by a host when source-specific reread/pagination is insufficient.
 
+The completed result of an isolated initial Read is projected as a typed tool
+observation with `origin="initial_read"` before the first provider turn. It is
+required initial context and is not silently omitted as a recomputable prior
+observation. Declared and boundary failures remain ordinary typed `llm-tools`
+results. Configuration defects, position conflicts, recovery requirements,
+oversized required context, suspension, and cancellation retain their distinct
+fail-closed one-shot outcomes.
+
 ## 8. Context and steering
 
 ### 8.1 Provider-neutral context
@@ -615,6 +637,10 @@ and is applied consistently to initial input, mid-loop appends, and any cold
 reconstruction. There is no post-render mutation seam. Input IDs and content
 remain visible, and the operational timestamp values remain available to host
 coordination regardless of rendering.
+
+When an isolated invocation selects an initial Read, its completed observation
+is added through this same context projection before any provider session is
+opened or turned.
 
 `llm-tools` renders typed prompt sections. XML-like presentation is structure and
 provenance, never a security boundary. Human input, retrieved memory, tool
@@ -866,17 +892,37 @@ An isolated one-shot:
 - Validates its invocation input projection against the definition policy
   before plan rendering, admission, provider I/O, or tool I/O.
 - Requires a HostTable plan containing no `ToolEffect.Write` binding.
-- Validates that plan, constructs a fresh budget through
-  `ToolBudgetFactoryPort`, and requires exact plan `RunLimits` before rendering,
-  admission, provider I/O, or tool I/O.
+- Validates that plan and, with no initial Read, constructs a fresh budget
+  through `ToolBudgetFactoryPort` and requires exact plan `RunLimits` before
+  rendering, admission, provider I/O, or tool I/O.
 - Requires a host-issued admission reservation; denial returns to the caller
   without retry or provider I/O.
+- MAY receive zero or one `InitialReadCall`. When present, it validates the exact
+  selected plan first, then proves the named binding is granted and exactly
+  `ToolEffect.Read` and purely validates its arguments before rendering,
+  admission, provider I/O, or tool I/O. Missing, ungranted, stale, `Pure`,
+  `Write`, or malformed selections fail at this boundary.
+- For that opt-in path, completes child admission/token and cancellation checks,
+  creates and verifies one fresh plan-aware budget, dispatches the initial Read
+  through the normal host port with `InitialReadDispatchLineage`, and projects
+  only a completed typed result. That exact budget is reused by every later
+  model-proposed call. The dependency-owned executor alone accounts calls,
+  attempts, bytes, external attempts, and tool elapsed time.
+- Opens the provider session only after the initial observation is logically
+  available and has passed required context-size projection. A typed
+  `BudgetExceeded` or declared failure may be shown to the model; it grants no
+  external work. A suspension or configuration/recovery defect fails closed.
 - Uses a fresh native session and no `InputCheckpointPort`, admission retry
   state, or `SessionRefPort`.
 - Uses the same structured step validation, serial tool loop, budgets, and
   cancellation.
 - Closes the native session in `finally`.
 - Returns only a schema-valid `finish.result` or a typed stop outcome.
+
+The facility is a single deterministic Read for constructing first-turn model
+context. It is not a hook, retry mechanism, list of calls, dependency graph,
+workflow engine, authority mechanism, or permission to execute commentary.
+`AgentText` remains observational and non-executable.
 
 `Read + BilledOnce` may be billed again if the caller fails before committing
 the result. Provider-internal session state may exist during the invocation but
@@ -995,6 +1041,12 @@ The release suite covers both single-run interior behavior and composed seams:
     or explicitly requested, rejects widening requests before any external
     boundary, and participates completely in deterministic fingerprinting for
     thread and isolated empty-plan runs.
+27. With no initial Read, one-shot behavior is byte-for-byte and behaviorally
+    unchanged. With one, plan/binding/input validation precedes admission and
+    I/O; admission and cancellation precede one exact shared tool budget and
+    dispatch; initial/model positions are deterministic and disjoint; the typed
+    completed observation precedes provider I/O; failures, bounds, commentary,
+    accounting, containment, and finally-close behavior remain fail-closed.
 
 ## 15. Explicitly deferred
 
@@ -1008,6 +1060,8 @@ The release suite covers both single-run interior behavior and composed seams:
 - General delegation, persistent peer agents, task trees, join, and cancellation
   propagation.
 - Kernel-owned SQL, workflow, queue, scheduler, lease, connector, memory, or UI.
+- Initial-call lists, hooks, retries, dependency graphs, and general pre-model
+  workflows beyond the single isolated Read defined above.
 
 Deferred features require measured need, an ADR, and preservation of the
 provider containment, plan-tightening, admission, and effect boundaries above.

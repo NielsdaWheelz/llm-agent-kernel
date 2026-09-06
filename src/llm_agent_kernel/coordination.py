@@ -345,6 +345,8 @@ class ToolBudgetFactoryPort(Protocol):
 
 
 class ToolDispatchPort(Protocol):
+    """Host dispatch; isolated lineages supply the exact llm-tools position."""
+
     async def dispatch(
         self,
         *,

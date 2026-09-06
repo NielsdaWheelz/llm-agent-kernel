@@ -16,6 +16,7 @@ from llm_tools import (
     Available,
     CapabilityProfile,
     HostTable,
+    InvocationPosition,
     NoDeclaredError,
     PolicyEpoch,
     ProfileId,
@@ -52,6 +53,7 @@ from provider_runtime.agent_runtime import (
     AgentText,
     AgentUsage,
     CredentialRef,
+    InvalidAgentRequest,
     PermissionPolicy,
     ReasoningSpec,
     TextContent,
@@ -60,8 +62,11 @@ from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel import (
     BatchAsOfMode,
+    InitialReadCall,
+    InitialReadDispatchLineage,
     InputProjectionPolicy,
     InputProjectionRequest,
+    IsolatedDispatchLineage,
     ToolBudgetFactoryPort,
     bootstrap_context,
     continuation_context,
@@ -421,6 +426,30 @@ def test_entry_points_require_the_exported_plan_aware_budget_factory() -> None:
         parameters = signature(entry_point).parameters
         assert "budget_factory" in parameters
         assert "budgets" not in parameters
+
+
+def test_initial_read_public_api_and_isolated_positions_are_exact() -> None:
+    parameter = signature(run_one_shot).parameters["initial_read"]
+    assert parameter.kind.name == "KEYWORD_ONLY"
+    assert parameter.default is None
+
+    call = InitialReadCall(ToolId("test.count"), {"count": 2})
+    assert call.tool_id == ToolId("test.count")
+    assert call.arguments == {"count": 2}
+    with pytest.raises(FrozenInstanceError):
+        call.tool_id = ToolId("test.other")  # type: ignore[misc]
+    with pytest.raises(InvalidAgentRequest):
+        InitialReadCall(ToolId("test.count"), {"count": object()})
+
+    initial = InitialReadDispatchLineage(RunId("isolated-run"))
+    same_initial = InitialReadDispatchLineage(RunId("isolated-run"))
+    first_model = IsolatedDispatchLineage(RunId("isolated-run"), 1)
+    second_model = IsolatedDispatchLineage(RunId("isolated-run"), 2)
+    assert isinstance(initial.position, InvocationPosition)
+    assert initial.position == same_initial.position
+    assert len({initial.position, first_model.position, second_model.position}) == 3
+    with pytest.raises((FrozenInstanceError, TypeError)):
+        initial.position = InvocationPosition("changed")  # type: ignore[misc]
 
 
 def test_input_projection_public_api_is_exact() -> None:

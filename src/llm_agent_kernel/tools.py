@@ -18,7 +18,7 @@ from llm_tools import (
 )
 from provider_runtime.agent_runtime import thaw_json_value
 
-from .definitions import CallToolStep
+from .definitions import CallToolStep, InitialReadCall
 
 
 class PlanValidationError(ValueError):
@@ -40,6 +40,12 @@ class ValidatedToolCall:
     @property
     def tool_id(self) -> ToolId:
         return self.binding.spec.id
+
+
+@dataclass(frozen=True, slots=True)
+class _ValidatedInitialReadCall:
+    binding: ToolBinding[Any, Any, Any]
+    arguments: object
 
 
 def require_host_plan(
@@ -102,6 +108,33 @@ def validate_tool_call(step: CallToolStep, plan: FrozenToolPlan) -> ValidatedToo
     except (KeyError, TypeError, ValueError) as exc:
         raise ToolProposalError("invalid tool id or arguments") from exc
     return ValidatedToolCall(step=step, binding=binding, arguments=validated)
+
+
+def _validate_initial_read_call(
+    call: InitialReadCall,
+    plan: FrozenToolPlan,
+) -> _ValidatedInitialReadCall:
+    """Resolve one host-selected initial Read without creating a model step."""
+
+    if not isinstance(call, InitialReadCall):
+        raise TypeError("initial Read must be an InitialReadCall")
+    if not isinstance(plan, FrozenToolPlan):
+        raise TypeError("initial Read validation requires a FrozenToolPlan")
+    if not plan.is_tightening_of(plan.profile):
+        raise PlanValidationError("initial Read requires a consistent frozen plan")
+    try:
+        plan.grant(call.tool_id)
+        binding = plan.catalog_view.binding(call.tool_id)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PlanValidationError("initial Read tool is not granted by the frozen plan") from exc
+    if binding.spec.effect is not ToolEffect.Read:
+        raise PlanValidationError("initial call must select a ToolEffect.Read binding")
+    try:
+        arguments = cast(dict[str, object], thaw_json_value(call.arguments))
+        validated = validate_tool_input(binding, arguments)
+    except (TypeError, ValueError) as exc:
+        raise ToolProposalError("invalid initial Read arguments") from exc
+    return _ValidatedInitialReadCall(binding=binding, arguments=validated)
 
 
 __all__ = [

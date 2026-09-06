@@ -21,6 +21,7 @@ from typing import cast
 import pytest
 from llm_tools import (
     Available,
+    BudgetState,
     CapabilityProfile,
     FrozenToolPlan,
     HostTable,
@@ -68,17 +69,23 @@ from llm_agent_kernel.definitions import (
     BatchAsOfMode,
     ConversationalOutput,
     DefinitionId,
+    DispatchCompleted,
     FinishStep,
     HostInput,
+    InitialReadCall,
     InputId,
     InputProjectionPolicy,
     InputProjectionRequest,
+    OneShotCompleted,
     OutputContract,
     ProviderConfiguration,
     ProviderUsage,
+    RunId,
     SessionMode,
     StructuredOutput,
 )
+from llm_agent_kernel.fakes import InMemoryAdmissionPort, ScriptedToolDispatchPort
+from llm_agent_kernel.kernel import run_one_shot
 from llm_agent_kernel.protocol import validate_provider_step
 from llm_agent_kernel.provider import CodexProvider
 from llm_agent_kernel.tools import ValidatedToolCall
@@ -99,6 +106,7 @@ class _ObservingAgentRuntime(AgentRuntime):
     def __init__(self, config: AgentRuntimeConfig) -> None:
         super().__init__(config)
         self.observed_text: list[str] = []
+        self.observed_requests: list[TurnRequest] = []
 
     async def stream_turn(
         self,
@@ -108,6 +116,7 @@ class _ObservingAgentRuntime(AgentRuntime):
         approvals: ApprovalHandler | None = None,
         cancel: CancelSignal | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
+        self.observed_requests.append(request)
         async for event in super().stream_turn(
             session,
             request,
@@ -146,6 +155,26 @@ class LiveToolSuccess(BaseModel):
     echoed: str
 
 
+class _LiveBudgets:
+    def __init__(self, limits: RunLimits) -> None:
+        self.limits = limits
+
+    @property
+    def remaining_elapsed_seconds(self) -> float:
+        return self.limits.max_elapsed_seconds
+
+    async def reserve(self, *_args: object, **_kwargs: object) -> bool:
+        raise AssertionError("scripted live dispatcher must not reserve directly")
+
+    async def settle(self, *_args: object, **_kwargs: object) -> None:
+        raise AssertionError("scripted live dispatcher must not settle directly")
+
+
+class _LiveBudgetFactory:
+    def create(self, plan: FrozenToolPlan) -> BudgetState:
+        return cast(BudgetState, _LiveBudgets(plan.profile.run_limits))
+
+
 async def _must_not_execute(value: object, context: object) -> object:
     raise AssertionError(f"live schema qualification dispatched: {value!r}, {context!r}")
 
@@ -177,6 +206,48 @@ def _definition(
         "live-qualification-v1",
         input_projection_policy=input_projection_policy or InputProjectionPolicy(),
     )
+
+
+def _initial_read_definition(profile_key: str) -> tuple[AgentDefinition, FrozenToolPlan]:
+    spec = ToolSpec(
+        id=ToolId("live.initial_read"),
+        summary="Return one qualified initial observation",
+        documentation=PromptDocument("Read one known qualification value."),
+        input_type=LiveToolInput,
+        success_type=LiveToolSuccess,
+        error_type=NoDeclaredError,
+        effect=ToolEffect.Read,
+        limits=ToolLimits(4_096, 4_096, 1, 30.0),
+    )
+    binding = ToolBinding(
+        spec=spec,
+        execute=Available(_must_not_execute),
+        replay_policy=ReplayPolicy.ReDispatchable,
+        implementation_revision="live-initial-read-v1",
+        policy_epoch=PolicyEpoch("v1"),
+        policy_inputs={},
+    )
+    catalog = ToolCatalog.compose((ToolFamily("live", (spec,), (binding,)),))
+    maximum = CapabilityProfile(
+        ProfileId("live-initial-read"),
+        (ToolGrant(spec.id, None),),
+        RunLimits(2, 2, 8_192, 8_192, 1, 600.0),
+    ).freeze(catalog)
+    plan = ToolPlan(maximum.id, HostTable()).freeze(catalog, maximum)
+    definition = AgentDefinition(
+        DefinitionId("live-initial-read"),
+        AgentRole("probe", PromptSections(())),
+        PromptSections(()),
+        SessionMode.isolated,
+        StructuredOutput("live_initial_read_result", LiveStructuredResult),
+        maximum,
+        ProviderConfiguration(
+            CredentialRef("local_account", profile_key),
+            os.environ.get("LLM_AGENT_KERNEL_MODEL", "gpt-5"),
+        ),
+        "live-initial-read-v1",
+    )
+    return definition, plan
 
 
 async def test_live_codex_stream_continuation_and_cancellation() -> None:
@@ -359,6 +430,72 @@ async def test_live_structured_nested_optional_output_and_commentary_selection()
             "the dual-phase qualification did not observe commentary before the final answer"
         )
         await provider.close(lease)
+    finally:
+        await provider.shutdown()
+        await runtime.close()
+
+
+async def test_live_one_shot_uses_initial_read_before_first_provider_turn() -> None:
+    if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
+        pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
+    state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
+    definition, plan = _initial_read_definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+    known_value = "kernel-initial-read-qualified"
+    runtime = _ObservingAgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
+    provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
+    dispatcher = ScriptedToolDispatchPort(
+        (DispatchCompleted({"type": "Success", "value": {"echoed": known_value}}),)
+    )
+    try:
+        outcome = await run_one_shot(
+            run_id=RunId("live-initial-read"),
+            definition=definition,
+            inputs=(
+                HostInput(
+                    InputId("live-initial-read-input"),
+                    PromptSections(
+                        (
+                            PromptSection(
+                                PromptSectionKind("human_text"),
+                                (),
+                                PromptText(
+                                    "Use the completed initial Read observation. Respond through "
+                                    "finish with answer equal to its echoed value, count null, "
+                                    "nested.label qualified, nested.note null, and reason null."
+                                ),
+                            ),
+                        )
+                    ),
+                    datetime(2026, 9, 6, 10, 0, tzinfo=UTC),
+                ),
+            ),
+            as_of=datetime(2026, 9, 6, 10, 1, tzinfo=UTC),
+            plan=plan,
+            source_sections=PromptSections(()),
+            admission=InMemoryAdmissionPort(),
+            provider=provider,
+            dispatcher=dispatcher,
+            budget_factory=_LiveBudgetFactory(),
+            initial_read=InitialReadCall(
+                ToolId("live.initial_read"),
+                {"text": "qualification lookup"},
+            ),
+        )
+        assert isinstance(outcome, OneShotCompleted)
+        assert outcome.result == {
+            "answer": known_value,
+            "count": None,
+            "nested": {"label": "qualified", "note": None},
+        }
+        assert len(dispatcher.calls) == 1
+        assert len(runtime.observed_requests) == 1
+        first_input = "\n".join(
+            part.text
+            for part in runtime.observed_requests[0].input
+            if isinstance(part, TextContent)
+        )
+        assert 'origin="initial_read"' in first_input
+        assert known_value in first_input
     finally:
         await provider.shutdown()
         await runtime.close()

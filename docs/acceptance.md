@@ -102,7 +102,10 @@ assigned to exactly one implementation slice.
   schema, handler-implementation, replay-policy, and revision substitution.
   Only after that proof, a plan-aware factory constructs a fresh `BudgetState`;
   its limits must exactly equal the selected plan before rendering, admission,
-  provider I/O, or tool I/O.
+  provider I/O, or tool I/O. The sole exception in ordering is an opted-in
+  one-shot initial Read: normal child admission and cancellation checks precede
+  construction, while exact budget verification still precedes dispatch,
+  observation rendering, and provider I/O.
 - **K020** — The kernel has no run-class abstraction. The host claim returns one
   non-empty bounded input batch and its already-selected plan; the host owns
   priority, batching, and compatibility.
@@ -153,7 +156,9 @@ assigned to exactly one implementation slice.
   stopped conclusion and cannot obtain fresh repair budget automatically.
 - **K029** — Exactly one tool executes serially per model step. There is no
   parallel executor, multi-call outcome vector, not-initiated suffix, or second
-  kernel tool budget.
+  kernel tool budget. An isolated one-shot may additionally dispatch exactly one
+  host-selected initial Read before its first model step; it is not a model step
+  and does not create a general orchestration surface.
 - **K030** — `KernelLimits` own provider turns, repairs, reported provider usage,
   `KernelLimits.max_cooperative_seconds`, and cumulative newly rendered
   model-visible context bytes. The elapsed limit is checked at safe boundaries
@@ -171,7 +176,9 @@ assigned to exactly one implementation slice.
   recorder state never blind-redispatches.
 - **K032** — `Pure`/`Read` may use attempt-scoped positions and a non-durable
   recorder. Tests and docs expose that `Read + BilledOnce` can be billed again
-  after crash or discarded one-shot.
+  after crash or discarded one-shot. Isolated initial-Read and model-step
+  lineages carry deterministic, disjoint kernel-derived positions that the host
+  passes unchanged to `llm-tools`.
 - **K033** — Dispatch returns only completed `llm_tools.ToolResult` or durable
   suspended `(host_ref, waiting_for)`; configuration, recorder, executor, and
   position defects are typed exceptions rather than fabricated tool failures.
@@ -184,6 +191,8 @@ assigned to exactly one implementation slice.
   the current invocation, emits explicit omission markers for recomputable
   reads, and never silently truncates effect, approval, or reconciliation
   evidence.
+  A completed initial Read is required first-turn context: its typed result is
+  rendered before provider I/O and cannot be silently omitted.
 - **K036** — V1 emits no model-authored nonterminal progress prose; the host may
   expose activity/typing state.
 
@@ -197,7 +206,8 @@ assigned to exactly one implementation slice.
   unclaimed.
 - **K039** — Immediate stop/pause or host preemption prevents later provider/tool
   boundaries where possible and propagates cancellation in flight. Cancellation
-  never claims to undo an already committed effect.
+  never claims to undo an already committed effect. Initial Read dispatch checks
+  cancellation before dispatch and again after completion, before provider I/O.
 - **K040** — `settle` idempotently and atomically persists the host conclusion
   and consumes through the checkpoint. A valid answer is retained when an
   ordinary follow-up races with finalization; that follow-up is signalled and
@@ -235,9 +245,18 @@ assigned to exactly one implementation slice.
   through the same factory as a thread run. Admission denial calls no provider
   and returns to its caller without retry. It validates and applies the same
   definition-bound input projection, including with an empty plan.
+  It may opt into zero or one `InitialReadCall` naming a granted exact Read
+  binding and JSON-compatible arguments. Plan, binding, effect, and pure input
+  validation precede admission and I/O; admission/cancellation precede one
+  plan-aware budget and normal dispatch. The typed completed observation enters
+  the initial context before provider open, and later model calls reuse that
+  exact budget. `Pure`, `Write`, missing, ungranted, stale, malformed,
+  configuration/recovery, suspension, cancellation, and context-boundary cases
+  fail closed without interpreting commentary.
 - **K047** — One-shot sessions always close. Their results remain non-canonical
   until the caller commits them, and provider-internal continuation is never
-  saved.
+  saved. An initial Read does not create a saved provider reference or durable
+  generic observation store.
 - **K048** — Default traces contain IDs, revisions, timings, counts, usage, and
   outcomes—not prompts, user text, memory, arguments/results, session refs,
   credentials, or provider payloads. Sink failure is nonfatal.
@@ -247,7 +266,8 @@ assigned to exactly one implementation slice.
 - **K050** — Deterministic tests inject failures at claim, admission reservation,
   plan-specific budget construction, provider terminal, session CAS,
   validation, recorder/effect commit, suspension, settlement, release, and
-  usage settlement/refund boundaries.
+  usage settlement/refund boundaries, plus initial-Read validation, budget,
+  dispatch, recovery, cancellation, and observation projection boundaries.
 - **K051** — Multi-run race tests cover poison input, no automatic rearm,
   attempt-ceiling recovery, rolling admission, mid-loop steering, stop
   preemption, ordinary follow-up finalization, suspension/resolution, and
@@ -264,6 +284,9 @@ assigned to exactly one implementation slice.
   without historical recharge, and in-flight cancellation. Contract and
   consumer tests prove that production calls `stream_turn`, never `run_turn`,
   and validates only terminal structured output.
+  Provider-facing releases that add initial one-shot context run a paid
+  `gpt-5.6-terra` kernel probe proving that a known initial Read observation is
+  present and usable before the first structured provider result.
 
 ## Slice assignment
 

@@ -12,6 +12,7 @@ from typing import Any, Literal, Self
 from llm_tools import (
     FrozenCapabilityProfile,
     FrozenToolPlan,
+    InvocationPosition,
     PromptSections,
     ToolId,
     ToolResult,
@@ -355,6 +356,8 @@ class DispatchLineage:
 
 @dataclass(frozen=True, slots=True)
 class IsolatedDispatchLineage:
+    """One model-authored isolated call and its exact dependency position."""
+
     run_id: RunId
     model_step_ordinal: int
 
@@ -363,8 +366,27 @@ class IsolatedDispatchLineage:
             raise TypeError("isolated dispatch run id must be RunId")
         _require_ordinal(self.model_step_ordinal)
 
+    @property
+    def position(self) -> InvocationPosition:
+        return _isolated_position(self.run_id, "model_step", self.model_step_ordinal)
 
-type ToolDispatchLineage = DispatchLineage | IsolatedDispatchLineage
+
+@dataclass(frozen=True, slots=True)
+class InitialReadDispatchLineage:
+    """The non-model initial Read and its exact dependency position."""
+
+    run_id: RunId
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.run_id, RunId):
+            raise TypeError("initial Read dispatch run id must be RunId")
+
+    @property
+    def position(self) -> InvocationPosition:
+        return _isolated_position(self.run_id, "initial_read", None)
+
+
+type ToolDispatchLineage = DispatchLineage | IsolatedDispatchLineage | InitialReadDispatchLineage
 
 
 @dataclass(frozen=True, slots=True)
@@ -393,6 +415,24 @@ class CallToolStep:
             freeze_json_object(arguments, context="call_tool arguments"),
         )
         object.__setattr__(self, "type", "call_tool")
+
+
+@dataclass(frozen=True, slots=True)
+class InitialReadCall:
+    """One host-selected Read used to construct isolated initial context."""
+
+    tool_id: ToolId
+    arguments: FrozenJsonDict
+
+    def __init__(self, tool_id: ToolId, arguments: dict[str, object] | FrozenJsonDict) -> None:
+        if not isinstance(tool_id, ToolId):
+            raise TypeError("initial Read tool id must be ToolId")
+        object.__setattr__(self, "tool_id", tool_id)
+        object.__setattr__(
+            self,
+            "arguments",
+            freeze_json_object(arguments, context="initial Read arguments"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -640,6 +680,24 @@ def _require_ordinal(value: int) -> None:
         raise ValueError("model step ordinal must be a positive integer")
 
 
+def _isolated_position(
+    run_id: RunId,
+    origin: Literal["initial_read", "model_step"],
+    model_step_ordinal: int | None,
+) -> InvocationPosition:
+    digest = hashlib.sha256(
+        canonical_json_bytes(
+            {
+                "model_step_ordinal": model_step_ordinal,
+                "namespace": "llm-agent-kernel-isolated-position-v1",
+                "origin": origin,
+                "run_id": str(run_id),
+            }
+        )
+    ).hexdigest()
+    return InvocationPosition(f"llm-agent-kernel-isolated-v1:{digest}")
+
+
 def _require_closed_objects(value: object) -> None:
     if isinstance(value, dict):
         if (value.get("type") == "object" or "properties" in value) and value.get(
@@ -760,6 +818,8 @@ __all__ = [
     "InputId",
     "InputProjectionPolicy",
     "InputProjectionRequest",
+    "InitialReadCall",
+    "InitialReadDispatchLineage",
     "IsolatedDispatchLineage",
     "KernelLimits",
     "ModelStep",

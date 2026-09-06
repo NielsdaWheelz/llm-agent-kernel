@@ -89,6 +89,8 @@ from .definitions import (
     FinishStep,
     HostConclusion,
     HostInput,
+    InitialReadCall,
+    InitialReadDispatchLineage,
     InputClaim,
     InputProjectionRequest,
     IsolatedDispatchLineage,
@@ -129,7 +131,12 @@ from .events import (
 from .protocol import ProtocolValidationError, ValidatedToolCall, validate_provider_step
 from .provider import ProviderDefect, ProviderSessionLease, ProviderSessionPort
 from .sessions import ContinuingSessionState, SessionCoordinator, StaleSessionReference
-from .tools import PlanValidationError, require_host_plan, require_read_only_plan
+from .tools import (
+    PlanValidationError,
+    _validate_initial_read_call,
+    require_host_plan,
+    require_read_only_plan,
+)
 
 
 class KernelConfigurationDefect(RuntimeError):
@@ -982,6 +989,7 @@ async def run_one_shot(
     provider: ProviderSessionPort,
     dispatcher: ToolDispatchPort,
     budget_factory: ToolBudgetFactoryPort,
+    initial_read: InitialReadCall | None = None,
     input_projection: InputProjectionRequest | None = None,
     parent_admission: AdmissionToken | None = None,
     cancellation: CancellationToken | None = None,
@@ -998,7 +1006,14 @@ async def run_one_shot(
     definition.input_projection_policy.resolve(input_projection)
     require_host_plan(plan, definition.maximum_profile)
     require_read_only_plan(plan)
-    budgets = _create_tool_budget(budget_factory, plan)
+    if initial_read is not None and not isinstance(initial_read, InitialReadCall):
+        raise TypeError("initial_read must be an InitialReadCall")
+    validated_initial_read = (
+        None if initial_read is None else _validate_initial_read_call(initial_read, plan)
+    )
+    budgets = (
+        None if validated_initial_read is not None else _create_tool_budget(budget_factory, plan)
+    )
     cancellation = cancellation or CancellationToken()
     state = _RunState(run_id, clock)
 
@@ -1026,20 +1041,22 @@ async def run_one_shot(
         state.outcome_type = "completed"
         return OneShotCompleted(state.metrics(consumed=False), result)
 
-    try:
-        projection = bootstrap_context(
-            definition,
-            inputs,
-            as_of,
-            plan,
-            source_sections,
-            prior_visible_bytes=state.visible_bytes,
-            input_projection=input_projection,
-        )
-    except ContextLimitExceeded:
-        event(EventKind.outcome, outcome_type="configuration_error")
-        return stopped(ThreadStopKind.configuration_error)
-    state.visible_bytes = projection.cumulative_visible_bytes
+    projection = None
+    if validated_initial_read is None:
+        try:
+            projection = bootstrap_context(
+                definition,
+                inputs,
+                as_of,
+                plan,
+                source_sections,
+                prior_visible_bytes=state.visible_bytes,
+                input_projection=input_projection,
+            )
+        except ContextLimitExceeded:
+            event(EventKind.outcome, outcome_type="configuration_error")
+            return stopped(ThreadStopKind.configuration_error)
+        state.visible_bytes = projection.cumulative_visible_bytes
 
     admission_request = AdmissionRequest(
         run_id=run_id,
@@ -1074,7 +1091,7 @@ async def run_one_shot(
     lease: ProviderSessionLease | None = None
     previous_lease_usage = ProviderUsage()
     repairs = 0
-    pending_content = [TextContent(projection.rendered)]
+    pending_content: list[TextContent] = []
 
     async def account_lease_usage() -> None:
         nonlocal previous_lease_usage
@@ -1088,6 +1105,56 @@ async def run_one_shot(
         try:
             if cancellation.cancelled:
                 return stopped(ThreadStopKind.cancelled)
+            if validated_initial_read is not None:
+                budgets = _create_tool_budget(budget_factory, plan)
+                if cancellation.cancelled:
+                    return stopped(ThreadStopKind.cancelled)
+                lineage = InitialReadDispatchLineage(run_id)
+                event(
+                    EventKind.tool_dispatch,
+                    tool_id=str(validated_initial_read.binding.spec.id),
+                    dispatch_origin="initial_read",
+                    invocation_position=str(lineage.position),
+                    plan_revision=plan.plan_revision,
+                    implementation_revision=(
+                        validated_initial_read.binding.implementation_revision
+                    ),
+                )
+                dispatch = await dispatcher.dispatch(
+                    binding=validated_initial_read.binding,
+                    validated_input=validated_initial_read.arguments,
+                    plan=plan,
+                    budgets=budgets,
+                    cancellation=cancellation,
+                    lineage=lineage,
+                )
+                if isinstance(dispatch, DispatchSuspended):
+                    return stopped(ThreadStopKind.configuration_error)
+                if not isinstance(dispatch, DispatchCompleted):
+                    raise KernelConfigurationDefect("dispatcher returned an unknown result variant")
+                if cancellation.cancelled:
+                    return stopped(ThreadStopKind.cancelled)
+                projection = bootstrap_context(
+                    definition,
+                    inputs,
+                    as_of,
+                    plan,
+                    source_sections,
+                    observations=(
+                        ToolObservation(
+                            validated_initial_read.binding,
+                            dispatch.result,
+                            None,
+                            initial_read_position=lineage.position,
+                        ),
+                    ),
+                    prior_visible_bytes=state.visible_bytes,
+                    input_projection=input_projection,
+                )
+                state.visible_bytes = projection.cumulative_visible_bytes
+            assert projection is not None
+            assert budgets is not None
+            pending_content.append(TextContent(projection.rendered))
             lease = await provider.open_isolated(definition)
 
             while True:

@@ -19,6 +19,15 @@ Hosts must not duplicate prohibited metadata in role, stable, retrieved, or
 other caller-supplied prompt sections. Operational timestamps remain in host
 memory/state even when omitted from model-visible context.
 
+An opted-in isolated initial Read does not expand authority. The selected frozen
+plan must already grant the exact Read binding; `Pure` and `Write` are rejected,
+arguments receive pure strict validation, and dispatch still crosses the host
+and `llm-tools` budget/recorder boundary. Its arguments and result are private
+payloads excluded from default events. The completed result is intentionally
+sent to the configured provider as first-turn context, so hosts must apply the
+same disclosure policy they use for retrieved memory and other prompt content.
+Provider commentary remains non-executable.
+
 The exact `llm-tools` dependency pin uses `llm-tools-web-read-v2` extraction:
 plain text is never interpreted as markup or entities, and HTML/XHTML parser
 output is not entity-decoded a second time. Retrieved text remains untrusted;

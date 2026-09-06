@@ -84,6 +84,28 @@ continuing run composes `CodexProvider` with `SessionCoordinator`; production
 provider work therefore consumes `AgentRuntime.stream_turn` and never the
 event-discarding `run_turn` projection.
 
+An isolated structured run may opt into one deterministic initial Read:
+
+```python
+outcome = await run_one_shot(
+    # existing isolated one-shot arguments
+    initial_read=InitialReadCall(
+        ToolId("memory.search"),
+        {"query": "current owner request"},
+    ),
+)
+```
+
+The selected plan must grant that exact `ToolEffect.Read` binding. The kernel
+purely validates the call, completes admission and cancellation checks, creates
+one exact plan-aware budget, and uses the normal dispatcher before opening the
+provider session. The completed typed observation is marked
+`origin="initial_read"` in first-turn context, and every later model-proposed
+call shares the same budget. `InitialReadDispatchLineage.position` and
+`IsolatedDispatchLineage.position` are deterministic and disjoint; isolated
+dispatchers pass them unchanged to `llm-tools`. `initial_read=None` preserves
+the prior one-shot path exactly.
+
 The package root exports the public values, ports, outcomes, provider/session
 lifecycle, protocol and context helpers, loop entry points, opt-in
 `DiagnosticTranscript` redaction boundary, and deterministic fakes. Diagnostics
@@ -114,6 +136,8 @@ The kernel owns:
 - Whole-wire, whole-step, and output-contract validation, including
   construction-time structured-result schema compatibility checks.
 - Exactly one serial host tool call per model step.
+- Zero or one host-selected initial Read for an isolated one-shot, dispatched
+  before provider I/O through the same authority and budget boundary.
 - Mid-loop input polling, preemption, cancellation, and settlement choreography.
 - Per-run limits and conservative host-issued cross-run admission reservations.
 - Plan-aware construction of the independently owned `llm-tools` tool budget.
@@ -130,6 +154,9 @@ The kernel does not own:
 - A second tool catalog, executor, budget, recorder, prompt renderer, or
   provider SDK adapter.
 - Program execution, semantic discovery, or a delegation graph.
+- Initial-call lists, hooks, retries, dependency graphs, or a pre-model workflow
+  system; the opt-in facility is only one Read used to construct initial model
+  context.
 
 Owning no schema does not mean requiring no durable state. A continuing host
 with writes normally needs canonical input/conclusion/delivery state, disposable

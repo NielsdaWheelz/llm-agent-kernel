@@ -137,6 +137,62 @@ from canonical inputs, alter rendered text afterward, or add application roles
 inside the kernel. No plan/HostTable re-freeze, effect revision, persistence
 migration, provider-wire change, or provider/dependency update is required.
 
+For the deterministic isolated initial-Read release from kernel
+`7f3a9b145e68ba23c8aafad08500e9c452a9faef`, consumers pin the successor
+kernel revision and regenerate their lock without changing the exact
+`provider-runtime` pin
+`2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`, `llm-tools` pin
+`9e6d155f3b64f03495911435b7cae8b8d131f9a2`, or `openai-codex==0.144.4`.
+The public additions are
+`InitialReadCall`, `InitialReadDispatchLineage`, deterministic `position` on
+both isolated lineage variants, and the keyword-only `initial_read` argument on
+`run_one_shot`. No `AgentDefinition` field, definition fingerprint input,
+provider wire, session-reference format, persistence schema, thread behavior,
+or dependency contract changes. Existing continuing sessions remain compatible,
+and a host MUST NOT rotate `session_compatibility_revision` solely for this
+release.
+
+`initial_read=None` is the exact prior path. With a value, the kernel proves the
+selected plan and exact catalog/profile relationship, resolves a granted
+`ToolEffect.Read` binding, and performs pure schema validation before rendering,
+admission, provider I/O, or tool I/O. It then completes normal isolated/child
+admission and cancellation checks, creates one fresh exact plan-aware budget,
+and dispatches the call through `ToolDispatchPort`. The dispatcher MUST use
+`InitialReadDispatchLineage.position` as the `llm-tools`
+`InvocationPosition`. It MUST likewise use `IsolatedDispatchLineage.position`
+for later model-proposed isolated calls; the kernel derives the two position
+domains deterministically so they cannot collide within the run. Thread
+position/effect ownership is unchanged.
+
+Only `DispatchCompleted` supplies initial context. Its exact typed `ToolResult`,
+including declared or `BudgetExceeded` boundary failure, is rendered with
+`origin="initial_read"` before the provider session opens. The same budget is
+passed to every later model-proposed dispatch, so `llm-tools` accounts calls,
+attempts, bytes, external attempts, and elapsed time once. Suspension,
+recovery/configuration defects, cancellation, or an oversized required
+observation stops before provider I/O. Initial arguments/results remain private
+payload and are absent from default events.
+
+Jarvis's recaller migration is:
+
+```python
+outcome = await run_one_shot(
+    # existing arguments unchanged
+    initial_read=InitialReadCall(
+        ToolId("memory.search"),
+        {"query": recall_query},
+    ),
+)
+```
+
+The selected frozen recaller plan must grant the exact revisioned
+`memory.search` Read binding, and its dispatcher must forward the lineage's
+provided isolated position unchanged. Remove any prompt instruction or host
+fallback that asks commentary to cause the mandatory search; commentary remains
+non-executable. Do not pre-execute the tool, add a second budget, synthesize a
+`CallToolStep`, persist a generic observation, or add a workflow/retry layer.
+The caller still commits the final one-shot result under its existing rules.
+
 For the dependency propagation from kernel `b53e4329d6a8fc8af622747c9670cf586cf9e1ff`,
 a consumer pins the successor kernel revision, regenerates its lock to exact
 `llm-tools` revision `9e6d155f3b64f03495911435b7cae8b8d131f9a2`,
@@ -252,6 +308,14 @@ restricted projection with explicitly requested batch `as_of`; the regular
 continuation, JSON-string argument, and separately gated in-flight cancellation
 probes remain required. Retired `gpt-5.4` and deliberately induced quota
 exhaustion remain prohibited.
+
+The isolated initial-Read release also changes model-visible first-turn context
+and therefore runs the current `gpt-5.6-terra` matrix rather than carrying prior
+qualification forward. In addition to continuation, structured
+commentary/final-answer, JSON-string argument, and separately gated in-flight
+cancellation probes, it runs the kernel one-shot entry point with a known typed
+initial Read result and proves that value is usable by the first provider turn.
+Retired `gpt-5.4` and deliberately induced quota exhaustion remain prohibited.
 
 The library release commands are:
 
