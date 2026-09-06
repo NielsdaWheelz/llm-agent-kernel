@@ -186,6 +186,7 @@ An `AgentDefinition` is immutable configuration containing:
 
 - Stable definition ID and role instructions.
 - Stable provider-neutral prompt sections.
+- A definition-bound model-visible input projection policy.
 - `SessionMode`: `continuing` or `isolated`.
 - `OutputContract`: `conversational` or one closed, provider-representable
   structured result type.
@@ -199,12 +200,20 @@ credential profile identity, model, reasoning, system/developer material,
 output schema, cwd scope, additional directories, MCP configuration,
 `PermissionPolicy`, and `CodexNativeOptions`.
 
+The input projection policy fixes whether per-input `source_timestamp`
+attributes are rendered and selects one batch-`as_of` mode: `always`, `never`,
+or `on_request`. The default renders both attributes exactly as before. An
+invocation may explicitly request batch `as_of`; that request is effective only
+for `on_request`, redundant for `always`, and is rejected as a widening request
+for `never`. Per-input timestamp visibility cannot be widened per invocation.
+
 The deterministic definition fingerprint covers every value that can change a
-native session's meaning or containment, including the exact
-`session_compatibility_revision`. The owner MUST rotate that revision when an
-application, kernel, or provider-runtime semantic change makes saved sessions
-incompatible even if no other serialized definition field changed. It excludes
-credential secret bytes, current input, dynamic context, the per-run plan, and
+native session's meaning or containment, including the complete input
+projection policy and exact `session_compatibility_revision`. The owner MUST
+rotate that revision when an application, kernel, or provider-runtime semantic
+change makes saved sessions incompatible even if no other serialized definition
+field changed. It excludes credential secret bytes, current input, the
+invocation's projection request, other dynamic context, the per-run plan, and
 host time. Any change to a covered value rotates the session and forces
 bootstrap.
 
@@ -258,6 +267,8 @@ The host claims one non-empty, bounded batch and returns an `InputClaim` with:
 The host chooses batching, priority, and compatibility. The kernel neither
 defines a `run_class` nor infers authority from input text. The plan is still
 independently proven inside the definition maximum before I/O.
+Source timestamps and `as_of` remain required operational inputs even when the
+definition policy omits them from model-visible context.
 
 ### 4.4 Run and model turn
 
@@ -586,11 +597,24 @@ added by a host when source-specific reread/pagination is insufficient.
 
 - Stable role instructions and application context.
 - Bounded canonical completed history.
-- Current claimed host inputs with identities and source timestamps.
+- Current claimed host inputs with identities, text, and operational source
+  timestamps.
 - Retrieved context selected by the host.
 - The exact frozen HostTable plan and tool documentation.
 - Host timezone or other stable locale context when relevant.
-- One `as_of` value for each newly admitted host-input batch.
+- One operational `as_of` value for each newly admitted host-input batch.
+
+`InputProjectionPolicy` is public immutable definition state. Its default
+renders each input's ID and source timestamp plus the batch `as_of`, preserving
+the pre-policy prompt byte-for-byte. A definition can permanently suppress
+per-input source timestamps. `BatchAsOfMode` selects `always`, `never`, or
+`on_request`; `InputProjectionRequest(render_batch_as_of=True)` is the only
+invocation-local widening request and is valid only where the definition allows
+it. The request is validated before claim/rendering/admission/provider/tool I/O
+and is applied consistently to initial input, mid-loop appends, and any cold
+reconstruction. There is no post-render mutation seam. Input IDs and content
+remain visible, and the operational timestamp values remain available to host
+coordination regardless of rendering.
 
 `llm-tools` renders typed prompt sections. XML-like presentation is structure and
 provenance, never a security boundary. Human input, retrieved memory, tool
@@ -626,7 +650,8 @@ poll(claim, through_checkpoint)
 `append` inputs MUST be non-empty, ordered, and compatible with the already
 frozen plan according to host policy. They extend the claim/checkpoint and are
 sent to the provider exactly once. A new `as_of` accompanies the appended batch;
-ordinary tool continuations do not receive a repeated clock.
+its model visibility follows the invocation's validated projection. Ordinary
+tool continuations do not receive a repeated clock.
 
 `preempt` stops before another provider turn or tool dispatch. The host decides
 which input types preempt and how the interrupted input is concluded. The
@@ -793,6 +818,7 @@ an unconditional retry.
 The public behavior is equivalent to:
 
 ```text
+validate the invocation input projection against the definition policy
 claim one bounded non-empty host batch or return no_work/busy/deferred
 verify frozen plan/catalog tightening
 construct a fresh tool budget from that plan and verify exact RunLimits
@@ -837,6 +863,8 @@ No database transaction remains open across provider or external tool I/O.
 An isolated one-shot:
 
 - Requires `SessionMode.isolated` and a structured output contract.
+- Validates its invocation input projection against the definition policy
+  before plan rendering, admission, provider I/O, or tool I/O.
 - Requires a HostTable plan containing no `ToolEffect.Write` binding.
 - Validates that plan, constructs a fresh budget through
   `ToolBudgetFactoryPort`, and requires exact plan `RunLimits` before rendering,
@@ -962,6 +990,11 @@ The release suite covers both single-run interior behavior and composed seams:
     execution remains under its independently frozen `llm-tools` deadline.
 25. A non-empty owner-controlled session-compatibility revision participates in
     the definition fingerprint, and mutating it rotates saved-session identity.
+26. A definition-bound input projection preserves legacy rendering by default,
+    can suppress per-input timestamps, controls batch `as_of` as always, never,
+    or explicitly requested, rejects widening requests before any external
+    boundary, and participates completely in deterministic fingerprinting for
+    thread and isolated empty-plan runs.
 
 ## 15. Explicitly deferred
 

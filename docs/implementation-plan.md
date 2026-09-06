@@ -76,6 +76,9 @@ Deliver:
   discard, and one safe cold-bootstrap fallback.
 - Provider-neutral continuation and bootstrap sections using qualified
   `llm-tools` rendering and frozen `HostTable` publication.
+- Definition-bound model-visible input projection with byte-compatible defaults,
+  optional suppression of per-input timestamps, three-state batch `as_of`,
+  pre-boundary request validation, and deterministic fingerprint rotation.
 - Cold-bootstrap fixtures built only from canonical host and durable action
   state.
 

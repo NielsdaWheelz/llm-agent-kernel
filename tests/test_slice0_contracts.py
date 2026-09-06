@@ -58,7 +58,15 @@ from provider_runtime.agent_runtime import (
 )
 from pydantic import BaseModel, ConfigDict
 
-from llm_agent_kernel import ToolBudgetFactoryPort
+from llm_agent_kernel import (
+    BatchAsOfMode,
+    InputProjectionPolicy,
+    InputProjectionRequest,
+    ToolBudgetFactoryPort,
+    bootstrap_context,
+    continuation_context,
+    run_context,
+)
 from llm_agent_kernel.coordination import (
     AdmissionRequest,
     AdmissionToken,
@@ -415,6 +423,26 @@ def test_entry_points_require_the_exported_plan_aware_budget_factory() -> None:
         assert "budgets" not in parameters
 
 
+def test_input_projection_public_api_is_exact() -> None:
+    assert tuple(member.value for member in BatchAsOfMode) == (
+        "always",
+        "never",
+        "on_request",
+    )
+    assert InputProjectionPolicy().resolve(None) == (True, True)
+    assert InputProjectionRequest().render_batch_as_of is False
+    for entry_point in (
+        run_thread,
+        run_one_shot,
+        bootstrap_context,
+        run_context,
+        continuation_context,
+    ):
+        parameter = signature(entry_point).parameters["input_projection"]
+        assert parameter.kind.name == "KEYWORD_ONLY"
+        assert parameter.default is None
+
+
 def test_definition_is_frozen_and_fingerprint_covers_provider_configuration() -> None:
     first = _definition()
     same = _definition()
@@ -465,10 +493,37 @@ def test_definition_fingerprint_rotates_for_every_configurable_session_scope() -
         replace(first, provider=replace(first.provider, system=(TextContent("system"),))),
         replace(first, provider=replace(first.provider, developer=(TextContent("developer"),))),
         replace(first, limits=replace(first.limits, max_provider_turns=9)),
+        replace(
+            first,
+            input_projection_policy=InputProjectionPolicy(
+                render_source_timestamps=False,
+            ),
+        ),
     )
 
     assert all(candidate.fingerprint != first.fingerprint for candidate in variants)
     assert len({candidate.fingerprint for candidate in variants}) == len(variants)
+
+
+def test_input_projection_policy_is_validated_and_every_value_rotates_fingerprint() -> None:
+    first = _definition()
+    policies = tuple(
+        InputProjectionPolicy(render_source_timestamps, batch_as_of)
+        for render_source_timestamps in (False, True)
+        for batch_as_of in BatchAsOfMode
+    )
+    definitions = tuple(replace(first, input_projection_policy=policy) for policy in policies)
+
+    assert len({definition.fingerprint for definition in definitions}) == len(policies)
+    assert replace(first, input_projection_policy=InputProjectionPolicy()).fingerprint == (
+        first.fingerprint
+    )
+    with pytest.raises(TypeError, match="render_source_timestamps"):
+        InputProjectionPolicy(render_source_timestamps=1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="batch_as_of"):
+        InputProjectionPolicy(batch_as_of="always")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="render_batch_as_of"):
+        InputProjectionRequest(render_batch_as_of=1)  # type: ignore[arg-type]
 
 
 def test_session_compatibility_revision_is_required_and_rotates_the_fingerprint() -> None:

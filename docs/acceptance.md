@@ -87,13 +87,14 @@ assigned to exactly one implementation slice.
 - **K017** — A definition freezes role/stable context, session mode, output
   contract, maximum frozen capability profile, exact provider configuration,
   required non-empty owner-controlled session-compatibility revision, and finite
-  `KernelLimits`. A structured result contract is compiled and checked against
-  the Codex strict-schema subset at construction; an unrepresentable contract
-  fails before provider I/O.
+  `KernelLimits`, plus a definition-bound input projection policy. A structured
+  result contract is compiled and checked against the Codex strict-schema subset
+  at construction; an unrepresentable contract fails before provider I/O.
 - **K018** — The deterministic fingerprint covers every session-scoped semantic
-  and containment value, including `PermissionPolicy`, native options, and the
-  owner-controlled session-compatibility revision; changing any covered value
-  rotates the session. Secret bytes and dynamic input are excluded.
+  and containment value, including `PermissionPolicy`, native options, the full
+  input projection policy, and the owner-controlled session-compatibility
+  revision; changing any covered value rotates the session. Secret bytes,
+  dynamic input, and the invocation projection request are excluded.
 - **K019** — Before rendering or provider/tool I/O, a qualified public predicate
   proves that the host-selected frozen plan is internally consistent with its
   exact catalog view, tightens the definition maximum in full, and sets
@@ -119,10 +120,15 @@ assigned to exactly one implementation slice.
   covers only kernel-rendered model-visible material newly submitted during the
   current invocation under `KernelLimits.max_new_context_bytes`; provider
   configuration/schema overhead, retained native history, and provider
-  compaction are excluded.
-- **K024** — Each newly admitted input batch carries source timestamps and one
-  host `as_of`; timezone/locale is included only when relevant. Ordinary tool
-  continuations do not receive a changing ambient clock.
+  compaction are excluded. The default input projection is byte-for-byte
+  compatible with the prior rendering and no post-render mutation seam exists.
+- **K024** — Every newly admitted input batch retains operational source
+  timestamps and one host `as_of`; timezone/locale is included only when
+  relevant. A definition may suppress model-visible per-input timestamps and
+  sets batch `as_of` to always, never, or invocation-requested. Widening is
+  rejected before rendering, admission, provider I/O, or tool I/O, and the same
+  resolved projection covers initial, appended, and reconstructed input.
+  Ordinary tool continuations do not receive a changing ambient clock.
 
 ## Protocol and tool boundary
 
@@ -227,7 +233,8 @@ assigned to exactly one implementation slice.
   claim/checkpoint/admission-retry/session-ref port, and returns only a valid
   result or typed stop. It constructs and verifies the plan-specific tool budget
   through the same factory as a thread run. Admission denial calls no provider
-  and returns to its caller without retry.
+  and returns to its caller without retry. It validates and applies the same
+  definition-bound input projection, including with an empty plan.
 - **K047** — One-shot sessions always close. Their results remain non-canonical
   until the caller commits them, and provider-internal continuation is never
   saved.

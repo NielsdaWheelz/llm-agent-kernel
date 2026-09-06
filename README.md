@@ -70,12 +70,19 @@ git diff --check
 The primary entry points are `run_thread(...)` and `run_one_shot(...)`.
 Applications construct an immutable `AgentDefinition`, provide one qualified
 maximum profile, set an owner-controlled session-compatibility revision, and
-implement the typed ports. After the host claim selects a frozen plan, the
-kernel asks `ToolBudgetFactoryPort` to construct that plan's budget and rejects
-any limits mismatch before provider or tool I/O. A continuing
-run composes `CodexProvider` with `SessionCoordinator`; production provider work
-therefore consumes `AgentRuntime.stream_turn` and never the event-discarding
-`run_turn` projection.
+implement the typed ports. `InputProjectionPolicy` is definition-bound and
+defaults to the exact prior rendering of per-input source timestamps and batch
+`as_of`. A definition may suppress source timestamps and select
+`BatchAsOfMode.always`, `.never`, or `.on_request`; the latter renders `as_of`
+only when the run receives
+`InputProjectionRequest(render_batch_as_of=True)`. Requests cannot widen a
+prohibiting definition and are rejected before rendering or external I/O.
+Operational timestamps remain on host input/claim values. After the host claim
+selects a frozen plan, the kernel asks `ToolBudgetFactoryPort` to construct that
+plan's budget and rejects any limits mismatch before provider or tool I/O. A
+continuing run composes `CodexProvider` with `SessionCoordinator`; production
+provider work therefore consumes `AgentRuntime.stream_turn` and never the
+event-discarding `run_turn` projection.
 
 The package root exports the public values, ports, outcomes, provider/session
 lifecycle, protocol and context helpers, loop entry points, opt-in
@@ -168,7 +175,7 @@ still never silently truncated.
 durable host input
         |
         v
-claim batch + prove plan + construct exact plan budget + reserve admission
+validate input projection + claim batch + prove plan + exact budget + admission
         |
         v
 open/resume contained Codex agent session with one closed required wire schema

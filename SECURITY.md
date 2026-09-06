@@ -13,6 +13,12 @@ effect recording and reconciliation, and delivery. Provider-native transcripts
 are unredacted third-party data at rest; discarding a local session reference
 does not promise provider deletion.
 
+The definition-bound input projection can suppress kernel-rendered source
+timestamps and batch `as_of` values, but it is not a general prompt redactor.
+Hosts must not duplicate prohibited metadata in role, stable, retrieved, or
+other caller-supplied prompt sections. Operational timestamps remain in host
+memory/state even when omitted from model-visible context.
+
 The exact `llm-tools` dependency pin uses `llm-tools-web-read-v2` extraction:
 plain text is never interpreted as markup or entities, and HTML/XHTML parser
 output is not entity-decoded a second time. Retrieved text remains untrusted;

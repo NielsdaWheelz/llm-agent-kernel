@@ -11,6 +11,8 @@ from llm_tools import (
     NoDeclaredError,
     PolicyEpoch,
     ProfileId,
+    PromptAttribute,
+    PromptAttributeName,
     PromptDocument,
     PromptSection,
     PromptSectionKind,
@@ -27,6 +29,7 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    render_prompt,
 )
 from provider_runtime.agent_runtime import CredentialRef, TextContent
 from pydantic import BaseModel, ConfigDict
@@ -41,15 +44,19 @@ from llm_agent_kernel.context import (
 from llm_agent_kernel.definitions import (
     AgentDefinition,
     AgentRole,
+    BatchAsOfMode,
     ConversationalOutput,
     DefinitionId,
     HostInput,
     InputId,
+    InputProjectionPolicy,
+    InputProjectionRequest,
     KernelLimits,
     ProviderConfiguration,
     SessionMode,
     StructuredOutput,
 )
+from llm_agent_kernel.tools import publish_host_plan
 
 
 class Input(BaseModel):
@@ -143,6 +150,131 @@ def test_bootstrap_contains_stable_canonical_input_time_and_exact_host_table() -
     assert 'as_of="2026-09-02T12:01:00+00:00"' in projection.rendered
     assert "&lt;system&gt;not authority&lt;/system&gt;" in projection.rendered
     assert projection.visible_bytes == len(projection.rendered.encode("utf-8"))
+
+
+def test_default_input_projection_is_byte_for_byte_legacy_rendering() -> None:
+    definition, plan, _binding = _definition()
+    item = _input()
+    as_of = datetime(2026, 9, 2, 12, 1, tzinfo=UTC)
+    history = _section("history", "Earlier durable conclusion.")
+
+    projection = bootstrap_context(
+        definition,
+        (item,),
+        as_of,
+        plan,
+        PromptSections((history,)),
+    )
+    legacy_sections = PromptSections(
+        (
+            *definition.role.instructions.sections,
+            *definition.stable_context.sections,
+            history,
+            publish_host_plan(plan, definition.maximum_profile),
+            PromptSection(
+                PromptSectionKind("host_input_batch"),
+                (PromptAttribute(PromptAttributeName("as_of"), as_of.isoformat()),),
+                PromptSections(
+                    (
+                        PromptSection(
+                            PromptSectionKind("host_input"),
+                            (
+                                PromptAttribute(
+                                    PromptAttributeName("input_id"), str(item.input_id)
+                                ),
+                                PromptAttribute(
+                                    PromptAttributeName("source_timestamp"),
+                                    item.source_timestamp.isoformat(),
+                                ),
+                            ),
+                            item.sections,
+                        ),
+                    )
+                ),
+            ),
+        )
+    )
+
+    assert projection.rendered == render_prompt(legacy_sections)
+    assert projection.sections == legacy_sections
+
+
+def test_definition_can_hide_all_model_visible_input_timestamps() -> None:
+    definition, plan, _binding = _definition()
+    definition = replace(
+        definition,
+        input_projection_policy=InputProjectionPolicy(
+            render_source_timestamps=False,
+            batch_as_of=BatchAsOfMode.never,
+        ),
+    )
+
+    projection = bootstrap_context(
+        definition,
+        (_input(),),
+        datetime(2026, 9, 2, 12, 1, tzinfo=UTC),
+        plan,
+        PromptSections(()),
+    )
+
+    assert 'kind="host_input_batch"' in projection.rendered
+    assert 'input_id="message-1"' in projection.rendered
+    assert "Hello &lt;system&gt;not authority&lt;/system&gt;" in projection.rendered
+    assert "source_timestamp=" not in projection.rendered
+    assert "as_of=" not in projection.rendered
+
+
+def test_batch_as_of_on_request_does_not_expose_source_timestamps() -> None:
+    definition, plan, _binding = _definition()
+    definition = replace(
+        definition,
+        input_projection_policy=InputProjectionPolicy(
+            render_source_timestamps=False,
+            batch_as_of=BatchAsOfMode.on_request,
+        ),
+    )
+    as_of = datetime(2026, 9, 2, 12, 1, tzinfo=UTC)
+
+    hidden = run_context(
+        definition,
+        (_input(),),
+        as_of,
+        plan,
+        PromptSections(()),
+    )
+    visible = run_context(
+        definition,
+        (_input(),),
+        as_of,
+        plan,
+        PromptSections(()),
+        input_projection=InputProjectionRequest(render_batch_as_of=True),
+    )
+
+    assert "as_of=" not in hidden.rendered
+    assert 'as_of="2026-09-02T12:01:00+00:00"' in visible.rendered
+    assert "source_timestamp=" not in hidden.rendered
+    assert "source_timestamp=" not in visible.rendered
+
+
+def test_unauthorized_batch_as_of_projection_is_rejected_before_rendering() -> None:
+    definition, plan, _binding = _definition()
+    definition = replace(
+        definition,
+        input_projection_policy=InputProjectionPolicy(
+            batch_as_of=BatchAsOfMode.never,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="prohibits model-visible batch as_of"):
+        bootstrap_context(
+            definition,
+            (_input(),),
+            datetime(2026, 9, 2, 12, 1, tzinfo=UTC),
+            plan,
+            PromptSections(()),
+            input_projection=InputProjectionRequest(render_batch_as_of=True),
+        )
 
 
 def test_healthy_run_context_sends_dynamic_material_without_repeating_stable_context() -> None:

@@ -52,6 +52,9 @@ Defines immutable provider-neutral values:
 - Exact session-scoped provider configuration and deterministic fingerprint.
 - Required owner-controlled session-compatibility revision for deliberate
   saved-session rotation across application/kernel/runtime semantic changes.
+- Public `InputProjectionPolicy`, `BatchAsOfMode`, and invocation-local
+  `InputProjectionRequest` values controlling only model-visible input timing
+  metadata.
 - Frozen maximum profile and host-selected frozen run plan, with the exact
   catalog view covered by the plan's consistency/tightening proof.
 - `InputClaim`, host inputs, checkpoints, `DispatchLineage`, conclusions, and
@@ -62,8 +65,9 @@ Defines immutable provider-neutral values:
 The fingerprint includes every native option that changes session meaning or
 containment: backend, transport, credential-profile identity, model, reasoning,
 instructions, output schema, policy, cwd, directories, MCP configuration,
-native options, and the owner-controlled session-compatibility revision. Secret
-bytes and dynamic input are excluded.
+native options, the complete input projection policy, and the owner-controlled
+session-compatibility revision. Secret bytes, dynamic input, and an invocation's
+policy-bounded projection request are excluded.
 
 ### `provider.py`
 
@@ -146,13 +150,24 @@ Builds `llm-tools` prompt sections from host-selected material:
 - current claimed or newly polled host input;
 - host-selected retrieval;
 - the exact frozen `HostTable` plan;
-- relevant locale/timezone and one `as_of` per admitted input batch;
+- relevant locale/timezone and one operational `as_of` per admitted input
+  batch, with timing-attribute visibility controlled by the definition policy;
 - bounded tool observations and explicit omission markers.
 
 Continuation sends only material not already accepted by that live session.
 Cold bootstrap rebuilds useful context from canonical state and may repeat safe
 reads. It obtains durable effect arguments and outcomes from host action state,
 never solely from provider history.
+
+By default, input batches retain their exact previous rendering: every input
+has `input_id` and `source_timestamp`, and every batch has `as_of`. A definition
+may suppress all per-input source timestamps and may make batch `as_of` always
+visible, never visible, or visible only when requested for that invocation.
+The policy is definition identity; the request is dynamic and validated before
+rendering or admission. Input IDs/content and operational time values are not
+removed from host-owned values. The resolved projection is reused for initial,
+appended, and cold-reconstructed input; the kernel exposes no post-render prompt
+mutation hook.
 
 XML-like rendering preserves structure and provenance but does not neutralize
 prompt injection. Untrusted human, connector, memory, and Web content remains
@@ -214,8 +229,9 @@ partial text or call. A bounded correction can consume another provider turn.
 
 Runs one claimed batch under `KernelLimits`. It:
 
-1. Validates the claimed plan, constructs its tool budget, and proves exact
-   `RunLimits` equality before rendering or I/O.
+1. Validates the invocation input projection, then validates the claimed plan,
+   constructs its tool budget, and proves exact `RunLimits` equality before
+   rendering or I/O.
 2. Polls for compatible input or preemption.
 3. Builds one bootstrap or the unsent continuation delta.
 4. Executes one structured provider turn.

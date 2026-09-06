@@ -90,6 +90,53 @@ The kernel continues to validate only `AgentTerminal.structured_output`, so a
 Jarvis consumer needs no application-code, plan, HostTable, persistence, or
 session migration for this release.
 
+For the input-projection release from kernel
+`670da13ff0cfe766f36d8966e0575db0f7525143`, consumers pin the successor
+kernel revision and regenerate their lock without changing the exact
+`provider-runtime`, `llm-tools`, or `openai-codex` pins. The public additions
+are `BatchAsOfMode`, `InputProjectionPolicy`, and `InputProjectionRequest`, the
+`AgentDefinition.input_projection_policy` field, and the keyword-only
+`input_projection` argument on `run_thread`, `run_one_shot`,
+`bootstrap_context`, `run_context`, and `continuation_context`.
+
+The default `InputProjectionPolicy()` renders input IDs, per-input
+`source_timestamp`, and batch `as_of` byte-for-byte as before.
+`render_source_timestamps=False` suppresses the timestamp attribute for every
+invocation of that definition. `batch_as_of` is `always`, `never`, or
+`on_request`; an `on_request` definition renders the batch clock only when the
+invocation supplies `InputProjectionRequest(render_batch_as_of=True)`. A
+request for a definition whose mode is `never` is rejected before claim,
+context rendering, admission, provider I/O, or tool I/O. The host must continue
+to supply aware `HostInput.source_timestamp`, `InputClaim.as_of`, appended
+`new_as_of`, and one-shot `as_of` values because this is visibility policy, not
+an operational-data deletion.
+
+Every projection-policy value participates in the definition fingerprint, so
+this kernel revision rotates definition identity even for the byte-compatible
+default and non-default policies rotate again according to their exact value.
+An invocation request is dynamic and does not participate. Old saved session
+references remain in their former fingerprint namespace and are not resumed;
+no session-reference format or persistence schema changes. A host MUST NOT also
+bump `session_compatibility_revision` solely for this release because the new
+covered policy field already provides the deliberate rotation.
+
+For Jarvis Slice 5, define AutomaticWriteGate with:
+
+```python
+input_projection_policy = InputProjectionPolicy(
+    render_source_timestamps=False,
+    batch_as_of=BatchAsOfMode.on_request,
+)
+```
+
+Keep its plan empty and its restricted effect descriptor in ordinary
+definition-owned context. Invoke it without `input_projection` normally; pass
+`InputProjectionRequest(render_batch_as_of=True)` only when that invocation's
+relative-time validation requires the batch clock. Do not strip timestamps
+from canonical inputs, alter rendered text afterward, or add application roles
+inside the kernel. No plan/HostTable re-freeze, effect revision, persistence
+migration, provider-wire change, or provider/dependency update is required.
+
 For the dependency propagation from kernel `b53e4329d6a8fc8af622747c9670cf586cf9e1ff`,
 a consumer pins the successor kernel revision, regenerates its lock to exact
 `llm-tools` revision `9e6d155f3b64f03495911435b7cae8b8d131f9a2`,
@@ -197,6 +244,14 @@ observed; and the separately gated in-flight cancellation probe must also run.
 Quota exhaustion runs only against a qualification profile that is already
 exhausted and MUST NOT be induced for release testing. The retired `gpt-5.4`
 local-account route is neither a release gate nor a permitted probe.
+
+The input-projection release changes model-visible context and definition
+identity, so it also requires the current `gpt-5.6-terra` matrix rather than
+carrying prior qualification forward. Its structured probe must submit the
+restricted projection with explicitly requested batch `as_of`; the regular
+continuation, JSON-string argument, and separately gated in-flight cancellation
+probes remain required. Retired `gpt-5.4` and deliberately induced quota
+exhaustion remain prohibited.
 
 The library release commands are:
 

@@ -90,6 +90,7 @@ from .definitions import (
     HostConclusion,
     HostInput,
     InputClaim,
+    InputProjectionRequest,
     IsolatedDispatchLineage,
     OneShotCompleted,
     OneShotOutcome,
@@ -363,6 +364,7 @@ async def run_thread(
     context_source: ContextSourcePort,
     dispatcher: ToolDispatchPort,
     budget_factory: ToolBudgetFactoryPort,
+    input_projection: InputProjectionRequest | None = None,
     cancellation: CancellationToken | None = None,
     consume_on_cancel: bool = True,
     event_sink: EventSink | None = None,
@@ -375,6 +377,7 @@ async def run_thread(
         raise ValueError("a thread run requires a continuing definition")
     if type(consume_on_cancel) is not bool:
         raise TypeError("consume_on_cancel must be bool")
+    definition.input_projection_policy.resolve(input_projection)
     cancellation = cancellation or CancellationToken()
     state = _RunState(run_id, clock)
 
@@ -505,6 +508,7 @@ async def run_thread(
             inputs=result.inputs,
             as_of=result.new_as_of,
             prior_visible_bytes=state.visible_bytes,
+            input_projection=input_projection,
         )
         state.visible_bytes = projection.cumulative_visible_bytes
         pending_content.append(TextContent(projection.rendered))
@@ -585,6 +589,7 @@ async def run_thread(
                     claim.plan,
                     source,
                     prior_visible_bytes=state.visible_bytes,
+                    input_projection=input_projection,
                 )
                 state.visible_bytes = projection.cumulative_visible_bytes
                 pending_content[:] = [TextContent(projection.rendered)]
@@ -602,6 +607,7 @@ async def run_thread(
                         inputs=batch,
                         as_of=batch_as_of,
                         prior_visible_bytes=state.visible_bytes,
+                        input_projection=input_projection,
                     )
                     state.visible_bytes = projection.cumulative_visible_bytes
                     pending_content.append(TextContent(projection.rendered))
@@ -683,6 +689,7 @@ async def run_thread(
                     claim.plan,
                     source,
                     prior_visible_bytes=state.visible_bytes,
+                    input_projection=input_projection,
                 )
             else:
                 source = await context_source.continuation(
@@ -698,6 +705,7 @@ async def run_thread(
                     claim.plan,
                     source,
                     prior_visible_bytes=state.visible_bytes,
+                    input_projection=input_projection,
                 )
             state.visible_bytes = projection.cumulative_visible_bytes
             pending_content.insert(0, TextContent(projection.rendered))
@@ -974,6 +982,7 @@ async def run_one_shot(
     provider: ProviderSessionPort,
     dispatcher: ToolDispatchPort,
     budget_factory: ToolBudgetFactoryPort,
+    input_projection: InputProjectionRequest | None = None,
     parent_admission: AdmissionToken | None = None,
     cancellation: CancellationToken | None = None,
     event_sink: EventSink | None = None,
@@ -986,6 +995,7 @@ async def run_one_shot(
         raise ValueError("one-shot requires an isolated definition")
     if not isinstance(definition.output_contract, StructuredOutput):
         raise ValueError("one-shot requires a structured output contract")
+    definition.input_projection_policy.resolve(input_projection)
     require_host_plan(plan, definition.maximum_profile)
     require_read_only_plan(plan)
     budgets = _create_tool_budget(budget_factory, plan)
@@ -1024,6 +1034,7 @@ async def run_one_shot(
             plan,
             source_sections,
             prior_visible_bytes=state.visible_bytes,
+            input_projection=input_projection,
         )
     except ContextLimitExceeded:
         event(EventKind.outcome, outcome_type="configuration_error")

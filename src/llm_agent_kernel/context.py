@@ -21,7 +21,7 @@ from llm_tools import (
     render_prompt,
 )
 
-from .definitions import AgentDefinition, HostInput
+from .definitions import AgentDefinition, HostInput, InputProjectionRequest
 from .tools import publish_host_plan, require_host_plan
 
 
@@ -76,11 +76,15 @@ def bootstrap_context(
     observations: tuple[ToolObservation, ...] = (),
     correction: str | None = None,
     prior_visible_bytes: int = 0,
+    input_projection: InputProjectionRequest | None = None,
 ) -> ContextProjection:
     """Build one cold bootstrap solely from canonical host material."""
 
     if not isinstance(source_sections, PromptSections):
         raise TypeError("bootstrap source must be PromptSections")
+    render_source_timestamps, render_batch_as_of = _resolve_input_projection(
+        definition, input_projection
+    )
     return _project(
         definition,
         plan,
@@ -89,7 +93,12 @@ def bootstrap_context(
             *definition.stable_context.sections,
             *source_sections.sections,
             publish_host_plan(plan, definition.maximum_profile),
-            _input_batch(inputs, as_of),
+            _input_batch(
+                inputs,
+                as_of,
+                render_source_timestamps=render_source_timestamps,
+                render_batch_as_of=render_batch_as_of,
+            ),
         ),
         observations,
         correction,
@@ -107,18 +116,27 @@ def run_context(
     observations: tuple[ToolObservation, ...] = (),
     correction: str | None = None,
     prior_visible_bytes: int = 0,
+    input_projection: InputProjectionRequest | None = None,
 ) -> ContextProjection:
     """Build the first delta for a healthy continuing session and new run."""
 
     if not isinstance(source_sections, PromptSections):
         raise TypeError("run source must be PromptSections")
+    render_source_timestamps, render_batch_as_of = _resolve_input_projection(
+        definition, input_projection
+    )
     return _project(
         definition,
         plan,
         (
             *source_sections.sections,
             publish_host_plan(plan, definition.maximum_profile),
-            _input_batch(inputs, as_of),
+            _input_batch(
+                inputs,
+                as_of,
+                render_source_timestamps=render_source_timestamps,
+                render_batch_as_of=render_batch_as_of,
+            ),
         ),
         observations,
         correction,
@@ -136,15 +154,27 @@ def continuation_context(
     observations: tuple[ToolObservation, ...] = (),
     correction: str | None = None,
     prior_visible_bytes: int = 0,
+    input_projection: InputProjectionRequest | None = None,
 ) -> ContextProjection:
     """Build only material not already sent during the current run."""
 
     if not isinstance(source_sections, PromptSections):
         raise TypeError("continuation source must be PromptSections")
+    render_source_timestamps, render_batch_as_of = _resolve_input_projection(
+        definition, input_projection
+    )
     if bool(inputs) != (as_of is not None):
         raise ValueError("new host input and its as_of must be supplied together")
     dynamic = (
-        (*source_sections.sections, _input_batch(inputs, as_of))
+        (
+            *source_sections.sections,
+            _input_batch(
+                inputs,
+                as_of,
+                render_source_timestamps=render_source_timestamps,
+                render_batch_as_of=render_batch_as_of,
+            ),
+        )
         if as_of is not None
         else source_sections.sections
     )
@@ -212,24 +242,50 @@ def _project(
         omitted.add(removable)
 
 
-def _input_batch(inputs: tuple[HostInput, ...], as_of: datetime) -> PromptSection:
+def _resolve_input_projection(
+    definition: AgentDefinition,
+    request: InputProjectionRequest | None,
+) -> tuple[bool, bool]:
+    if not isinstance(definition, AgentDefinition):
+        raise TypeError("context requires an AgentDefinition")
+    return definition.input_projection_policy.resolve(request)
+
+
+def _input_batch(
+    inputs: tuple[HostInput, ...],
+    as_of: datetime,
+    *,
+    render_source_timestamps: bool,
+    render_batch_as_of: bool,
+) -> PromptSection:
     if type(inputs) is not tuple or not inputs:
         raise ValueError("an admitted host-input batch must not be empty")
     if any(not isinstance(item, HostInput) for item in inputs):
         raise TypeError("input batches must contain HostInput values")
     if not isinstance(as_of, datetime) or as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("input batch as_of must be timezone-aware")
+    batch_attributes = (
+        (PromptAttribute(PromptAttributeName("as_of"), as_of.isoformat()),)
+        if render_batch_as_of
+        else ()
+    )
     return PromptSection(
         kind=PromptSectionKind("host_input_batch"),
-        attributes=(PromptAttribute(PromptAttributeName("as_of"), as_of.isoformat()),),
+        attributes=batch_attributes,
         body=PromptSections(
             PromptSection(
                 kind=PromptSectionKind("host_input"),
                 attributes=(
                     PromptAttribute(PromptAttributeName("input_id"), str(item.input_id)),
-                    PromptAttribute(
-                        PromptAttributeName("source_timestamp"),
-                        item.source_timestamp.isoformat(),
+                    *(
+                        (
+                            PromptAttribute(
+                                PromptAttributeName("source_timestamp"),
+                                item.source_timestamp.isoformat(),
+                            ),
+                        )
+                        if render_source_timestamps
+                        else ()
                     ),
                 ),
                 body=item.sections,

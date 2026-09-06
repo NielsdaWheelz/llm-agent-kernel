@@ -78,6 +78,50 @@ class SessionMode(StrEnum):
     isolated = "isolated"
 
 
+class BatchAsOfMode(StrEnum):
+    always = "always"
+    never = "never"
+    on_request = "on_request"
+
+
+@dataclass(frozen=True, slots=True)
+class InputProjectionRequest:
+    """Invocation-local request for definition-authorized input context."""
+
+    render_batch_as_of: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.render_batch_as_of) is not bool:
+            raise TypeError("render_batch_as_of must be bool")
+
+
+@dataclass(frozen=True, slots=True)
+class InputProjectionPolicy:
+    """Definition-bound policy for model-visible host-input metadata."""
+
+    render_source_timestamps: bool = True
+    batch_as_of: BatchAsOfMode = BatchAsOfMode.always
+
+    def __post_init__(self) -> None:
+        if type(self.render_source_timestamps) is not bool:
+            raise TypeError("render_source_timestamps must be bool")
+        if not isinstance(self.batch_as_of, BatchAsOfMode):
+            raise TypeError("batch_as_of must be BatchAsOfMode")
+
+    def resolve(self, request: InputProjectionRequest | None) -> tuple[bool, bool]:
+        """Validate one request and return source/as-of rendering decisions."""
+
+        if request is not None and not isinstance(request, InputProjectionRequest):
+            raise TypeError("input projection request must be InputProjectionRequest")
+        render_requested_as_of = request is not None and request.render_batch_as_of
+        if self.batch_as_of is BatchAsOfMode.never and render_requested_as_of:
+            raise ValueError("definition prohibits model-visible batch as_of")
+        render_batch_as_of = self.batch_as_of is BatchAsOfMode.always or (
+            self.batch_as_of is BatchAsOfMode.on_request and render_requested_as_of
+        )
+        return self.render_source_timestamps, render_batch_as_of
+
+
 @dataclass(frozen=True, slots=True)
 class ConversationalOutput:
     kind: Literal["conversational"] = field(default="conversational", init=False)
@@ -214,6 +258,7 @@ class AgentDefinition:
     provider: ProviderConfiguration
     session_compatibility_revision: str
     limits: KernelLimits = KernelLimits()
+    input_projection_policy: InputProjectionPolicy = InputProjectionPolicy()
     fingerprint: str = field(init=False)
 
     def __post_init__(self) -> None:
@@ -240,6 +285,8 @@ class AgentDefinition:
             raise ValueError("session compatibility revision must not be empty")
         if not isinstance(self.limits, KernelLimits):
             raise TypeError("definition limits must be KernelLimits")
+        if not isinstance(self.input_projection_policy, InputProjectionPolicy):
+            raise TypeError("definition input projection policy must be InputProjectionPolicy")
         object.__setattr__(self, "fingerprint", _definition_fingerprint(self))
 
 
@@ -621,6 +668,12 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
     provider = definition.provider
     value = {
         "definition_id": str(definition.definition_id),
+        "input_projection_policy": {
+            "batch_as_of": definition.input_projection_policy.batch_as_of.value,
+            "render_source_timestamps": (
+                definition.input_projection_policy.render_source_timestamps
+            ),
+        },
         "limits": {
             "max_new_context_bytes": definition.limits.max_new_context_bytes,
             "max_protocol_repairs": definition.limits.max_protocol_repairs,
@@ -683,6 +736,7 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
 
 
 __all__ = [
+    "BatchAsOfMode",
     "CODEX_NATIVE_OPTIONS",
     "CONTAINMENT_POLICY",
     "NO_RESULT",
@@ -704,6 +758,8 @@ __all__ = [
     "HostRef",
     "InputClaim",
     "InputId",
+    "InputProjectionPolicy",
+    "InputProjectionRequest",
     "IsolatedDispatchLineage",
     "KernelLimits",
     "ModelStep",

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -27,7 +28,10 @@ from llm_tools import (
     PolicyEpoch,
     ProfileId,
     PromptDocument,
+    PromptSection,
+    PromptSectionKind,
     PromptSections,
+    PromptText,
     ReplayPolicy,
     RunLimits,
     ToolBinding,
@@ -57,12 +61,18 @@ from provider_runtime.types import Absent, CancelSignal, Present
 from pydantic import BaseModel, ConfigDict
 
 from llm_agent_kernel.cancellation import CancellationToken
+from llm_agent_kernel.context import bootstrap_context
 from llm_agent_kernel.definitions import (
     AgentDefinition,
     AgentRole,
+    BatchAsOfMode,
     ConversationalOutput,
     DefinitionId,
     FinishStep,
+    HostInput,
+    InputId,
+    InputProjectionPolicy,
+    InputProjectionRequest,
     OutputContract,
     ProviderConfiguration,
     ProviderUsage,
@@ -145,6 +155,7 @@ def _definition(
     *,
     output_contract: OutputContract | None = None,
     session_mode: SessionMode = SessionMode.continuing,
+    input_projection_policy: InputProjectionPolicy | None = None,
 ) -> AgentDefinition:
     empty_catalog = ToolCatalog.compose(())
     maximum = CapabilityProfile(
@@ -164,6 +175,7 @@ def _definition(
             os.environ.get("LLM_AGENT_KERNEL_MODEL", "gpt-5"),
         ),
         "live-qualification-v1",
+        input_projection_policy=input_projection_policy or InputProjectionPolicy(),
     )
 
 
@@ -287,26 +299,54 @@ async def test_live_structured_nested_optional_output_and_commentary_selection()
         _required_environment("LLM_AGENT_KERNEL_PROFILE"),
         output_contract=contract,
         session_mode=SessionMode.isolated,
+        input_projection_policy=InputProjectionPolicy(
+            render_source_timestamps=False,
+            batch_as_of=BatchAsOfMode.on_request,
+        ),
     )
+    plan = _empty_plan(definition)
+    projection = bootstrap_context(
+        definition,
+        (
+            HostInput(
+                InputId("live-projection-input"),
+                PromptSections(
+                    (
+                        PromptSection(
+                            PromptSectionKind("human_text"),
+                            (),
+                            PromptText(
+                                "Without invoking tools, first send a brief progress update on "
+                                "the commentary channel. Then respond through the finish branch. "
+                                "Set answer to pong, count to null, nested.label to qualified, "
+                                "nested.note to null, and reason to null."
+                            ),
+                        ),
+                    )
+                ),
+                datetime(2026, 9, 6, 9, 0, tzinfo=UTC),
+            ),
+        ),
+        datetime(2026, 9, 6, 9, 1, tzinfo=UTC),
+        plan,
+        PromptSections(()),
+        input_projection=InputProjectionRequest(render_batch_as_of=True),
+    )
+    assert 'input_id="live-projection-input"' in projection.rendered
+    assert 'as_of="2026-09-06T09:01:00+00:00"' in projection.rendered
+    assert "source_timestamp=" not in projection.rendered
     runtime = _ObservingAgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
     provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
     try:
         lease = await provider.open_isolated(definition)
         terminal = await provider.run_observed_turn(
             lease,
-            (
-                TextContent(
-                    "Without invoking tools, first send a brief progress update on the "
-                    "commentary channel. Then respond through the finish branch. Set answer "
-                    "to pong, count to null, nested.label to qualified, nested.note to null, "
-                    "and reason to null."
-                ),
-            ),
+            (TextContent(projection.rendered),),
             CancellationToken(),
             timeout_seconds=600.0,
         )
         assert terminal.status == "succeeded"
-        step = validate_provider_step(terminal.structured_output, contract, _empty_plan())
+        step = validate_provider_step(terminal.structured_output, contract, plan)
         assert isinstance(step, FinishStep)
         assert step.result == {
             "answer": "pong",
@@ -379,8 +419,8 @@ async def test_live_quota_exhaustion() -> None:
         await runtime.close()
 
 
-def _empty_plan() -> FrozenToolPlan:
-    definition = _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+def _empty_plan(definition: AgentDefinition | None = None) -> FrozenToolPlan:
+    definition = definition or _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
     return ToolPlan(definition.maximum_profile.id, HostTable()).freeze(
         ToolCatalog.compose(()),
         definition.maximum_profile,

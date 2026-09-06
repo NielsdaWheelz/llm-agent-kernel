@@ -49,6 +49,7 @@ from provider_runtime.agent_runtime import (
     CredentialRef,
     FrozenJsonDict,
     ResumeSession,
+    SessionUnavailable,
     TextContent,
     TurnNotStarted,
     TurnRequest,
@@ -65,6 +66,7 @@ from llm_agent_kernel.coordination import (
     AdmissionStateDefect,
     AdmissionToken,
     AdmissionUsage,
+    AppendInputs,
     CheckpointStateDefect,
     ClaimAcquired,
     ClaimNoWork,
@@ -75,6 +77,7 @@ from llm_agent_kernel.coordination import (
 from llm_agent_kernel.definitions import (
     AgentDefinition,
     AgentRole,
+    BatchAsOfMode,
     Checkpoint,
     ClaimId,
     ConversationalOutput,
@@ -87,6 +90,8 @@ from llm_agent_kernel.definitions import (
     HostRef,
     InputClaim,
     InputId,
+    InputProjectionPolicy,
+    InputProjectionRequest,
     KernelLimits,
     OneShotCompleted,
     OwnerToken,
@@ -189,6 +194,7 @@ def _definition(
     structured: bool = False,
     effect: ToolEffect | None = None,
     limits: KernelLimits | None = None,
+    input_projection_policy: InputProjectionPolicy | None = None,
 ) -> tuple[AgentDefinition, Any, ToolBinding[Any, Any, Any] | None]:
     maximum, plan, binding = _authority(effect)
     return (
@@ -205,6 +211,7 @@ def _definition(
             ),
             "kernel-test-v1",
             limits or KernelLimits(),
+            input_projection_policy or InputProjectionPolicy(),
         ),
         plan,
         binding,
@@ -367,6 +374,28 @@ class _CancellingRuntime(_Runtime):
             yield event
 
 
+class _ResumeFailOnceRuntime(_Runtime):
+    def __init__(self, scripts: list[tuple[AgentEvent, ...]]) -> None:
+        super().__init__(scripts)
+        self.failed = False
+
+    async def stream_turn(
+        self,
+        session: AgentSession,
+        request: TurnRequest,
+        *,
+        approvals: object | None = None,
+        cancel: CancelSignal | None = None,
+    ) -> AsyncGenerator[AgentEvent, None]:
+        del session, approvals, cancel
+        self.turns.append(request)
+        if not self.failed:
+            self.failed = True
+            raise SessionUnavailable("injected resume failure")
+        for event in self.scripts.popleft():
+            yield event
+
+
 class _Budgets:
     def __init__(self, limits: RunLimits) -> None:
         self.limits = limits
@@ -469,6 +498,7 @@ async def _thread(
     event_sink: RecordingEventSink | None = None,
     budget_factory: Any | None = None,
     context_source: StaticContextSource | None = None,
+    input_projection: InputProjectionRequest | None = None,
 ):
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
     refs = references or InMemorySessionRefPort()
@@ -487,6 +517,7 @@ async def _thread(
             cancellation=cancellation,
             diagnostics=diagnostics,
             event_sink=event_sink,
+            input_projection=input_projection,
         )
     finally:
         await provider.shutdown()
@@ -893,6 +924,119 @@ async def test_frozen_plan_is_rejected_before_rendering_admission_or_provider(
     assert context_source.continuation_calls == []
     assert admission.charged_turns == 0
     assert runtime.opens == []
+
+
+async def test_unauthorized_projection_is_rejected_before_claim_rendering_admission_or_io(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        input_projection_policy=InputProjectionPolicy(batch_as_of=BatchAsOfMode.never)
+    )
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    admission = InMemoryAdmissionPort()
+    runtime = _Runtime([])
+    context_source = StaticContextSource(_sections("must not render"))
+    dispatch = ScriptedToolDispatchPort(())
+
+    with pytest.raises(ValueError, match="prohibits model-visible batch as_of"):
+        await _thread(
+            tmp_path,
+            definition,
+            claim,
+            runtime,
+            checkpoints,
+            dispatch,
+            admission,
+            context_source=context_source,
+            input_projection=InputProjectionRequest(render_batch_as_of=True),
+        )
+
+    assert len(checkpoints.claims) == 1
+    assert context_source.bootstrap_calls == []
+    assert context_source.continuation_calls == []
+    assert admission.charged_turns == 0
+    assert runtime.opens == []
+    assert dispatch.calls == []
+
+
+async def test_thread_projection_applies_to_claim_and_appended_input_batches(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        input_projection_policy=InputProjectionPolicy(
+            render_source_timestamps=False,
+            batch_as_of=BatchAsOfMode.on_request,
+        )
+    )
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    checkpoints.queue_poll(
+        claim.claim_id,
+        AppendInputs(
+            (_input("input-2", "current follow-up"),),
+            Checkpoint("checkpoint-2"),
+            datetime.now(UTC),
+        ),
+    )
+    runtime = _Runtime([(_terminal({"type": "say", "text": "done"}),)])
+
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        runtime,
+        checkpoints,
+        input_projection=InputProjectionRequest(render_batch_as_of=True),
+    )
+
+    assert outcome.type == "completed"
+    submitted = tuple(cast(TextContent, part).text for part in runtime.turns[0].input)
+    assert len(submitted) == 2
+    assert 'input_id="input-1"' in submitted[0]
+    assert 'input_id="input-2"' in submitted[1]
+    assert "current follow-up" in submitted[1]
+    assert all("source_timestamp=" not in part for part in submitted)
+    assert all("as_of=" in part for part in submitted)
+
+
+async def test_restricted_projection_survives_resume_failure_cold_reconstruction(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        input_projection_policy=InputProjectionPolicy(
+            render_source_timestamps=False,
+            batch_as_of=BatchAsOfMode.never,
+        )
+    )
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    references = InMemorySessionRefPort()
+    await references.compare_and_set(
+        ThreadId("thread-1"), definition.fingerprint, None, _ref("saved-projection-session")
+    )
+    runtime = _ResumeFailOnceRuntime(
+        [(_terminal({"type": "say", "text": "cold reconstructed"}, _ref("session-2")),)]
+    )
+
+    outcome, _ = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        runtime,
+        checkpoints,
+        references=references,
+    )
+
+    assert outcome.type == "completed"
+    assert len(runtime.turns) == 2
+    assert isinstance(runtime.opens[0].open, ResumeSession)
+    assert not isinstance(runtime.opens[1].open, ResumeSession)
+    for turn in runtime.turns:
+        submitted = "\n".join(cast(TextContent, part).text for part in turn.input)
+        assert 'input_id="input-1"' in submitted
+        assert "source_timestamp=" not in submitted
+        assert "as_of=" not in submitted
 
 
 async def test_claimed_plan_constructs_and_verifies_its_own_tool_budget_before_io(
@@ -1682,6 +1826,77 @@ async def test_isolated_structured_run_is_fresh_closed_and_uses_no_saved_state(
     assert not isinstance(runtime.opens[0].open, ResumeSession)
     assert len(runtime.closed) == 1
     assert admission.live_slots == 0
+
+
+async def test_isolated_empty_plan_honors_restricted_input_projection(
+    tmp_path: Path,
+) -> None:
+    definition, plan, binding = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        input_projection_policy=InputProjectionPolicy(
+            render_source_timestamps=False,
+            batch_as_of=BatchAsOfMode.never,
+        ),
+    )
+    assert binding is None
+    runtime = _Runtime([(_terminal({"type": "finish", "result": {"answer": "yes"}}),)])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+
+    outcome = await run_one_shot(
+        run_id=RunId("isolated-projection"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        admission=InMemoryAdmissionPort(),
+        provider=provider,
+        dispatcher=ScriptedToolDispatchPort(()),
+        budget_factory=_budget_factory(),
+    )
+
+    assert outcome.type == "completed"
+    submitted = cast(TextContent, runtime.turns[0].input[0]).text
+    assert 'input_id="input-1"' in submitted
+    assert "hello" in submitted
+    assert '"count":0' in submitted
+    assert "source_timestamp=" not in submitted
+    assert "as_of=" not in submitted
+    assert len(runtime.closed) == 1
+
+
+async def test_unauthorized_one_shot_projection_precedes_rendering_admission_and_provider(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated,
+        structured=True,
+        input_projection_policy=InputProjectionPolicy(batch_as_of=BatchAsOfMode.never),
+    )
+    runtime = _Runtime([])
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    admission = InMemoryAdmissionPort()
+    factory = _BudgetFactory()
+
+    with pytest.raises(ValueError, match="prohibits model-visible batch as_of"):
+        await run_one_shot(
+            run_id=RunId("isolated-unauthorized-projection"),
+            definition=definition,
+            inputs=(_input(),),
+            as_of=datetime.now(UTC),
+            plan=plan,
+            source_sections=_sections("must not render"),
+            admission=admission,
+            provider=provider,
+            dispatcher=ScriptedToolDispatchPort(()),
+            budget_factory=factory,
+            input_projection=InputProjectionRequest(render_batch_as_of=True),
+        )
+
+    assert factory.plans == []
+    assert admission.charged_turns == 0
+    assert runtime.opens == []
 
 
 async def test_isolated_provider_failure_closes_and_returns_typed_stop(tmp_path: Path) -> None:
