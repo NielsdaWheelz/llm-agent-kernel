@@ -39,6 +39,7 @@ from llm_tools import (
 from provider_runtime.agent_runtime import (
     AgentEvent,
     AgentFailure,
+    AgentNative,
     AgentQuotaExhausted,
     AgentRuntime,
     AgentSession,
@@ -50,6 +51,7 @@ from provider_runtime.agent_runtime import (
     AgentUsage,
     CredentialRef,
     FrozenJsonDict,
+    ProtocolDefect,
     ResumeSession,
     SessionUnavailable,
     TextContent,
@@ -78,6 +80,7 @@ from llm_agent_kernel.coordination import (
     ToolDispatchDefect,
 )
 from llm_agent_kernel.definitions import (
+    KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
     AgentRole,
     BatchAsOfMode,
@@ -1562,13 +1565,19 @@ async def test_native_authority_event_fail_stops_without_host_action(tmp_path: P
         [
             (
                 AgentText("suppressed"),
-                AgentToolUse("native-1", "shell", "started", FrozenJsonDict({})),
+                AgentToolUse(
+                    "retained-custom-call",
+                    "exec",
+                    "completed",
+                    FrozenJsonDict({}),
+                    succeeded=False,
+                ),
                 _terminal({"type": "say", "text": "must not escape"}),
             )
         ]
     )
 
-    outcome, _ = await _thread(
+    outcome, refs = await _thread(
         tmp_path,
         definition,
         claim,
@@ -1580,6 +1589,61 @@ async def test_native_authority_event_fail_stops_without_host_action(tmp_path: P
     assert outcome.type is ThreadStopKind.configuration_error
     assert dispatch.calls == []
     assert checkpoints.settlements == []
+    assert len(checkpoints.park_reasons) == 1
+    assert await refs.load(ThreadId("thread-1"), definition.fingerprint) is None
+    assert len(runtime.closed) == 1
+
+
+async def test_provider_protocol_defect_discards_without_terminal_or_host_effect(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition(effect=ToolEffect.Read)
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    dispatch = ScriptedToolDispatchPort(())
+    runtime = _Runtime(
+        [(_terminal({"type": "say", "text": "must not be accepted"}),)],
+        stream_error=ProtocolDefect("unknown app-server protocol activity"),
+    )
+
+    outcome, refs = await _thread(
+        tmp_path,
+        definition,
+        claim,
+        runtime,
+        checkpoints,
+        dispatch,
+    )
+
+    assert outcome.type is ThreadStopKind.configuration_error
+    assert dispatch.calls == []
+    assert checkpoints.settlements == []
+    assert len(checkpoints.park_reasons) == 1
+    assert await refs.load(ThreadId("thread-1"), definition.fingerprint) is None
+    assert len(runtime.closed) == 1
+
+
+async def test_inert_provider_observation_still_allows_terminal_conclusion(
+    tmp_path: Path,
+) -> None:
+    definition, plan, _ = _definition()
+    claim = _claim(plan)
+    checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
+    runtime = _Runtime(
+        [
+            (
+                AgentNative("warning", FrozenJsonDict({"kind": "inert"})),
+                _terminal({"type": "say", "text": "accepted terminal"}),
+            )
+        ]
+    )
+
+    outcome, _ = await _thread(tmp_path, definition, claim, runtime, checkpoints)
+
+    assert outcome.type == "completed"
+    assert [record.conclusion for record in checkpoints.settlements] == [
+        ConversationConclusion("accepted terminal")
+    ]
 
 
 async def test_suspension_is_durably_settled_and_returns(tmp_path: Path) -> None:
@@ -1960,6 +2024,7 @@ async def test_initial_read_precedes_provider_and_shares_budget_with_model_calls
     assert 'origin="initial_read"' in first_provider_input
     assert "initial_read_position=" not in first_provider_input
     assert "model_step_ordinal=" not in first_provider_input
+    assert runtime.opens[0].system[0] == TextContent(KERNEL_BASE_INSTRUCTION)
 
 
 async def test_declared_initial_read_failure_is_a_typed_first_turn_observation(

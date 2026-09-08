@@ -32,18 +32,29 @@ The distribution is `llm-agent-kernel`; applications import
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`
+  `4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 
-The provider baseline is usable without modification. It normalizes any
-provider-native cumulative accounting into invocation-local usage before the
-public agent-runtime boundary. V1 selects only
+The provider baseline owns the documented Codex App Server stdio protocol
+directly while preserving the public `backend="codex", transport="sdk"`
+compatibility route. It normalizes any provider-native cumulative accounting
+into invocation-local usage before the public agent-runtime boundary. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
 root `ProviderRuntime.generate` lane. The kernel distribution directly pins the
 Codex SDK version certified by that immutable provider revision so a later
 transitive release cannot silently invalidate the native-tool containment
 qualification.
+
+The corrected provider requires the `openai-codex` Python package, CLI bundle,
+and executable-reported version to remain exactly `0.144.4`. In the disabled-
+builtins posture it classifies every documented App Server message and retained
+custom-call shape. Native authority activity becomes typed tool or permission
+events; malformed, reordered, or unknown protocol becomes fatal
+`ProtocolDefect`. Native Code Mode is contained and detected, not proven absent
+before its first observable event. Strict protocol drift intentionally breaks
+availability until audited. A private read-only provider cwd prevents mutation
+within that scope but is not by itself a host-confidentiality boundary.
 
 The same provider baseline defines `AgentTerminal.final_text` as the
 provider-selected authoritative assistant response rather than the
@@ -146,6 +157,7 @@ uncertain position, or decide product authority.
 ### 3.3 The kernel owns
 
 - Immutable agent definitions and deterministic fingerprints.
+- The bounded kernel-owned base instruction and its immutable identity.
 - Plan-aware construction and exact-limit verification of the dependency-owned
   tool budget.
 - Provider containment requirements and the proof that a run plan tightens the
@@ -198,9 +210,22 @@ An `AgentDefinition` is immutable configuration containing:
 - `KernelLimits`.
 
 The provider configuration for the v1 Codex route includes backend, transport,
-credential profile identity, model, reasoning, system/developer material,
+credential profile identity, model, reasoning, application system/developer material,
 output schema, cwd scope, additional directories, MCP configuration,
 `PermissionPolicy`, and `CodexNativeOptions`.
+
+The kernel prepends one exact base instruction to the provider system channel
+for every new, resumed, reconstructed, continuing, and isolated session. It
+identifies a contained structured agent rather than a coding agent; makes only
+the authoritative final schema-conforming kernel step executable; restricts
+host-tool requests to the kernel `call_tool` step against the complete published
+`HostTable`; forbids provider-native shell, Code Mode, files, Web, MCP, apps,
+collaboration, permissions, and other native tools; makes `AgentText` and
+commentary observational; and requires tool observations to arrive through
+kernel-owned context without fabrication. Application role/context and
+application system/developer material remain separate specialization points and
+cannot remove the kernel-owned instruction. The prompt guides behavior; it is
+not an authority boundary.
 
 The input projection policy fixes whether per-input `source_timestamp`
 attributes are rendered and selects one batch-`as_of` mode: `always`, `never`,
@@ -210,8 +235,9 @@ for `on_request`, redundant for `always`, and is rejected as a widening request
 for `never`. Per-input timestamp visibility cannot be widened per invocation.
 
 The deterministic definition fingerprint covers every value that can change a
-native session's meaning or containment, including the complete input
-projection policy and exact `session_compatibility_revision`. The owner MUST
+native session's meaning or containment, including the kernel base
+instruction's immutable revision and SHA-256 digest, the complete input
+projection policy, and exact `session_compatibility_revision`. The owner MUST
 rotate that revision when an application, kernel, or provider-runtime semantic
 change makes saved sessions incompatible even if no other serialized definition
 field changed. It excludes credential secret bytes, current input, the
@@ -319,6 +345,13 @@ production or infer event history from its terminal. The adapter returns a
 terminal to the kernel only after observing a well-formed stream through that
 terminal.
 
+Every `AgentSessionRequest.system` begins with the exact kernel base instruction.
+The provider lowers non-empty system material to Codex App Server
+`baseInstructions`, replacing the built-in coding-agent prompt on new, resumed,
+and reconstructed sessions. Any application system material follows as a
+separate value; consumers MUST NOT copy, replace, or parameterize the kernel
+instruction.
+
 The adapter MUST represent the kernel provider-wire envelope through
 `JsonSchemaAgentOutput`. The root is one closed object, not a discriminated
 union. Every property of every object is required, and inactive/optional values
@@ -347,6 +380,13 @@ Any `AgentToolUse` or `AgentPermissionRequest` event fails the provider turn,
 discards its session, dispatches no host tool, and commits no model-authored
 conclusion. `AgentText` chunks are never delivered as conversational output;
 only a validated terminal structured step may be displayed or executed.
+
+Any provider `ProtocolDefect` is likewise fatal: the live session is discarded
+and no terminal for that turn may be accepted, synthesized, or replayed. The
+kernel does not parse provider-native method names; retained custom `exec`
+calls and future authority shapes remain provider-runtime's classification
+responsibility. Inert `AgentNative` observations remain non-executable and do
+not by themselves poison an otherwise clean terminal.
 
 `AgentTerminal.final_text` is the provider-selected authoritative assistant
 response. `AgentText` observations can contain commentary, drafts, or final
@@ -593,9 +633,10 @@ The kernel maintains one cumulative bound over the UTF-8 bytes of model-visible
 material it newly renders and submits during the current invocation. This
 includes its bootstrap or run delta, appended-input deltas, tool observations,
 protocol corrections, and any cold-bootstrap replay rendered in that run.
-Provider system/developer material, JSON-schema transport overhead, history
-already retained by a native session, and provider compaction are outside this
-counter and MUST NOT be described as covered by it. When older recomputable read
+The kernel base instruction, provider application system/developer material,
+JSON-schema transport overhead, history already retained by a native session,
+and provider compaction are outside this counter and MUST NOT be described as
+covered by it. When older recomputable read
 observations must be omitted, the kernel inserts an explicit omission marker and
 preserves stable source references supplied by the host. It MUST NOT silently
 truncate an action outcome, approval payload, or uncertainty evidence.
@@ -660,6 +701,11 @@ explicit omission markers. It need not reconstruct provider reasoning or
 turn-local read observations byte-for-byte. Reads may be repeated. Durable
 effect arguments and outcomes must come from host action state, never solely
 from the discarded provider transcript.
+
+A kernel base-instruction identity change rotates every definition fingerprint
+without a host compatibility-revision bump. Old references remain in their
+former fingerprint namespace and MUST NOT resume under the new model-visible
+protocol; the first run cold-bootstraps from canonical host context.
 
 ### 8.3 Mid-loop polling
 
@@ -1047,6 +1093,12 @@ The release suite covers both single-run interior behavior and composed seams:
     dispatch; initial/model positions are deterministic and disjoint; the typed
     completed observation precedes provider I/O; failures, bounds, commentary,
     accounting, containment, and finally-close behavior remain fail-closed.
+28. Empty application system configuration still replaces the Codex coding-agent
+    prompt with the kernel base instruction. Its immutable identity rotates
+    fingerprints and saved-session namespaces automatically; every session path
+    receives it, application material cannot remove it, retained custom-exec and
+    later-terminal incidents fail with zero host action, `ProtocolDefect` is
+    fatal, and inert provider observations preserve normal terminal behavior.
 
 ## 15. Explicitly deferred
 

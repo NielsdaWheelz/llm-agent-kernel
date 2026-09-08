@@ -11,13 +11,23 @@ ROOT = Path(__file__).parents[1]
 
 def test_package_metadata_locks_qualified_git_dependencies() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    lock = tomllib.loads((ROOT / "uv.lock").read_text())
+    packages = {package["name"]: package for package in lock["package"]}
 
     assert project["project"]["requires-python"] == ">=3.12"
     assert project["project"]["dependencies"][:3] == [
         "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@9e6d155f3b64f03495911435b7cae8b8d131f9a2",
-        "provider-runtime[codex-sdk] @ git+https://github.com/NielsdaWheelz/llm-calling.git@2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd",
+        "provider-runtime[codex-sdk] @ git+https://github.com/NielsdaWheelz/llm-calling.git@4ddced3bb5487ce988858c4c6d45d2e5ee0acad9",
         "openai-codex==0.144.4",
     ]
+    assert packages["provider-runtime"]["source"]["git"].endswith(
+        "?rev=4ddced3bb5487ce988858c4c6d45d2e5ee0acad9#4ddced3bb5487ce988858c4c6d45d2e5ee0acad9"
+    )
+    assert packages["llm-tools"]["source"]["git"].endswith(
+        "?rev=9e6d155f3b64f03495911435b7cae8b8d131f9a2#9e6d155f3b64f03495911435b7cae8b8d131f9a2"
+    )
+    assert packages["openai-codex"]["version"] == "0.144.4"
+    assert packages["openai-codex-cli-bin"]["version"] == "0.144.4"
 
 
 def test_import_has_no_filesystem_or_network_side_effect(tmp_path: Path) -> None:

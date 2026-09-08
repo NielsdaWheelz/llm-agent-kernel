@@ -27,6 +27,7 @@ from provider_runtime.agent_runtime import (
 )
 from provider_runtime.types import CancelSignal
 
+import llm_agent_kernel.definitions as definitions_module
 from llm_agent_kernel.coordination import (
     DiscardedSessionRef,
     SessionRefPort,
@@ -298,6 +299,35 @@ async def test_session_compatibility_revision_rotates_saved_session_key() -> Non
     rotated = replace(definition, session_compatibility_revision="session-test-v2")
     state = await coordinator.acquire_continuing(ThreadId("thread"), rotated)
 
+    assert state.cold_bootstrap is True
+    assert journal == ["provider.acquire:new"]
+
+
+async def test_kernel_instruction_identity_rotation_cold_bootstraps_old_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    journal: list[str] = []
+    refs = InMemorySessionRefPort()
+    old_definition = _definition()
+    await refs.compare_and_set(
+        ThreadId("thread"),
+        old_definition.fingerprint,
+        None,
+        _ref("old-instruction-session"),
+    )
+    identity = definitions_module.KERNEL_BASE_INSTRUCTION_IDENTITY
+    monkeypatch.setattr(
+        definitions_module,
+        "KERNEL_BASE_INSTRUCTION_IDENTITY",
+        f"{identity}-rotated",
+    )
+    new_definition = _definition()
+    provider = _Provider(journal)
+    coordinator = SessionCoordinator(cast(CodexProvider, provider), refs)
+
+    state = await coordinator.acquire_continuing(ThreadId("thread"), new_definition)
+
+    assert new_definition.fingerprint != old_definition.fingerprint
     assert state.cold_bootstrap is True
     assert journal == ["provider.acquire:new"]
 

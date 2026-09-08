@@ -41,6 +41,10 @@ This repository specifies and contains `llm-agent-kernel`, imported as
   kernel neither interprets nor persists either form.
 - Native Codex built-ins and Web are disabled; cwd is private, empty, and
   read-only; network, copied environment, MCP, and approvals are disabled.
+- Every contained Codex session receives the exact kernel-owned structured-agent
+  base instruction before application system material. Its immutable revision
+  and digest participate in the definition fingerprint; consumers do not copy
+  the text or manually rotate compatibility for a kernel instruction change.
 - Consume `AgentRuntime.stream_turn` directly; never use the event-discarding
   `run_turn` projection. Fail-stop and discard the session on any
   provider-native tool or permission event.

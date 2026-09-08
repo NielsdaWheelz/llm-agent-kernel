@@ -193,6 +193,47 @@ non-executable. Do not pre-execute the tool, add a second budget, synthesize a
 `CallToolStep`, persist a generic observation, or add a workflow/retry layer.
 The caller still commits the final one-shot result under its existing rules.
 
+For the sealed structured-agent instruction release from kernel
+`09a1af093479aa92f3e783f4b4a7cc38e301a4a7`, consumers pin the successor
+kernel revision and regenerate their lock to exact provider-runtime revision
+`4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`. Keep `llm-tools` at
+`9e6d155f3b64f03495911435b7cae8b8d131f9a2`, and keep both the
+`openai-codex` Python package and bundled CLI at `0.144.4`. The provider route
+remains `backend="codex", transport="sdk"`; the transport literal is the
+compatibility name for provider-runtime's directly owned App Server stream.
+
+The public kernel additions are `KERNEL_BASE_INSTRUCTION`,
+`KERNEL_BASE_INSTRUCTION_REVISION`, `KERNEL_BASE_INSTRUCTION_SHA256`, and
+`KERNEL_BASE_INSTRUCTION_IDENTITY`; no function or port signature changes. The
+identity for this release is
+`llm-agent-kernel-contained-structured-agent-v1:sha256:1817c90f24bf9149f20f94b69f825d9be0b78df8bb46b1d24ed2691cf71b80e7`.
+It participates in every definition fingerprint independently of application
+configuration. Old session references remain in their former fingerprint
+namespace and are not resumed; the next run cold-bootstraps from canonical
+host context. A host MUST NOT manually bump
+`session_compatibility_revision` solely for this release because the new kernel
+identity already provides the required rotation.
+
+Jarvis migration is only: repin the released kernel, regenerate its lock,
+record the kernel/provider/tool/Codex revisions and base-instruction identity in
+the compatibility manifest, preserve its existing application
+`session_compatibility_revision`, and allow affected sessions to cold-bootstrap.
+Keep Jarvis role/stable context and any provider `system`/`developer` values as
+application instructions; do not copy or parameterize the kernel text. Keep the
+existing frozen plans, HostTables, dispatcher, budgets, session-ref schema,
+persistence, and `(codex, sdk)` route. Continue rejecting every
+`AgentToolUse`/`AgentPermissionRequest` and treating provider `ProtocolDefect` as
+fatal with no accepted or replayed terminal. Do not add native method parsing,
+commentary parsing, dynamic tools, MCP, or another execution path.
+
+The base instruction replaces Codex's built-in coding-agent prompt for new,
+resumed, reconstructed, continuing, isolated, and initial-Read-backed sessions.
+It is bounded behavioral guidance, not authority. The corrected provider event
+boundary still contains and detects native Code Mode rather than proving it
+absent before the first event. Unknown protocol drift intentionally breaks
+availability. Read-only provider containment is not by itself a
+host-confidentiality boundary; use OS/container read isolation where required.
+
 For the dependency propagation from kernel `b53e4329d6a8fc8af622747c9670cf586cf9e1ff`,
 a consumer pins the successor kernel revision, regenerates its lock to exact
 `llm-tools` revision `9e6d155f3b64f03495911435b7cae8b8d131f9a2`,
@@ -254,12 +295,12 @@ add a blunt outer timeout around a `Write` that bypasses durable recorder and
 reconciliation handling.
 
 `KernelLimits.max_new_context_bytes` counts only UTF-8 bytes the kernel newly
-renders and submits during that invocation. Provider system/developer content,
-output-schema transport overhead, history retained by the native session, and
-provider compaction are outside it. Hosts must size provider-native context
-separately and continue supplying bounded canonical context and tool results;
-the kernel will not silently truncate required effect or reconciliation
-evidence.
+renders and submits during that invocation. The kernel base instruction,
+provider application system/developer content, output-schema transport overhead,
+history retained by the native session, and provider compaction are outside it.
+Hosts must size provider-native context separately and continue supplying
+bounded canonical context and tool results; the kernel will not silently
+truncate required effect or reconciliation evidence.
 
 ## Qualification
 
@@ -316,6 +357,18 @@ commentary/final-answer, JSON-string argument, and separately gated in-flight
 cancellation probes, it runs the kernel one-shot entry point with a known typed
 initial Read result and proves that value is usable by the first provider turn.
 Retired `gpt-5.4` and deliberately induced quota exhaustion remain prohibited.
+
+The sealed base-instruction release changes every Codex session's model-visible
+system input and therefore runs the current `gpt-5.6-terra` matrix rather than
+carrying prior qualification forward. It additionally uses one synthetic Read:
+natural language must produce the structured `call_tool`, the typed observation
+must be projected and used by the following turn, normal execution must emit no
+native exec event, and an adversarial shell/exec request must either remain in
+the structured protocol or fail containment with zero host effect. Fresh and
+close/reopen/resumed sessions are required. The changed provider lane is Codex;
+provider-runtime's Claude implementation is unchanged, so no fresh Claude
+qualification is required. Retired `gpt-5.4` and deliberately induced quota
+exhaustion remain prohibited.
 
 The library release commands are:
 

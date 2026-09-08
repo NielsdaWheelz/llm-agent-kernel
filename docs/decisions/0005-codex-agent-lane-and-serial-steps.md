@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-02
+- Amended: 2026-09-07
 
 ## Context
 
@@ -28,6 +29,21 @@ writeable filesystem, and provider approvals are disabled. The cwd is private,
 empty, and read-only. Any native tool-use or permission-request event is a
 fail-stop containment violation. The complete policy and native configuration
 participate in the definition fingerprint.
+
+The kernel also supplies one bounded immutable base instruction in the system
+channel before application system material. It replaces Codex's coding-agent
+base prompt and defines the contained structured-agent protocol, including the
+complete `HostTable`, final-step-only execution, observational commentary, and
+kernel-owned tool observations. Its revision and digest participate in every
+definition fingerprint, automatically rotating saved-session identity when the
+kernel protocol changes. The prompt is behavioral guidance; authority remains
+the provider event fail-stop plus the frozen host plan.
+
+The corrected provider directly owns the documented Codex App Server stream
+behind the preserved `transport="sdk"` compatibility literal. A
+`ProtocolDefect` is fatal and yields no acceptable terminal. Native Code Mode is
+contained/detected rather than proven absent before its first event, and the
+read-only cwd is not a host-confidentiality boundary.
 
 Application tools are represented through a frozen `llm-tools HostTable` in
 structured host context. The model emits exactly one `call_tool(tool_id,
@@ -64,6 +80,8 @@ Costs:
   qualified adapters and semantics.
 - The wire envelope and JSON-string arguments add tokens and require a separate
   strict decode before logical validation.
+- Kernel instruction changes deliberately cold-bootstrap continuing sessions;
+  strict protocol drift can reduce availability until audited.
 - No model-authored progress prose appears during long loops.
 
 ## Rejected alternatives

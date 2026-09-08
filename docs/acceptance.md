@@ -16,7 +16,10 @@ assigned to exactly one implementation slice.
   invocation-local terminal usage and progressive, non-additive invocation
   snapshots without resumed historical usage. It also exposes authoritative
   terminal assistant-message selection that excludes commentary from
-  structured output.
+  structured output. The corrected provider directly owns the Codex App Server
+  stream behind the preserved `codex`/`sdk` route, strictly classifies native
+  authority and retained custom-exec events, and fails unknown protocol closed
+  while preserving the exact `openai-codex==0.144.4` Python/CLI pair.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
@@ -57,13 +60,17 @@ assigned to exactly one implementation slice.
   transport, local-account credential reference, private empty absolute cwd,
   read-only filesystem, no additional directories, disabled network, denied
   approvals, empty copied environment, no MCP, disabled native Web, and
-  `builtin_tools="disabled"`.
+  `builtin_tools="disabled"`. Its system channel always begins with the exact
+  bounded kernel-owned structured-agent instruction, replacing Codex's built-in
+  coding-agent prompt before any separate application system material.
 - **K011** — The Codex `allowed_tools=("*",)` sentinel appears only where the
   pinned runtime requires it and is never interpreted as application authority.
 - **K012** — The adapter consumes and inspects every `stream_turn` event. Any
   native tool-use or permission-request event fails the turn, discards the
   session, returns no terminal to the loop, dispatches no host tool, and settles
-  no model-authored conclusion.
+  no model-authored conclusion. Provider `ProtocolDefect` is equally fatal and
+  permits no accepted, synthesized, or replayed terminal; the kernel never
+  parses native method names.
 - **K013** — Streaming model text is never delivered; only a successful terminal
   structured step can cross the host output boundary. `AgentText` observations
   need not concatenate to authoritative `AgentTerminal.final_text`, never enter
@@ -92,9 +99,11 @@ assigned to exactly one implementation slice.
   at construction; an unrepresentable contract fails before provider I/O.
 - **K018** — The deterministic fingerprint covers every session-scoped semantic
   and containment value, including `PermissionPolicy`, native options, the full
-  input projection policy, and the owner-controlled session-compatibility
-  revision; changing any covered value rotates the session. Secret bytes,
-  dynamic input, and the invocation projection request are excluded.
+  input projection policy, the exact kernel base-instruction revision plus
+  SHA-256 digest, and the owner-controlled session-compatibility revision;
+  changing any covered value rotates the session. Secret bytes, dynamic input,
+  and the invocation projection request are excluded. Kernel instruction
+  changes rotate automatically and do not require a consumer compatibility bump.
 - **K019** — Before rendering or provider/tool I/O, a qualified public predicate
   proves that the host-selected frozen plan is internally consistent with its
   exact catalog view, tightens the definition maximum in full, and sets
@@ -125,6 +134,8 @@ assigned to exactly one implementation slice.
   configuration/schema overhead, retained native history, and provider
   compaction are excluded. The default input projection is byte-for-byte
   compatible with the prior rendering and no post-render mutation seam exists.
+  Old saved references cannot resume after a kernel instruction-identity change;
+  the new fingerprint namespace cold-bootstraps from canonical host context.
 - **K024** — Every newly admitted input batch retains operational source
   timestamps and one host `as_of`; timezone/locale is included only when
   relevant. A definition may suppress model-visible per-input timestamps and
@@ -262,7 +273,10 @@ assigned to exactly one implementation slice.
   credentials, or provider payloads. Sink failure is nonfatal.
 - **K049** — Documentation states that provider-native transcripts are
   unredacted third-party data at rest and discarding a local ref does not promise
-  provider deletion.
+  provider deletion; the behavioral kernel prompt is not authority; native Code
+  Mode is contained/detected rather than proven absent before its first event;
+  protocol drift intentionally breaks availability; and read-only provider
+  containment is not by itself a host-confidentiality boundary.
 - **K050** — Deterministic tests inject failures at claim, admission reservation,
   plan-specific budget construction, provider terminal, session CAS,
   validation, recorder/effect commit, suspension, settlement, release, and
@@ -286,7 +300,13 @@ assigned to exactly one implementation slice.
   and validates only terminal structured output.
   Provider-facing releases that add initial one-shot context run a paid
   `gpt-5.6-terra` kernel probe proving that a known initial Read observation is
-  present and usable before the first structured provider result.
+  present and usable before the first structured provider result. A release
+  changing the kernel base instruction runs a paid synthetic Read through
+  natural-language `call_tool`, projects its typed observation into the next
+  turn, proves native exec is unused, adversarially requests shell/exec with
+  either structured containment or a fatal zero-host-effect stop, and covers
+  fresh plus close/reopen/resumed sessions. No fresh Claude qualification is
+  required when its provider implementation is unchanged.
 
 ## Slice assignment
 

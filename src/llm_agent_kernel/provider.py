@@ -30,6 +30,7 @@ from provider_runtime.agent_runtime import (
     ResumeSession,
     SessionMismatch,
     SessionUnavailable,
+    TextContent,
     TurnNotStarted,
     TurnRequest,
 )
@@ -38,6 +39,7 @@ from provider_runtime.types import CancelSignal, Present, TokenUsage
 from .definitions import (
     CODEX_NATIVE_OPTIONS,
     CONTAINMENT_POLICY,
+    KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
     ProviderUsage,
     SessionMode,
@@ -374,7 +376,7 @@ class CodexProvider:
             policy=provider.policy,
             model=provider.model,
             reasoning=provider.reasoning,
-            system=provider.system,
+            system=(TextContent(KERNEL_BASE_INSTRUCTION), *provider.system),
             developer=provider.developer,
             additional_dirs=(),
             mcp_servers=(),

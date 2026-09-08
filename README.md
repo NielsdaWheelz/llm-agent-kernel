@@ -19,7 +19,7 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`
+  `4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - provider-certified `openai-codex==0.144.4`
 
@@ -35,6 +35,26 @@ kernel orchestration behavior do not change.
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
 generation, MCP application tools, or provider-native application tools.
+The corrected provider owns the Codex App Server byte stream while preserving
+the public `(backend="codex", transport="sdk")` route and exact
+`openai-codex==0.144.4` SDK/CLI pair. Native Code Mode is contained and detected,
+not proven absent before its first observable event. Unknown protocol drift is
+an intentional availability failure, and a private empty read-only cwd is not
+by itself a host-confidentiality boundary.
+
+Every new, resumed, reconstructed, continuing, and isolated Codex session
+receives one kernel-owned base instruction before any application system
+material. It replaces Codex's coding-agent base prompt, identifies the model as
+a contained structured agent, makes only the final schema-conforming step
+executable, limits host-tool requests to `call_tool` against the complete
+published `HostTable`, forbids every provider-native tool surface, makes
+commentary observational, and requires tool observations to come from
+kernel-owned context. This prompt guides behavior; the typed fail-closed
+provider event boundary remains the authority control. Its identity is
+`llm-agent-kernel-contained-structured-agent-v1:sha256:1817c90f24bf9149f20f94b69f825d9be0b78df8bb46b1d24ed2691cf71b80e7`.
+That identity participates in every definition fingerprint, so this release
+automatically cold-bootstraps continuing sessions without a consumer-managed
+compatibility bump.
 `AgentUsage` events are progressive, non-additive snapshots of the current
 invocation, and `AgentTerminal.usage` is invocation-local on every status. The
 adapter retains the latest event snapshot, prefers terminal usage, and adds one
@@ -129,6 +149,8 @@ durability.
 The kernel owns:
 
 - Immutable definitions and complete containment fingerprints.
+- One bounded kernel-owned structured-agent base instruction, automatically
+  fingerprinted and applied before application system material.
 - Exact Codex agent-session request mapping and lifecycle.
 - Provider-neutral cold-bootstrap and continuation context.
 - A Codex-compatible closed provider-wire envelope that decodes to the closed
@@ -191,10 +213,10 @@ could obscure recorder uncertainty or reconciliation.
 
 `KernelLimits.max_new_context_bytes` counts the UTF-8 bytes of model-visible
 material newly rendered and submitted by the kernel during the current
-invocation. Provider system/developer material, JSON-schema transport overhead,
-history already retained by a native session, and provider compaction are
-outside that counter. Required effect, approval, and reconciliation evidence is
-still never silently truncated.
+invocation. The kernel base instruction, provider application system/developer
+material, JSON-schema transport overhead, history already retained by a native
+session, and provider compaction are outside that counter. Required effect,
+approval, and reconciliation evidence is still never silently truncated.
 
 ## Execution at a glance
 

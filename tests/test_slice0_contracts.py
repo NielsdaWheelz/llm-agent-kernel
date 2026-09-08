@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import FrozenInstanceError, fields, replace
@@ -60,7 +61,12 @@ from provider_runtime.agent_runtime import (
 )
 from pydantic import BaseModel, ConfigDict
 
+import llm_agent_kernel.definitions as definitions_module
 from llm_agent_kernel import (
+    KERNEL_BASE_INSTRUCTION,
+    KERNEL_BASE_INSTRUCTION_IDENTITY,
+    KERNEL_BASE_INSTRUCTION_REVISION,
+    KERNEL_BASE_INSTRUCTION_SHA256,
     BatchAsOfMode,
     InitialReadCall,
     InitialReadDispatchLineage,
@@ -482,6 +488,30 @@ def test_definition_is_frozen_and_fingerprint_covers_provider_configuration() ->
     assert len(first.fingerprint) == 64
     with pytest.raises(FrozenInstanceError):
         first.fingerprint = "tampered"  # type: ignore[misc]
+
+
+def test_kernel_base_instruction_identity_is_exact_and_rotates_definition_fingerprint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = _definition()
+    instruction = definitions_module.KERNEL_BASE_INSTRUCTION
+    revision = definitions_module.KERNEL_BASE_INSTRUCTION_REVISION
+    digest = definitions_module.KERNEL_BASE_INSTRUCTION_SHA256
+    identity = definitions_module.KERNEL_BASE_INSTRUCTION_IDENTITY
+
+    assert instruction == KERNEL_BASE_INSTRUCTION
+    assert revision == KERNEL_BASE_INSTRUCTION_REVISION
+    assert digest == KERNEL_BASE_INSTRUCTION_SHA256
+    assert identity == KERNEL_BASE_INSTRUCTION_IDENTITY
+    assert digest == hashlib.sha256(instruction.encode("utf-8")).hexdigest()
+    assert identity == f"{revision}:sha256:{digest}"
+    monkeypatch.setattr(
+        definitions_module,
+        "KERNEL_BASE_INSTRUCTION_IDENTITY",
+        f"{revision}:sha256:{'0' * 64}",
+    )
+
+    assert _definition().fingerprint != first.fingerprint
 
 
 def test_structured_wire_compilation_has_a_deterministic_definition_fingerprint() -> None:

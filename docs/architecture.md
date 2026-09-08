@@ -33,6 +33,11 @@ provider containment and the host-selected frozen tool plan form the effective
 authority together. Neither prompt text nor the model's requested operation can
 widen them.
 
+The kernel nevertheless owns one bounded behavioral base instruction so every
+provider session has the same structured-agent identity. It is not an authority
+boundary: provider-runtime's typed fail-closed event stream remains the native
+containment control.
+
 The ownership split is fixed by [ADR 0001](decisions/0001-library-boundary.md),
 [ADR 0003](decisions/0003-provider-and-tool-ownership.md), and
 [ADR 0005](decisions/0005-codex-agent-lane-and-serial-steps.md).
@@ -66,8 +71,9 @@ Defines immutable provider-neutral values:
 
 The fingerprint includes every native option that changes session meaning or
 containment: backend, transport, credential-profile identity, model, reasoning,
-instructions, output schema, policy, cwd, directories, MCP configuration,
-native options, the complete input projection policy, and the owner-controlled
+application instructions, output schema, policy, cwd, directories, MCP
+configuration, native options, the complete input projection policy, the
+kernel base-instruction revision plus digest, and the owner-controlled
 session-compatibility revision. Secret bytes, dynamic input, and an invocation's
 policy-bounded projection request are excluded.
 An invocation's optional initial Read is also excluded: it is dynamic context
@@ -99,6 +105,14 @@ exact containment request:
 - the Codex `allowed_tools=("*",)` SDK sentinel only where required by the
   pinned runtime.
 
+The corrected provider directly owns the Codex App Server stdio stream behind
+the preserved `transport="sdk"` route. The kernel supplies its exact base
+instruction as the first system value on every start and resume, which makes
+Codex `baseInstructions` replace the built-in coding-agent prompt. Application
+system values follow without a seam that can remove the kernel value. The
+instruction is a 682-byte stable prefix and is excluded from invocation context
+accounting.
+
 Provider-runtime projects provider-native cumulative accounting into usage
 attributable only to the current `AgentRuntime` invocation, including after a
 native session is resumed. Within one streamed turn, `AgentUsage` events are
@@ -126,6 +140,14 @@ conclusion can cross the boundary. Streaming text is not delivered; only
 terminal structured output from a fully inspected clean stream enters the
 kernel protocol. Streaming observations are neither concatenated nor parsed as
 logical steps.
+
+Provider `ProtocolDefect` is also fatal, including unknown App Server messages
+or malformed custom-exec lifecycle. The adapter discards the session and never
+accepts a later terminal; the kernel does not parse native method names. Inert
+`AgentNative` remains observational. Native Code Mode is contained/detected,
+not proven absent before its first event. Strict drift therefore trades
+availability for fail-closed authority. The read-only cwd limits mutation but
+does not itself isolate other host-readable data.
 
 ### `sessions.py`
 
@@ -186,9 +208,10 @@ untrusted data.
 The context counter is intentionally narrower than total provider context. It
 counts UTF-8 bytes of kernel-rendered material newly submitted during this
 invocation: initial bootstrap/run material, appended inputs, observations,
-corrections, and any cold-bootstrap replay. Provider system/developer material,
-output-schema transport overhead, retained native-session history, and provider
-compaction are outside the counter.
+corrections, and any cold-bootstrap replay. The kernel base instruction,
+provider application system/developer material, output-schema transport
+overhead, retained native-session history, and provider compaction are outside
+the counter.
 
 ### `_schema.py`
 

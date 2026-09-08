@@ -13,6 +13,18 @@ effect recording and reconciliation, and delivery. Provider-native transcripts
 are unredacted third-party data at rest; discarding a local session reference
 does not promise provider deletion.
 
+The kernel-owned base instruction is behavioral guidance, not an authority
+boundary. Provider-runtime's typed event stream remains authoritative: every
+native tool-use or permission event poisons the turn, and every
+`ProtocolDefect` discards the session without an accepted terminal. Native Code
+Mode is contained and detected, not proven absent before its first observable
+event. Fail-closed protocol drift intentionally trades availability for
+authority safety.
+
+The private empty read-only provider cwd prevents writes within that scope; it
+is not by itself a host-confidentiality boundary. A host that requires read
+isolation must add an appropriate dedicated OS user or container boundary.
+
 The definition-bound input projection can suppress kernel-rendered source
 timestamps and batch `as_of` values, but it is not a general prompt redactor.
 Hosts must not duplicate prohibited metadata in role, stable, retrieved, or

@@ -56,6 +56,10 @@ from .coordination import (
 from .definitions import (
     CODEX_NATIVE_OPTIONS,
     CONTAINMENT_POLICY,
+    KERNEL_BASE_INSTRUCTION,
+    KERNEL_BASE_INSTRUCTION_IDENTITY,
+    KERNEL_BASE_INSTRUCTION_REVISION,
+    KERNEL_BASE_INSTRUCTION_SHA256,
     NO_RESULT,
     AgentDefinition,
     AgentRole,
@@ -174,6 +178,10 @@ from .tools import (
 __all__ = [
     "CODEX_NATIVE_OPTIONS",
     "CONTAINMENT_POLICY",
+    "KERNEL_BASE_INSTRUCTION",
+    "KERNEL_BASE_INSTRUCTION_IDENTITY",
+    "KERNEL_BASE_INSTRUCTION_REVISION",
+    "KERNEL_BASE_INSTRUCTION_SHA256",
     "NO_RESULT",
     "AdmissionDeferred",
     "AdmissionGranted",

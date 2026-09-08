@@ -39,6 +39,10 @@ authoritative assistant response. `AgentText` is observational, the last
 completed Codex `final_answer` wins, the last phase-unknown completion is the
 fallback, and commentary is never executable. Provider-runtime owns that
 selection; the kernel does not concatenate or select messages.
+The corrected pin directly owns the Codex App Server stream behind the stable
+`codex`/`sdk` route, strictly projects native authority including retained
+custom-exec, and makes unknown protocol a fatal `ProtocolDefect` without
+changing the exact Codex 0.144.4 Python/CLI pair.
 
 Then deliver:
 
@@ -63,8 +67,12 @@ Deliver:
   directly by the distribution.
 - Fully fingerprinted `AgentSessionRequest`, `PermissionPolicy`, native options,
   private cwd lifecycle, and empty environment/MCP/network configuration.
+- One bounded kernel-owned structured-agent base instruction before application
+  system material, with immutable revision/digest fingerprint coverage and
+  automatic cold-bootstrap rotation.
 - Complete stream consumption and event fail-stop for native tool-use or
-  permission requests, plus suppression of streaming text delivery.
+  permission requests and provider `ProtocolDefect`, plus suppression of
+  streaming text delivery.
 - Terminal-only logical validation, with a consumer regression proving that
   commentary `AgentText` cannot become a model step or dispatch a tool.
 - Latest-progressive-snapshot retention, terminal-usage precedence, exactly-once
