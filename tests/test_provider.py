@@ -260,6 +260,31 @@ async def test_exact_request_mapping_private_cwd_cache_and_shutdown(tmp_path: Pa
     assert runtime.run_turn_calls == 0
 
 
+async def test_explicit_shared_runtime_cwd_is_empty_and_group_readable(tmp_path: Path) -> None:
+    tmp_path.chmod(0o2750)
+    runtime = _RecordingRuntime()
+    provider = CodexProvider(
+        _runtime(runtime),
+        cwd_parent=tmp_path,
+        share_cwd_with_group=True,
+    )
+
+    lease = await provider.open_isolated(_definition(SessionMode.isolated))
+
+    assert runtime.open_cwd_checks == [(True, True, 0o750)]
+    assert lease.cwd.stat().st_gid == tmp_path.stat().st_gid
+    await provider.discard(lease)
+
+
+def test_group_shared_runtime_requires_a_setgid_parent(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="setgid cwd_parent"):
+        CodexProvider(
+            _runtime(_RecordingRuntime()),
+            cwd_parent=tmp_path,
+            share_cwd_with_group=True,
+        )
+
+
 @pytest.mark.parametrize(
     ("mode", "saved_ref"),
     [

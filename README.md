@@ -19,9 +19,9 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`
+  `c9ecf4d974efba2af1aed09dbdb42e76a480d4f8`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
-- provider-certified `openai-codex==0.144.4`
+- an externally supervised Codex App Server at exactly `0.153.4`
 
 The `llm-tools` pin preserves the revisioned `web.search` whole-operation
 deadline and all of its v2 contract and policy identities. It also advances
@@ -35,12 +35,13 @@ kernel orchestration behavior do not change.
 V1 uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
 generation, MCP application tools, or provider-native application tools.
-The corrected provider owns the Codex App Server byte stream while preserving
-the public `(backend="codex", transport="sdk")` route and exact
-`openai-codex==0.144.4` SDK/CLI pair. Native Code Mode is contained and detected,
-not proven absent before its first observable event. Unknown protocol drift is
-an intentional availability failure, and a private empty read-only cwd is not
-by itself a host-confidentiality boundary.
+The provider attaches to the host-owned Codex App Server over its configured
+Unix socket while preserving the public `(backend="codex", transport="sdk")`
+route. It never spawns or terminates that shared service. The client verifies
+the exact `0.153.4` server version and fails closed on protocol drift. Native
+Code Mode is contained and detected, not proven absent before its first
+observable event. An empty read-only cwd is not by itself a
+host-confidentiality boundary.
 
 Every new, resumed, reconstructed, continuing, and isolated Codex session
 receives one kernel-owned base instruction before any application system
@@ -103,6 +104,12 @@ plan's budget and rejects any limits mismatch before provider or tool I/O. A
 continuing run composes `CodexProvider` with `SessionCoordinator`; production
 provider work therefore consumes `AgentRuntime.stream_turn` and never the
 event-discarding `run_turn` projection.
+
+`CodexProvider` creates private `0500` temporary session directories by
+default. A host that deliberately exposes those empty paths to another trusted
+local client must opt into `share_cwd_with_group=True`, supply an existing
+setgid parent, and receives per-session directories with the inherited group
+and mode `0750`. The host owns parent provisioning and group membership.
 
 An isolated structured run may opt into one deterministic initial Read:
 

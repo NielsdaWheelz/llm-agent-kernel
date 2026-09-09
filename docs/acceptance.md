@@ -8,9 +8,11 @@ assigned to exactly one implementation slice.
 - **K001** — The package supports Python 3.12 or newer, imports as
   `llm_agent_kernel`, and performs no I/O or authority grant on import.
 - **K002** — Runtime locks qualified immutable git revisions of
-  `provider-runtime` and `llm-tools` plus the exact Codex SDK/runtime version
-  certified by the provider revision; ordinary CI never imports mutable sibling
-  worktrees or an uncertified transitive Codex release. The `llm-tools` pin
+  `provider-runtime` (`c9ecf4d974efba2af1aed09dbdb42e76a480d4f8`) and
+  `llm-tools`; the provider attaches only to an
+  externally supervised Codex App Server at exact version `0.153.4`. Ordinary
+  CI never imports mutable sibling worktrees or an uncertified provider release.
+  The `llm-tools` pin
   exposes the revisioned `web.search` whole-operation deadline API and the
   corrected `web.read` v2 extraction identity. The provider pin exposes
   invocation-local terminal usage and progressive, non-additive invocation
@@ -18,8 +20,8 @@ assigned to exactly one implementation slice.
   terminal assistant-message selection that excludes commentary from
   structured output. The corrected provider directly owns the Codex App Server
   stream behind the preserved `codex`/`sdk` route, strictly classifies native
-  authority and retained custom-exec events, and fails unknown protocol closed
-  while preserving the exact `openai-codex==0.144.4` Python/CLI pair.
+  authority and retained custom-exec events, fails unknown protocol closed, and
+  contains no private Codex SDK, bundled binary, or process fallback.
 - **K003** — Before kernel implementation, public `llm-tools` APIs provide pure
   strict input validation, frozen-plan/catalog consistency and tightening
   proof, exact `HostTable` publication/rendering, and async durable
@@ -57,12 +59,15 @@ assigned to exactly one implementation slice.
   property; inactive and optional values are explicit nulls. The kernel
   independently decodes the envelope and revalidates the logical terminal value.
 - **K010** — A session request uses subscription Codex with the qualified
-  transport, local-account credential reference, private empty absolute cwd,
-  read-only filesystem, no additional directories, disabled network, denied
-  approvals, empty copied environment, no MCP, disabled native Web, and
-  `builtin_tools="disabled"`. Its system channel always begins with the exact
-  bounded kernel-owned structured-agent instruction, replacing Codex's built-in
-  coding-agent prompt before any separate application system material.
+  shared App Server transport, local-account credential reference, empty
+  absolute cwd, read-only filesystem, no additional directories, disabled
+  network, denied approvals, empty copied environment, no MCP, disabled native
+  Web, and `builtin_tools="disabled"`. Private operation creates a `0500` cwd.
+  Explicit group sharing requires an existing setgid parent, verifies inherited
+  group ownership, and creates a `0750` cwd. Its system channel always begins
+  with the exact bounded kernel-owned structured-agent instruction, replacing
+  Codex's built-in coding-agent prompt before any separate application system
+  material.
 - **K011** — The Codex `allowed_tools=("*",)` sentinel appears only where the
   pinned runtime requires it and is never interpreted as application authority.
 - **K012** — The adapter consumes and inspects every `stream_turn` event. Any

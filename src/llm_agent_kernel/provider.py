@@ -156,12 +156,18 @@ class CodexProvider:
         runtime: AgentRuntime,
         *,
         cwd_parent: Path | None = None,
+        share_cwd_with_group: bool = False,
         cache_continuing: bool = True,
     ) -> None:
         if cwd_parent is not None and (not cwd_parent.is_absolute() or not cwd_parent.is_dir()):
             raise ValueError("cwd_parent must be an existing absolute directory")
+        if share_cwd_with_group and (
+            cwd_parent is None or not cwd_parent.stat().st_mode & stat.S_ISGID
+        ):
+            raise ValueError("a group-shared cwd requires a setgid cwd_parent")
         self._runtime = runtime
         self._cwd_parent = cwd_parent
+        self._share_cwd_with_group = share_cwd_with_group
         self._cache_continuing = cache_continuing
         self._leases: dict[ProviderSessionLease, _LiveSession] = {}
         self._cache: dict[tuple[str, AgentSessionRef], _LiveSession] = {}
@@ -396,8 +402,15 @@ class CodexProvider:
         )
         if not cwd.is_absolute() or any(cwd.iterdir()):
             self._remove_cwd(cwd)
-            raise ProviderDefect("private provider cwd was not empty and absolute")
-        cwd.chmod(stat.S_IRUSR | stat.S_IXUSR)
+            raise ProviderDefect("provider cwd was not empty and absolute")
+        if self._share_cwd_with_group:
+            parent = self._cwd_parent
+            if parent is None or cwd.stat().st_gid != parent.stat().st_gid:
+                self._remove_cwd(cwd)
+                raise ProviderDefect("provider cwd did not inherit the configured group")
+            cwd.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP)
+        else:
+            cwd.chmod(stat.S_IRUSR | stat.S_IXUSR)
         return cwd
 
     @staticmethod

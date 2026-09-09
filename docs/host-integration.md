@@ -5,6 +5,21 @@ must implement persistence and product policy outside this package; replacing a
 store with an in-memory adapter changes the recovery guarantee and is not a
 deployment option for continuing effectful work.
 
+For Codex, the host supplies provider-runtime revision
+`c9ecf4d974efba2af1aed09dbdb42e76a480d4f8`, one
+absolute Unix-socket endpoint per credential profile, and an externally
+supervised App Server at exactly `0.153.4`. Provider-runtime connects to that
+service and never starts, kills, or owns it. There is no private Codex SDK,
+bundled executable, account-home enrollment, or process fallback.
+
+Kernel cognition directories are private `0500` by default. A host that needs a
+trusted local terminal client to enter the same empty directory must provision
+one absolute setgid parent, construct `CodexProvider` with
+`share_cwd_with_group=True`, and grant only the intended local principals the
+parent's group. The provider verifies inherited group ownership and publishes
+the child at mode `0750`; it neither creates the parent nor changes group
+membership.
+
 ## Required durable facts
 
 The checkpoint store is canonical for ordered input, exclusive claim ownership,
@@ -51,8 +66,8 @@ upgrade cold-bootstraps rather than resuming an old-schema native session.
 For the historical provider-runtime usage propagation from kernel
 `c9dac7a610636a668bbf932cc2f961c0904f9157`, a consumer pins the successor
 kernel revision and regenerates its lock to exact provider-runtime revision
-`f477dcdcad03c30019576203d4eb8a3581a6d32f`. It keeps `llm-tools` at
-`9e6d155f3b64f03495911435b7cae8b8d131f9a2` and `openai-codex` at `0.144.4`.
+`f477dcdcad03c30019576203d4eb8a3581a6d32f`. It keeps the then-qualified
+`llm-tools` and retired private-provider dependency set unchanged.
 No provider request, provider wire schema, public kernel API, persistence schema,
 or session-reference format changes. Existing native sessions remain compatible,
 so a host MUST NOT rotate `session_compatibility_revision` solely for this
@@ -71,10 +86,10 @@ when settling incomplete usage.
 For the provider-runtime assistant-message propagation from kernel
 `09f08df2970121ababe973b0e92d6901dd40da9e`, a consumer pins the successor
 kernel revision and regenerates its lock to exact provider-runtime revision
-`2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`. It keeps `llm-tools` at
-`9e6d155f3b64f03495911435b7cae8b8d131f9a2` and `openai-codex` at `0.144.4`,
-and records all three immutable revisions in its compatibility manifest. No
-kernel API, provider request, provider wire schema, persistence schema, or
+`2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`. It keeps the then-qualified
+dependency set unchanged and records its immutable revisions in the
+compatibility manifest. No kernel API, provider request, provider wire schema,
+persistence schema, or
 session-reference format changes. Existing native sessions remain compatible,
 so a host MUST NOT rotate `session_compatibility_revision` solely for this
 correction.
@@ -93,7 +108,7 @@ session migration for this release.
 For the input-projection release from kernel
 `670da13ff0cfe766f36d8966e0575db0f7525143`, consumers pin the successor
 kernel revision and regenerate their lock without changing the exact
-`provider-runtime`, `llm-tools`, or `openai-codex` pins. The public additions
+then-qualified provider and tool pins. The public additions
 are `BatchAsOfMode`, `InputProjectionPolicy`, and `InputProjectionRequest`, the
 `AgentDefinition.input_projection_policy` field, and the keyword-only
 `input_projection` argument on `run_thread`, `run_one_shot`,
@@ -142,7 +157,8 @@ For the deterministic isolated initial-Read release from kernel
 kernel revision and regenerate their lock without changing the exact
 `provider-runtime` pin
 `2cfed97ee5b9b8eb11103b0575eb7f29de00a0bd`, `llm-tools` pin
-`9e6d155f3b64f03495911435b7cae8b8d131f9a2`, or `openai-codex==0.144.4`.
+`9e6d155f3b64f03495911435b7cae8b8d131f9a2`, or its retired private-provider
+dependency set.
 The public additions are
 `InitialReadCall`, `InitialReadDispatchLineage`, deterministic `position` on
 both isolated lineage variants, and the keyword-only `initial_read` argument on
@@ -197,10 +213,10 @@ For the sealed structured-agent instruction release from kernel
 `09a1af093479aa92f3e783f4b4a7cc38e301a4a7`, consumers pin the successor
 kernel revision and regenerate their lock to exact provider-runtime revision
 `4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`. Keep `llm-tools` at
-`9e6d155f3b64f03495911435b7cae8b8d131f9a2`, and keep both the
-`openai-codex` Python package and bundled CLI at `0.144.4`. The provider route
-remains `backend="codex", transport="sdk"`; the transport literal is the
-compatibility name for provider-runtime's directly owned App Server stream.
+`9e6d155f3b64f03495911435b7cae8b8d131f9a2`. That historical release used the
+retired private-provider lane and does not qualify the current shared App
+Server. The provider route remains `backend="codex", transport="sdk"`; the
+transport literal is the public provider-runtime route name.
 
 The public kernel additions are `KERNEL_BASE_INSTRUCTION`,
 `KERNEL_BASE_INSTRUCTION_REVISION`, `KERNEL_BASE_INSTRUCTION_SHA256`, and
@@ -314,19 +330,23 @@ checkpoint, action/recorder, admission, and delivery implementations under
 process termination at each boundary. It must also pin its compatibility-
 revision policy and qualify plan-aware budget construction against every
 selectable plan. Jarvis must run its paid Codex account qualification for the
-exact provider-runtime and provider-certified Codex SDK pins on at least one
+exact provider-runtime revision and shared App Server `0.153.4` on at least one
 currently supported local-account route, including conversational, structured
 nested/nullable result, commentary-plus-final-answer behavior when observed,
 JSON-string arguments, continuation, close/reopen/resume, invocation-local
-usage, and in-flight cancellation. The current qualified route is
+usage, and in-flight cancellation. The target route is
 `gpt-5.6-terra`; retired `gpt-5.4` MUST NOT be invoked through `local_account`.
 Qualification records contain only sanitized route, revision, status, usage,
 timing, and trace identifiers. Provider-native
 transcripts remain unredacted third-party data at rest; deleting a local
 reference does not promise provider deletion.
 
+The `0.153.4` shared-server live qualification is `NOT_RUN` until explicitly
+authorized. Historical private-runtime results are not carried forward across
+this provider-facing boundary change.
+
 A dependency-only `llm-tools` propagation may carry that paid provider
-qualification forward only when the exact `provider-runtime` and Codex SDK
+qualification forward only when the exact `provider-runtime` and App Server
 pins, kernel provider adapter, containment request, and structured-output wire
 are unchanged and the complete deterministic suite still passes. The
 `web.read` extraction propagation meets those conditions. Any provider-facing
