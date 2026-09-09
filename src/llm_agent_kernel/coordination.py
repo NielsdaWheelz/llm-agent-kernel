@@ -345,7 +345,16 @@ class ToolBudgetFactoryPort(Protocol):
 
 
 class ToolDispatchPort(Protocol):
-    """Host dispatch; isolated lineages supply the exact llm-tools position."""
+    """Host dispatch; isolated lineages supply the exact llm-tools position.
+
+    Before a recoverable Write, the host MUST durably accept the exact original
+    tool decision: lineage (including definition fingerprint), frozen plan and
+    binding revisions, validated arguments, and stable action/effect identity.
+    Recovery uses that immutable record, never a regenerated model choice.
+    Existing host policy/approval gates run before acceptance; this port does
+    not authorize a Write merely because the model proposed it. In particular,
+    storing a provider session reference is not durable decision acceptance.
+    """
 
     async def dispatch(
         self,

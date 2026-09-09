@@ -7,6 +7,9 @@ assigned to exactly one implementation slice.
 
 - **K001** — The package supports Python 3.12 or newer, imports as
   `llm_agent_kernel`, and performs no I/O or authority grant on import.
+  Importing `llm_agent_kernel.generation` does not initialize `llm_tools`;
+  the flat structured-agent API preserves its concrete types, exported objects,
+  and introspection when requested.
 - **K002** — Runtime locks qualified immutable git revisions of
   `provider-runtime` and `llm-tools` plus the exact Codex SDK/runtime version
   certified by the provider revision; ordinary CI never imports mutable sibling
@@ -84,8 +87,9 @@ assigned to exactly one implementation slice.
   cancellation and failure paths.
 - **K015** — Quota exhaustion, expected provider failure, cancellation, resume
   incompatibility, and runtime invariant failure remain distinct. There is at
-  most one safe cold-bootstrap fallback before a successful terminal and no
-  fallback after host tool dispatch.
+  most one safe cold open for session acquisition before model arming. After
+  provider invocation, absence of accepted terminal evidence is durable
+  uncertainty; session/timeout error names never authorize redispatch.
 
 ## Definitions, plans, sessions, and context
 
@@ -185,11 +189,11 @@ assigned to exactly one implementation slice.
   and `EffectId`. The dispatch exposes immutable claim ID, through-checkpoint,
   ordered admitted-input IDs, and model-step ordinal; conflict or uncertain
   recorder state never blind-redispatches.
-- **K032** — `Pure`/`Read` may use attempt-scoped positions and a non-durable
-  recorder. Tests and docs expose that `Read + BilledOnce` can be billed again
-  after crash or discarded one-shot. Isolated initial-Read and model-step
-  lineages carry deterministic, disjoint kernel-derived positions that the host
-  passes unchanged to `llm-tools`.
+- **K032** — Recoverable `Pure`/`Read` use original decision lineage positions;
+  BilledOnce work has a durable llm-tools recorder. Explicitly transient isolated
+  inference may accept nondurable repeated cost. Initial/model positions are
+  deterministic, disjoint, and supplied unchanged to the dependency executor.
+
 - **K033** — Dispatch returns only completed `llm_tools.ToolResult` or durable
   suspended `(host_ref, waiting_for)`; configuration, recorder, executor, and
   position defects are typed exceptions rather than fabricated tool failures.
@@ -308,6 +312,50 @@ assigned to exactly one implementation slice.
   fresh plus close/reopen/resumed sessions. No fresh Claude qualification is
   required when its provider implementation is unchanged.
 
+## Shared generation extension
+
+- **K053** — Typed native payloads cross portable generation ports without
+  application schema, provider SDK, tool-executor, or storage ownership moving
+  into the kernel. A fresh child starts at one; recovery starts from a
+  host-validated durable continuation.
+- **K054** — Admission refusal never arms a child. Arming occurs exactly once
+  before native dispatch evidence; any unknown, reordered, missing-terminal,
+  or post-terminal stream event prevents durable terminal acceptance.
+- **K055** — The whole stream is validated and its exact terminal/ordered
+  continuation committed before proposal/terminal acknowledgment and dependent
+  effects. Failed commit, acknowledgment, or continuation identity prevents
+  subsequent work.
+- **K056** — Ordered tools retain original arguments and correlation IDs;
+  existing host authority and llm-tools positions/recorders own effect identity
+  and replay. No automatic retry or later call follows an uncertain failure.
+- **K057** — Cancellation is checked between effect boundaries. Native
+  cancellation remains transport-owned; task cancellation closes the stream.
+  Cancelled/exhausted orchestration returns an explicit stopped outcome, never
+  synthetic native success. Absolute turn bounds survive resumption.
+- **K058** — Nexus durable-store integration qualifies atomic terminal and
+  continuation commit, exact recovery, effect reconciliation, and stopped parent
+  publication. Kernel fakes are not evidence of those production guarantees.
+
+## Durable paid decisions
+
+- **K059** — Stable scope plus ordinal survives new claim/run UUIDs; the separate
+  request fingerprint binds original authority, lineage, counters, and context.
+- **K060** — Exact normalized terminal acceptance precedes effects and output;
+  completed thread and isolated decisions replay without provider I/O, prior
+  usage recharge, or stale session-reference CAS.
+- **K061** — Any uncertainty after provider invocation remains armed, including
+  missing native identity; lookup precedes poison/attempt exhaustion. Only a
+  positively uninvoked request may be released. No implicit redispatch occurs.
+- **K062** — Recovery cold-boots subsequent work from bounded stored canonical
+  material and retains logical limits; changed authority/claim or substituted
+  journal results prevent effects. Hosts restore their typed evidence atomically.
+- **K063** — Stable accepted model decision IDs and disjoint stable initial-Read
+  positions reach the existing llm-tools recorder; recoverable BilledOnce reads
+  cannot silently rebill. Write action positions and authority remain host-owned.
+- **K064** — Every isolated caller explicitly selects durable or transient
+  semantics; fakes and transient calls make no crash-durability claim. Real
+  Jarvis storage qualifies claim freezing, evidence replay, and paid-read recovery.
+
 ## Slice assignment
 
 | Slice | Acceptance IDs |
@@ -317,3 +365,5 @@ assigned to exactly one implementation slice.
 | 2 — strict serial protocol and tool boundary | K025–K036 |
 | 3 — polling, settlement, and admission | K037–K045 |
 | 4 — one-shot, assurance, and release | K046–K052 |
+| 5 — shared generation choreography | K053–K058 |
+| 6 — durable paid decisions | K059–K064 |

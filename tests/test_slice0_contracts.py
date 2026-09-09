@@ -56,7 +56,6 @@ from provider_runtime.agent_runtime import (
     CredentialRef,
     InvalidAgentRequest,
     PermissionPolicy,
-    ReasoningSpec,
     TextContent,
 )
 from pydantic import BaseModel, ConfigDict
@@ -266,7 +265,10 @@ def _definition(**provider_changes: object) -> AgentDefinition:
     _, profile, _ = _catalog_and_profile()
     provider_values = {
         "auth": CredentialRef("local_account", "personal"),
-        "model": "gpt-5",
+        "model_key": "gpt-5",
+        "reasoning": "low",
+        "agent_definition_revision": "test-catalog-v1",
+        "row_fingerprint": "a" * 64,
         **provider_changes,
     }
     return AgentDefinition(
@@ -447,10 +449,10 @@ def test_initial_read_public_api_and_isolated_positions_are_exact() -> None:
     with pytest.raises(InvalidAgentRequest):
         InitialReadCall(ToolId("test.count"), {"count": object()})
 
-    initial = InitialReadDispatchLineage(RunId("isolated-run"))
-    same_initial = InitialReadDispatchLineage(RunId("isolated-run"))
-    first_model = IsolatedDispatchLineage(RunId("isolated-run"), 1)
-    second_model = IsolatedDispatchLineage(RunId("isolated-run"), 2)
+    initial = InitialReadDispatchLineage(RunId("isolated-run"), "stable-operation")
+    same_initial = InitialReadDispatchLineage(RunId("new-recovery-attempt"), "stable-operation")
+    first_model = IsolatedDispatchLineage(RunId("isolated-run"), 1, "a" * 64)
+    second_model = IsolatedDispatchLineage(RunId("isolated-run"), 2, "b" * 64)
     assert isinstance(initial.position, InvocationPosition)
     assert initial.position == same_initial.position
     assert len({initial.position, first_model.position, second_model.position}) == 3
@@ -481,7 +483,7 @@ def test_input_projection_public_api_is_exact() -> None:
 def test_definition_is_frozen_and_fingerprint_covers_provider_configuration() -> None:
     first = _definition()
     same = _definition()
-    changed = _definition(model="gpt-5-high")
+    changed = _definition(model_key="gpt-5-high")
 
     assert first.fingerprint == same.fingerprint
     assert first.fingerprint != changed.fingerprint
@@ -547,8 +549,10 @@ def test_definition_fingerprint_rotates_for_every_configurable_session_scope() -
         replace(
             first, provider=replace(first.provider, auth=CredentialRef("local_account", "other"))
         ),
-        replace(first, provider=replace(first.provider, model="gpt-5-other")),
-        replace(first, provider=replace(first.provider, reasoning=ReasoningSpec("high"))),
+        replace(first, provider=replace(first.provider, model_key="gpt-5-other")),
+        replace(first, provider=replace(first.provider, reasoning="high")),
+        replace(first, provider=replace(first.provider, agent_definition_revision="catalog-v2")),
+        replace(first, provider=replace(first.provider, row_fingerprint="b" * 64)),
         replace(first, provider=replace(first.provider, system=(TextContent("system"),))),
         replace(first, provider=replace(first.provider, developer=(TextContent("developer"),))),
         replace(first, limits=replace(first.limits, max_provider_turns=9)),
@@ -601,7 +605,10 @@ def test_provider_configuration_rejects_authority_widening() -> None:
     with pytest.raises(ValueError, match="containment"):
         ProviderConfiguration(
             auth=CredentialRef("local_account", "personal"),
-            model="gpt-5",
+            model_key="gpt-5",
+            reasoning="low",
+            agent_definition_revision="test-catalog-v1",
+            row_fingerprint="a" * 64,
             policy=PermissionPolicy(
                 filesystem="read_only",
                 network="disabled",
@@ -668,8 +675,24 @@ def test_thread_dispatch_lineage_is_complete_and_immutable() -> None:
         Checkpoint("checkpoint-2"),
         (InputId("input-1"), InputId("input-2")),
         3,
+        "a" * 64,
+        "b" * 64,
     )
 
     assert lineage.input_ids == (InputId("input-1"), InputId("input-2"))
+    assert lineage.definition_fingerprint == "a" * 64
     with pytest.raises(FrozenInstanceError):
         lineage.model_step_ordinal = 4  # type: ignore[misc]
+
+
+@pytest.mark.parametrize("fingerprint", ["", "a" * 63, "g" * 64, "A" * 64, None])
+def test_thread_dispatch_requires_exact_definition_identity(fingerprint: object) -> None:
+    with pytest.raises(ValueError, match="definition fingerprint"):
+        DispatchLineage(
+            ClaimId("claim"),
+            Checkpoint("checkpoint"),
+            (InputId("input"),),
+            1,
+            fingerprint,  # type: ignore[arg-type]
+            "b" * 64,
+        )

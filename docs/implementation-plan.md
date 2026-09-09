@@ -3,6 +3,13 @@
 Implementation begins only after an explicit request. Each slice closes one
 boundary and passes its assigned acceptance criteria before the next begins.
 
+The 2026-09-09 Nexus implementation is authorized by ADR 0008. Slice 5 owns
+K053–K058: first establish the portable behavior reds, then move Nexus's
+native-child and ordered-tool choreography into `generation.py`, qualify the
+consumer adapters and durable stores, and remove the local duplicate loop.
+Preserve the full contained AgentRuntime suite throughout. The library suite
+does not replace consumer durability or paid/live qualification.
+
 ## Slice 0: dependency truth and package contract
 
 The pinned `llm-tools` revision provides:
@@ -81,7 +88,7 @@ Deliver:
 - Live continuing-session leases, isolated lifecycle, shutdown close, and typed
   provider terminal mapping.
 - Generation-CAS session-ref port, resume compatibility, speculative-ref
-  discard, and one safe cold-bootstrap fallback.
+  discard, and session-acquisition fallback before a paid request is armed.
 - Provider-neutral continuation and bootstrap sections using qualified
   `llm-tools` rendering and frozen `HostTable` publication.
 - Definition-bound model-visible input projection with byte-compatible defaults,
@@ -107,8 +114,8 @@ Deliver:
 - Pure plan lookup and argument validation before any mutation.
 - Exactly one serial dispatcher call per model step.
 - Explicit separation between `KernelLimits` and `llm_tools.RunLimits`.
-- Host-owned action/effect identity mapping for `Write` and attempt-scoped
-  `Pure`/`Read` behavior.
+- Host-owned action/effect identity mapping for `Write` and original decision
+  positions for recoverable `Pure`/`Read` behavior.
 - Completed and suspended dispatch results with typed defect paths.
 - Bounded observation projection, context omission markers, cancellation, and
   host activity events without model-authored progress prose.
@@ -174,3 +181,8 @@ Exit: K046–K052 pass.
 - General delegation, persistent peers, task trees, join, and cancellation
   propagation.
 - Kernel-owned SQL, queues, workflows, schedulers, or distributed leases.
+
+The accepted [paid-decision extension](../SPEC.md#17-durable-paid-decisions)
+adds original request/terminal journaling, explicit isolated recovery policy,
+and stable Read positions. Slice 6 owns K059–K064; application durable-store
+qualification is required in addition to process-local kernel tests.

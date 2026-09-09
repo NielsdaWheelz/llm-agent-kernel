@@ -6,6 +6,8 @@ profile:
     LLM_AGENT_KERNEL_LIVE=1 \
     LLM_AGENT_KERNEL_STATE_ROOT=/absolute/private/root \
     LLM_AGENT_KERNEL_PROFILE=profile \
+    LLM_AGENT_KERNEL_MODEL=gpt-5.6-terra \
+    LLM_AGENT_KERNEL_REASONING=low \
     uv run pytest -m live tests/live/test_codex_qualification.py
 """
 
@@ -73,6 +75,7 @@ from llm_agent_kernel.context import (
     continuation_context,
     run_context,
 )
+from llm_agent_kernel.decisions import TransientModelDecisions
 from llm_agent_kernel.definitions import (
     KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
@@ -198,7 +201,28 @@ async def _must_not_execute(value: object, context: object) -> object:
     raise AssertionError(f"live schema qualification dispatched: {value!r}, {context!r}")
 
 
-def _definition(
+async def _provider_configuration(profile_key: str) -> ProviderConfiguration:
+    auth = CredentialRef("local_account", profile_key)
+    model_key = _required_environment("LLM_AGENT_KERNEL_MODEL")
+    reasoning = _required_environment("LLM_AGENT_KERNEL_REASONING")
+    config = AgentRuntimeConfig(
+        state_root_base=Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
+    )
+    async with AgentRuntime(config) as runtime:
+        catalog = await runtime.model_catalog("codex", auth)
+    rows = [row for row in catalog.models if row.key == model_key]
+    if len(rows) != 1 or reasoning not in {item.key for item in rows[0].reasoning}:
+        pytest.fail("live model and reasoning must select one exact catalog option", pytrace=False)
+    return ProviderConfiguration(
+        auth=auth,
+        model_key=model_key,
+        reasoning=reasoning,
+        agent_definition_revision=catalog.definition_revision,
+        row_fingerprint=rows[0].row_fingerprint,
+    )
+
+
+async def _definition(
     profile_key: str,
     *,
     output_contract: OutputContract | None = None,
@@ -218,16 +242,13 @@ def _definition(
         session_mode,
         output_contract or ConversationalOutput(),
         maximum,
-        ProviderConfiguration(
-            CredentialRef("local_account", profile_key),
-            os.environ.get("LLM_AGENT_KERNEL_MODEL", "gpt-5"),
-        ),
+        await _provider_configuration(profile_key),
         "live-qualification-v1",
         input_projection_policy=input_projection_policy or InputProjectionPolicy(),
     )
 
 
-def _initial_read_definition(profile_key: str) -> tuple[AgentDefinition, FrozenToolPlan]:
+async def _initial_read_definition(profile_key: str) -> tuple[AgentDefinition, FrozenToolPlan]:
     spec = ToolSpec(
         id=ToolId("live.initial_read"),
         summary="Return one qualified initial observation",
@@ -260,16 +281,13 @@ def _initial_read_definition(profile_key: str) -> tuple[AgentDefinition, FrozenT
         SessionMode.isolated,
         StructuredOutput("live_initial_read_result", LiveStructuredResult),
         maximum,
-        ProviderConfiguration(
-            CredentialRef("local_account", profile_key),
-            os.environ.get("LLM_AGENT_KERNEL_MODEL", "gpt-5"),
-        ),
+        await _provider_configuration(profile_key),
         "live-initial-read-v1",
     )
     return definition, plan
 
 
-def _synthetic_read_definition(
+async def _synthetic_read_definition(
     profile_key: str,
 ) -> tuple[AgentDefinition, FrozenToolPlan, ToolBinding[LiveToolInput, LiveToolSuccess, object]]:
     spec = ToolSpec(
@@ -306,10 +324,7 @@ def _synthetic_read_definition(
         SessionMode.continuing,
         ConversationalOutput(),
         maximum,
-        ProviderConfiguration(
-            CredentialRef("local_account", profile_key),
-            os.environ.get("LLM_AGENT_KERNEL_MODEL", "gpt-5"),
-        ),
+        await _provider_configuration(profile_key),
         "live-synthetic-read-v1",
     )
     return definition, plan, binding
@@ -337,7 +352,7 @@ async def test_live_codex_stream_continuation_and_cancellation() -> None:
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
     if not state_root.is_absolute() or not state_root.is_dir():
         pytest.fail("LLM_AGENT_KERNEL_STATE_ROOT must be an existing absolute directory")
-    definition = _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+    definition = await _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
     runtime = AgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
     provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
     try:
@@ -354,7 +369,9 @@ async def test_live_codex_stream_continuation_and_cancellation() -> None:
             timeout_seconds=600.0,
         )
         assert first.status == "succeeded"
-        validate_provider_step(first.structured_output, definition.output_contract, _empty_plan())
+        validate_provider_step(
+            first.structured_output, definition.output_contract, _empty_plan(definition)
+        )
         assert isinstance(first.usage, Present)
         assert await provider.accumulated_usage(lease) == ProviderUsage(
             first.usage.value.input_tokens,
@@ -368,7 +385,9 @@ async def test_live_codex_stream_continuation_and_cancellation() -> None:
             timeout_seconds=600.0,
         )
         assert second.status == "succeeded"
-        validate_provider_step(second.structured_output, definition.output_contract, _empty_plan())
+        validate_provider_step(
+            second.structured_output, definition.output_contract, _empty_plan(definition)
+        )
         assert isinstance(second.usage, Present)
         assert await provider.accumulated_usage(lease) == ProviderUsage(
             first.usage.value.input_tokens + second.usage.value.input_tokens,
@@ -384,7 +403,9 @@ async def test_live_codex_stream_continuation_and_cancellation() -> None:
             timeout_seconds=600.0,
         )
         assert resumed.status == "succeeded"
-        validate_provider_step(resumed.structured_output, definition.output_contract, _empty_plan())
+        validate_provider_step(
+            resumed.structured_output, definition.output_contract, _empty_plan(definition)
+        )
         assert resumed.session_ref.native_session_id == first.session_ref.native_session_id
         if isinstance(resumed.usage, Present):
             assert await provider.accumulated_usage(continued) == ProviderUsage(
@@ -414,7 +435,7 @@ async def test_live_synthetic_read_call_observation_and_close_reopen_resume() ->
     if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
         pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
-    definition, plan, binding = _synthetic_read_definition(
+    definition, plan, binding = await _synthetic_read_definition(
         _required_environment("LLM_AGENT_KERNEL_PROFILE")
     )
     runtime = _ObservingAgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
@@ -550,7 +571,7 @@ async def test_live_adversarial_shell_is_structured_or_contained_without_host_ef
     if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
         pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
-    definition, plan, _binding = _synthetic_read_definition(
+    definition, plan, _binding = await _synthetic_read_definition(
         _required_environment("LLM_AGENT_KERNEL_PROFILE")
     )
     runtime = _ObservingAgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
@@ -602,7 +623,7 @@ async def test_live_in_flight_cancellation() -> None:
     if os.environ.get("LLM_AGENT_KERNEL_LIVE_IN_FLIGHT_CANCEL") != "1":
         pytest.skip("set LLM_AGENT_KERNEL_LIVE_IN_FLIGHT_CANCEL=1 for the paid cancellation probe")
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
-    definition = _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+    definition = await _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
     runtime = AgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
     provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
     cancellation = CancellationToken()
@@ -635,7 +656,7 @@ async def test_live_structured_nested_optional_output_and_commentary_selection()
         pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
     contract = StructuredOutput("live_structured_result", LiveStructuredResult)
-    definition = _definition(
+    definition = await _definition(
         _required_environment("LLM_AGENT_KERNEL_PROFILE"),
         output_contract=contract,
         session_mode=SessionMode.isolated,
@@ -708,7 +729,9 @@ async def test_live_one_shot_uses_initial_read_before_first_provider_turn() -> N
     if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
         pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
-    definition, plan = _initial_read_definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+    definition, plan = await _initial_read_definition(
+        _required_environment("LLM_AGENT_KERNEL_PROFILE")
+    )
     known_value = "kernel-initial-read-qualified"
     runtime = _ObservingAgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
     provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
@@ -717,6 +740,7 @@ async def test_live_one_shot_uses_initial_read_before_first_provider_turn() -> N
     )
     try:
         outcome = await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("live-initial-read"),
             definition=definition,
             inputs=(
@@ -774,7 +798,7 @@ async def test_live_json_encoded_tool_arguments() -> None:
     if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
         pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
-    definition = _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+    definition = await _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
     runtime = AgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
     provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
     try:
@@ -807,7 +831,7 @@ async def test_live_quota_exhaustion() -> None:
     if os.environ.get("LLM_AGENT_KERNEL_EXPECT_QUOTA") != "1":
         pytest.skip("set LLM_AGENT_KERNEL_EXPECT_QUOTA=1 with an exhausted qualification account")
     state_root = Path(_required_environment("LLM_AGENT_KERNEL_STATE_ROOT"))
-    definition = _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+    definition = await _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
     runtime = AgentRuntime(AgentRuntimeConfig(state_root_base=state_root))
     provider = CodexProvider(runtime, cwd_parent=state_root, cache_continuing=False)
     try:
@@ -825,8 +849,7 @@ async def test_live_quota_exhaustion() -> None:
         await runtime.close()
 
 
-def _empty_plan(definition: AgentDefinition | None = None) -> FrozenToolPlan:
-    definition = definition or _definition(_required_environment("LLM_AGENT_KERNEL_PROFILE"))
+def _empty_plan(definition: AgentDefinition) -> FrozenToolPlan:
     return ToolPlan(definition.maximum_profile.id, HostTable()).freeze(
         ToolCatalog.compose(()),
         definition.maximum_profile,

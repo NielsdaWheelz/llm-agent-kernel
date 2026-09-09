@@ -21,6 +21,7 @@ from llm_tools import (
     ToolResult,
     render_prompt,
 )
+from provider_runtime.agent_runtime import AgentTerminal, thaw_json_value
 
 from .definitions import AgentDefinition, HostInput, InputProjectionRequest
 from .tools import publish_host_plan, require_host_plan
@@ -28,6 +29,27 @@ from .tools import publish_host_plan, require_host_plan
 
 class ContextLimitExceeded(ValueError):
     """Required context cannot fit without silently losing evidence."""
+
+
+def recorded_model_context(terminal: AgentTerminal) -> str:
+    """Render accepted historical model evidence for a fresh recovery session."""
+    return render_prompt(
+        PromptSections(
+            (
+                PromptSection(
+                    PromptSectionKind("prior_model_decision"),
+                    (),
+                    PromptJson(
+                        {
+                            "status": terminal.status,
+                            "final_text": terminal.final_text,
+                            "structured_output": thaw_json_value(terminal.structured_output),
+                        }
+                    ),
+                ),
+            )
+        )
+    )
 
 
 @dataclass(frozen=True, slots=True)

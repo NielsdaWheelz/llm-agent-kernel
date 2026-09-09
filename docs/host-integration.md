@@ -5,6 +5,17 @@ must implement persistence and product policy outside this package; replacing a
 store with an in-memory adapter changes the recovery guarantee and is not a
 deployment option for continuing effectful work.
 
+The shared generation protocol is specified separately in
+[SPEC section 16](../SPEC.md#16-shared-generation-protocol). Its host lifecycle
+must arm native children, atomically commit terminal and exact successor
+decision, and reopen the same canonical bytes under the current claim. Its
+observer must acknowledge events before dependent tools run. Resume must use
+the original durable decision and existing tool recorder positions. The host
+must atomically retire pending continuation and persist a distinct stopped
+parent outcome when the kernel returns `GenerationStopped`; it must preserve
+the real child terminal evidence. No in-memory lifecycle fake proves these
+obligations.
+
 ## Required durable facts
 
 The checkpoint store is canonical for ordered input, exclusive claim ownership,
@@ -196,7 +207,7 @@ The caller still commits the final one-shot result under its existing rules.
 For the sealed structured-agent instruction release from kernel
 `09a1af093479aa92f3e783f4b4a7cc38e301a4a7`, consumers pin the successor
 kernel revision and regenerate their lock to exact provider-runtime revision
-`4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`. Keep `llm-tools` at
+`8fde23ac56571a63c65cfcff55c73a0976f83eb4`. Keep `llm-tools` at
 `9e6d155f3b64f03495911435b7cae8b8d131f9a2`, and keep both the
 `openai-codex` Python package and bundled CLI at `0.144.4`. The provider route
 remains `backend="codex", transport="sdk"`; the transport literal is the
@@ -383,3 +394,29 @@ uv build
 uv run pip-audit
 git diff --check
 ```
+
+## Shared-kernel paid-decision cutover
+
+The current contract is [SPEC section 17](../SPEC.md#17-durable-paid-decisions).
+Thread calls supply the host-backed `decisions` journal. Isolated calls supply
+`DurableIsolatedDecisions(IsolatedDecisionScope(stable_operation_id), journal)`
+or explicitly `TransientModelDecisions()`. Historical migration examples above
+predate these required arguments and are not the current invocation contract.
+
+Persist original request and normalized terminal separately from native session
+references and Write actions. Restore original claim inputs/checkpoint/as-of
+before retries; consult armed uncertainty before no-progress limits. Preserve
+action recovery priority. Store existing typed role evidence atomically with
+the terminal and restore it for replay; do not parse prompt history as authority.
+
+`DispatchLineage` now requires definition fingerprint and model decision ID.
+Both model-derived lineages expose the exact accepted decision `position` for
+Read recorders. Initial Reads require the stable isolated operation ID and use
+a disjoint position. Recoverable BilledOnce reads need a durable llm-tools
+recorder. Write positions remain the host action IDs, admitted after existing
+policy/approval; the kernel model journal never replaces them.
+
+An exception after provider entry retains paid uncertainty, including a stop
+before the first provider event. Do not automatically release or redispatch it.
+This explicit availability cost prevents duplicate billing. No table here is
+an outbox, scheduler, approval system, or general-purpose workflow engine.
