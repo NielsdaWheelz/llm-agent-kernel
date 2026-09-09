@@ -11,6 +11,8 @@ This repository specifies and contains `llm-agent-kernel`, imported as
   permits additional native provider lanes and ordered multi-call proposals.
   Earlier v1-only restrictions below apply to the contained AgentRuntime
   protocol, not to that explicitly qualified generation protocol.
+- SPEC section 17 and ADR 0009 require host-backed paid decision journals for
+  recoverable work and explicit transient selection for disposable inference.
 - `SPEC.md` is normative. Architecture, acceptance, slices, and ADRs must agree
   with it.
 - The public `llm-tools` seams in SPEC section 2 are qualified and locked at the
@@ -41,7 +43,8 @@ This repository specifies and contains `llm-agent-kernel`, imported as
 - Validate the whole step and pure tool input before output or dispatch.
 - Exactly one serial tool call per model step; model supplies no call/effect ID.
 - Thread dispatch carries immutable claim, checkpoint, ordered input, and
-  model-step lineage; isolated dispatch carries run and step identity. The
+  model-step lineage plus accepted decision ID; isolated dispatch carries run,
+  step, and accepted decision identity. The
   kernel neither interprets nor persists either form.
 - Native Codex built-ins and Web are disabled; cwd is private, empty, and
   read-only; network, copied environment, MCP, and approvals are disabled.

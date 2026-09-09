@@ -79,6 +79,7 @@ from llm_agent_kernel.coordination import (
     StaleSessionRef,
     ToolDispatchDefect,
 )
+from llm_agent_kernel.decisions import TransientModelDecisions
 from llm_agent_kernel.definitions import (
     KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
@@ -125,6 +126,7 @@ from llm_agent_kernel.events import (
 from llm_agent_kernel.fakes import (
     InMemoryAdmissionPort,
     InMemoryInputCheckpointPort,
+    InMemoryModelDecisionJournal,
     InMemorySessionRefPort,
     RecordingEventSink,
     ScriptedToolDispatchPort,
@@ -514,6 +516,7 @@ async def _thread(
     budget_factory: Any | None = None,
     context_source: StaticContextSource | None = None,
     input_projection: InputProjectionRequest | None = None,
+    decisions: InMemoryModelDecisionJournal | None = None,
 ):
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
     refs = references or InMemorySessionRefPort()
@@ -524,6 +527,7 @@ async def _thread(
             owner_token=OwnerToken("owner-1"),
             definition=definition,
             checkpoints=checkpoints,
+            decisions=decisions or InMemoryModelDecisionJournal(),
             admission=admission or InMemoryAdmissionPort(),
             sessions=SessionCoordinator(provider, refs),
             context_source=context_source or StaticContextSource(_sections("canonical")),
@@ -1015,7 +1019,7 @@ async def test_thread_projection_applies_to_claim_and_appended_input_batches(
     assert all("as_of=" in part for part in submitted)
 
 
-async def test_restricted_projection_survives_resume_failure_cold_reconstruction(
+async def test_restricted_projection_does_not_redispatch_an_uncertain_resume_failure(
     tmp_path: Path,
 ) -> None:
     definition, plan, _ = _definition(
@@ -1043,10 +1047,12 @@ async def test_restricted_projection_survives_resume_failure_cold_reconstruction
         references=references,
     )
 
-    assert outcome.type == "completed"
-    assert len(runtime.turns) == 2
+    assert outcome.type is ThreadStopKind.model_decision_uncertain
+    assert len(runtime.turns) == 1
+    assert len(runtime.opens) == 1
+    assert not checkpoints.settlements
+    assert checkpoints.park_reasons
     assert isinstance(runtime.opens[0].open, ResumeSession)
-    assert not isinstance(runtime.opens[1].open, ResumeSession)
     for turn in runtime.turns:
         submitted = "\n".join(cast(TextContent, part).text for part in turn.input)
         assert 'input_id="input-1"' in submitted
@@ -1194,7 +1200,7 @@ async def test_reported_token_limit_stops_after_cas_before_model_action(
     assert await refs.load(ThreadId("thread-1"), definition.fingerprint) is None
 
 
-async def test_turn_timeout_is_a_zero_turn_budget_stop_and_closes_session(
+async def test_turn_timeout_without_native_identity_is_uncertain_and_closes_session(
     tmp_path: Path,
 ) -> None:
     definition, plan, _ = _definition()
@@ -1204,14 +1210,15 @@ async def test_turn_timeout_is_a_zero_turn_budget_stop_and_closes_session(
 
     outcome, refs = await _thread(tmp_path, definition, claim, runtime, checkpoints)
 
-    assert outcome.type is ThreadStopKind.budget_exhausted
-    assert outcome.metrics.provider_turns == 0
-    assert checkpoints.settlements[0].conclusion == StoppedConclusion(StopReason.budget_exhausted)
+    assert outcome.type is ThreadStopKind.model_decision_uncertain
+    assert outcome.metrics.provider_turns == 1
+    assert not checkpoints.settlements
+    assert checkpoints.park_reasons
     assert await refs.load(ThreadId("thread-1"), definition.fingerprint) is None
     assert len(runtime.closed) == 1
 
 
-async def test_runtime_cancelled_before_turn_is_a_typed_cancelled_stop(tmp_path: Path) -> None:
+async def test_runtime_cancel_without_native_identity_retains_uncertainty(tmp_path: Path) -> None:
     definition, plan, _ = _definition()
     claim = _claim(plan)
     checkpoints = InMemoryInputCheckpointPort((ClaimAcquired(claim),))
@@ -1219,9 +1226,10 @@ async def test_runtime_cancelled_before_turn_is_a_typed_cancelled_stop(tmp_path:
 
     outcome, _ = await _thread(tmp_path, definition, claim, runtime, checkpoints)
 
-    assert outcome.type is ThreadStopKind.cancelled
-    assert outcome.metrics.provider_turns == 0
-    assert checkpoints.settlements[0].conclusion == StoppedConclusion(StopReason.cancelled)
+    assert outcome.type is ThreadStopKind.model_decision_uncertain
+    assert outcome.metrics.provider_turns == 1
+    assert not checkpoints.settlements
+    assert checkpoints.park_reasons
     assert len(runtime.closed) == 1
 
 
@@ -1723,6 +1731,7 @@ async def test_cooperative_limit_stops_before_a_provider_turn(tmp_path: Path) ->
     refs = InMemorySessionRefPort()
     try:
         outcome = await run_thread(
+            decisions=InMemoryModelDecisionJournal(),
             run_id=RunId("wall-limit"),
             thread_id=ThreadId("thread-1"),
             owner_token=OwnerToken("owner-1"),
@@ -1784,6 +1793,7 @@ async def test_cooperative_limit_does_not_wrap_write_dispatch(
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
     try:
         outcome = await run_thread(
+            decisions=InMemoryModelDecisionJournal(),
             run_id=RunId("cooperative-write"),
             thread_id=ThreadId("thread-1"),
             owner_token=OwnerToken("owner-1"),
@@ -1885,6 +1895,7 @@ async def test_isolated_structured_run_is_fresh_closed_and_uses_no_saved_state(
     admission = InMemoryAdmissionPort()
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("isolated-1"),
         definition=definition,
         inputs=(_input(),),
@@ -1929,6 +1940,7 @@ async def test_one_shot_without_initial_read_is_exactly_unchanged(tmp_path: Path
         provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
         dispatcher = ScriptedToolDispatchPort(())
         outcome = await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("no-initial-read"),
             definition=definition,
             inputs=inputs,
@@ -1996,6 +2008,7 @@ async def test_initial_read_precedes_provider_and_shares_budget_with_model_calls
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-order"),
         definition=definition,
         inputs=(_input(),),
@@ -2046,6 +2059,7 @@ async def test_declared_initial_read_failure_is_a_typed_first_turn_observation(
     )
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-failure"),
         definition=definition,
         inputs=(_input(),),
@@ -2083,6 +2097,7 @@ async def test_initial_read_rejects_non_read_effects_before_io(
 
     with pytest.raises(ValueError, match="Read|Write"):
         await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId(f"reject-{effect.value}"),
             definition=definition,
             inputs=(_input(),),
@@ -2126,6 +2141,7 @@ async def test_invalid_initial_read_fails_before_admission_tool_or_provider_io(
 
     with pytest.raises(ValueError):
         await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("invalid-initial-read"),
             definition=definition,
             inputs=(_input(),),
@@ -2198,6 +2214,7 @@ async def test_initial_read_tool_in_maximum_but_not_selected_plan_is_ungranted(
 
     with pytest.raises(ValueError, match="not granted"):
         await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("ungranted-initial-read"),
             definition=definition,
             inputs=(_input(),),
@@ -2233,6 +2250,7 @@ async def test_stale_initial_read_plan_fails_before_any_external_boundary(
 
     with pytest.raises(ValueError):
         await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("stale-initial-read"),
             definition=definition,
             inputs=(_input(),),
@@ -2266,6 +2284,7 @@ async def test_initial_read_admission_and_budget_failures_precede_dispatch(
     denied_dispatcher = ScriptedToolDispatchPort(())
     denied_factory = _BudgetFactory()
     denied = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-admission-denied"),
         definition=definition,
         inputs=(_input(),),
@@ -2288,6 +2307,7 @@ async def test_initial_read_admission_and_budget_failures_precede_dispatch(
     admission = InMemoryAdmissionPort()
     wrong_factory = _BudgetFactory(RunLimits(7, 8, 32_768, 32_768, 1, 30.0))
     mismatch = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-budget-mismatch"),
         definition=definition,
         inputs=(_input(),),
@@ -2320,6 +2340,7 @@ async def test_initial_read_budget_boundary_is_rendered_without_external_work(
     dispatcher = ScriptedToolDispatchPort((DispatchCompleted({"type": "BudgetExceeded"}),))
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-over-budget"),
         definition=definition,
         inputs=(_input(),),
@@ -2353,6 +2374,7 @@ async def test_initial_read_cancellation_before_dispatch_and_after_completion(
     before_runtime = _Runtime([])
     before_dispatcher = ScriptedToolDispatchPort(())
     before = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-cancelled-before"),
         definition=definition,
         inputs=(_input(),),
@@ -2383,6 +2405,7 @@ async def test_initial_read_cancellation_before_dispatch_and_after_completion(
         (DispatchCompleted({"type": "Success", "value": {"value": "seen"}}),)
     )
     after = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-cancelled-after"),
         definition=definition,
         inputs=(_input(),),
@@ -2418,6 +2441,7 @@ async def test_initial_read_observation_context_limit_stops_before_provider(
     admission = InMemoryAdmissionPort()
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-context-limit"),
         definition=definition,
         inputs=(_input(),),
@@ -2466,6 +2490,7 @@ async def test_initial_read_dispatch_defects_settle_admission_and_open_no_provid
     admission = InMemoryAdmissionPort()
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-defect"),
         definition=definition,
         inputs=(_input(),),
@@ -2531,6 +2556,7 @@ async def test_initial_read_commentary_call_is_non_executable_and_usage_settles(
     )
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("initial-read-commentary"),
         definition=definition,
         inputs=(_input(),),
@@ -2571,6 +2597,7 @@ async def test_isolated_empty_plan_honors_restricted_input_projection(
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("isolated-projection"),
         definition=definition,
         inputs=(_input(),),
@@ -2608,6 +2635,7 @@ async def test_unauthorized_one_shot_projection_precedes_rendering_admission_and
 
     with pytest.raises(ValueError, match="prohibits model-visible batch as_of"):
         await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("isolated-unauthorized-projection"),
             definition=definition,
             inputs=(_input(),),
@@ -2632,6 +2660,7 @@ async def test_isolated_provider_failure_closes_and_returns_typed_stop(tmp_path:
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("isolated-failure"),
         definition=definition,
         inputs=(_input(),),
@@ -2663,6 +2692,7 @@ async def test_isolated_write_plan_is_rejected_before_admission_or_provider(
 
     with pytest.raises(ValueError, match="Write"):
         await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("isolated-1"),
             definition=definition,
             inputs=(_input(),),
@@ -2691,6 +2721,7 @@ async def test_isolated_budget_mismatch_is_rejected_before_admission_or_provider
 
     with pytest.raises(KernelConfigurationDefect, match="budget limits"):
         await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("isolated-budget-mismatch"),
             definition=definition,
             inputs=(_input(),),
@@ -2715,6 +2746,7 @@ async def test_isolated_admission_rejection_returns_without_provider_io(tmp_path
     admission = InMemoryAdmissionPort(max_turns=1)
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("isolated-rejected"),
         definition=definition,
         inputs=(_input(),),
@@ -2759,6 +2791,7 @@ async def test_isolated_cancellation_before_dispatch_closes_without_tool_action(
     dispatch = ScriptedToolDispatchPort(())
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("isolated-1"),
         definition=definition,
         inputs=(_input(),),
@@ -2795,6 +2828,7 @@ async def test_child_one_shot_rejects_a_forged_independent_slot_before_provider(
     admission = _ForgedChildAdmission()
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("isolated-1"),
         definition=definition,
         inputs=(_input(),),
@@ -2849,6 +2883,7 @@ async def test_isolated_pre_cancel_emits_metadata_without_opening_provider(
     events = RecordingEventSink()
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("isolated-cancel"),
         definition=definition,
         inputs=(_input(),),
@@ -2877,6 +2912,7 @@ async def test_bounded_event_rejection_never_changes_one_shot_work(tmp_path: Pat
     events = RecordingEventSink()
 
     outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
         run_id=RunId("r" * 257),
         definition=definition,
         inputs=(_input(),),

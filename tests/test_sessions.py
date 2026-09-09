@@ -21,7 +21,6 @@ from provider_runtime.agent_runtime import (
     AgentSessionRef,
     AgentTerminal,
     CredentialRef,
-    SessionUnavailable,
     TextContent,
     freeze_json_object,
 )
@@ -48,7 +47,6 @@ from llm_agent_kernel.definitions import (
 from llm_agent_kernel.fakes import InMemorySessionRefPort
 from llm_agent_kernel.provider import CodexProvider, ProviderSessionLease
 from llm_agent_kernel.sessions import (
-    ColdBootstrapUnavailable,
     SessionCoordinator,
     StaleSessionReference,
 )
@@ -280,7 +278,6 @@ async def test_successful_terminals_advance_ref_by_generation_cas() -> None:
         "ref.cas:None",
         "ref.cas:1",
     ]
-    assert state.fallback_available is False
 
 
 async def test_session_compatibility_revision_rotates_saved_session_key() -> None:
@@ -417,56 +414,6 @@ async def test_stale_recovery_discard_closes_cached_ref_and_performs_no_open() -
         "ref.discard:4",
         "provider.discard_ref:speculative",
     ]
-
-
-async def test_resume_failure_allows_one_cold_fallback_only() -> None:
-    journal: list[str] = []
-    refs = _MemoryRefs(journal)
-    refs.value = StoredSessionRef(_ref("saved"), 2)
-    provider = _Provider(journal)
-    coordinator = _coordinator(provider, refs)
-    state = await coordinator.acquire_continuing(
-        cast(ThreadId, ThreadId("thread")),
-        _definition(),
-    )
-
-    state = await coordinator.cold_fallback(
-        state,
-        SessionUnavailable("resume failed"),
-    )
-
-    assert state.cold_bootstrap is True
-    assert state.fallback_available is False
-    assert state.expected_generation is None
-    assert journal[-3:] == [
-        "ref.discard:2",
-        "provider.discard:saved",
-        "provider.acquire:new",
-    ]
-    with pytest.raises(ColdBootstrapUnavailable):
-        await coordinator.cold_fallback(
-            state,
-            SessionUnavailable("failed again"),
-        )
-
-
-async def test_successful_terminal_disables_cold_fallback_before_step_action() -> None:
-    journal: list[str] = []
-    refs = _MemoryRefs(journal)
-    refs.value = StoredSessionRef(_ref("saved"), 2)
-    provider = _Provider(journal)
-    coordinator = _coordinator(provider, refs)
-    state = await coordinator.acquire_continuing(
-        cast(ThreadId, ThreadId("thread")),
-        _definition(),
-    )
-    state = await coordinator.store_terminal_ref(state, _terminal(state.lease.session.ref))
-
-    with pytest.raises(ColdBootstrapUnavailable):
-        await coordinator.cold_fallback(
-            state,
-            SessionUnavailable("failure after a successful terminal"),
-        )
 
 
 async def test_discard_before_replay_removes_advanced_ref_then_live_session() -> None:

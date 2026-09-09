@@ -449,10 +449,10 @@ def test_initial_read_public_api_and_isolated_positions_are_exact() -> None:
     with pytest.raises(InvalidAgentRequest):
         InitialReadCall(ToolId("test.count"), {"count": object()})
 
-    initial = InitialReadDispatchLineage(RunId("isolated-run"))
-    same_initial = InitialReadDispatchLineage(RunId("isolated-run"))
-    first_model = IsolatedDispatchLineage(RunId("isolated-run"), 1)
-    second_model = IsolatedDispatchLineage(RunId("isolated-run"), 2)
+    initial = InitialReadDispatchLineage(RunId("isolated-run"), "stable-operation")
+    same_initial = InitialReadDispatchLineage(RunId("new-recovery-attempt"), "stable-operation")
+    first_model = IsolatedDispatchLineage(RunId("isolated-run"), 1, "a" * 64)
+    second_model = IsolatedDispatchLineage(RunId("isolated-run"), 2, "b" * 64)
     assert isinstance(initial.position, InvocationPosition)
     assert initial.position == same_initial.position
     assert len({initial.position, first_model.position, second_model.position}) == 3
@@ -676,6 +676,7 @@ def test_thread_dispatch_lineage_is_complete_and_immutable() -> None:
         (InputId("input-1"), InputId("input-2")),
         3,
         "a" * 64,
+        "b" * 64,
     )
 
     assert lineage.input_ids == (InputId("input-1"), InputId("input-2"))
@@ -693,4 +694,5 @@ def test_thread_dispatch_requires_exact_definition_identity(fingerprint: object)
             (InputId("input"),),
             1,
             fingerprint,  # type: ignore[arg-type]
+            "b" * 64,
         )

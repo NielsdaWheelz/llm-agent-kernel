@@ -275,3 +275,9 @@ parallel calls, and a durable generic observation store.
 - [Implementation plan](docs/implementation-plan.md)
 - [Architecture decisions](docs/decisions/README.md)
 - [Host integration and release qualification](docs/host-integration.md)
+
+Recoverable contained runs require a host-backed `ModelDecisionJournal`.
+Isolated calls must explicitly select durable operation identity or transient
+inference. See [paid-decision contract](SPEC.md#17-durable-paid-decisions) and
+[ADR 0009](docs/decisions/0009-durable-paid-decisions.md) for recovery, BilledOnce
+Read positions, and the preserved host action barrier.

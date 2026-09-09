@@ -53,6 +53,21 @@ from .coordination import (
     ToolDispatchDefect,
     ToolDispatchPort,
 )
+from .decisions import (
+    DecisionScope,
+    DurableIsolatedDecisions,
+    IsolatedDecisionScope,
+    IsolatedModelDecisions,
+    ModelDecisionArmed,
+    ModelDecisionCompleted,
+    ModelDecisionDefect,
+    ModelDecisionJournal,
+    ModelDecisionRecord,
+    ModelDecisionRequest,
+    ModelDecisionScope,
+    ModelDecisionUncertain,
+    TransientModelDecisions,
+)
 from .definitions import (
     CODEX_NATIVE_OPTIONS,
     CONTAINMENT_POLICY,
@@ -134,6 +149,7 @@ from .fakes import (
     DispatchRecord,
     InMemoryAdmissionPort,
     InMemoryInputCheckpointPort,
+    InMemoryModelDecisionJournal,
     InMemorySessionRefPort,
     RecordingEventSink,
     ScriptedToolDispatchPort,
@@ -160,7 +176,6 @@ from .provider import (
     ProviderStreamDefect,
 )
 from .sessions import (
-    ColdBootstrapUnavailable,
     ContinuingSessionState,
     SessionCoordinator,
     StaleSessionReference,
@@ -176,6 +191,20 @@ from .tools import (
 )
 
 __all__ = [
+    "DecisionScope",
+    "DurableIsolatedDecisions",
+    "IsolatedDecisionScope",
+    "IsolatedModelDecisions",
+    "ModelDecisionArmed",
+    "ModelDecisionCompleted",
+    "ModelDecisionDefect",
+    "ModelDecisionJournal",
+    "ModelDecisionRecord",
+    "ModelDecisionRequest",
+    "ModelDecisionScope",
+    "ModelDecisionUncertain",
+    "TransientModelDecisions",
+    "InMemoryModelDecisionJournal",
     "CODEX_NATIVE_OPTIONS",
     "CONTAINMENT_POLICY",
     "KERNEL_BASE_INSTRUCTION",
@@ -209,7 +238,6 @@ __all__ = [
     "ClaimResult",
     "CheckpointStateDefect",
     "CodexProvider",
-    "ColdBootstrapUnavailable",
     "ContextLimitExceeded",
     "ContextProjection",
     "ContextSourcePort",

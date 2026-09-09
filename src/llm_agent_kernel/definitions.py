@@ -368,6 +368,7 @@ class DispatchLineage:
     input_ids: tuple[InputId, ...]
     model_step_ordinal: int
     definition_fingerprint: str
+    model_decision_id: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.claim_id, ClaimId):
@@ -386,6 +387,12 @@ class DispatchLineage:
         ):
             raise ValueError("dispatch definition fingerprint must be lowercase SHA-256")
 
+        _require_decision_id(self.model_decision_id)
+
+    @property
+    def position(self) -> InvocationPosition:
+        return InvocationPosition(f"model-decision:{self.model_decision_id}")
+
 
 @dataclass(frozen=True, slots=True)
 class IsolatedDispatchLineage:
@@ -393,15 +400,17 @@ class IsolatedDispatchLineage:
 
     run_id: RunId
     model_step_ordinal: int
+    model_decision_id: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.run_id, RunId):
             raise TypeError("isolated dispatch run id must be RunId")
         _require_ordinal(self.model_step_ordinal)
+        _require_decision_id(self.model_decision_id)
 
     @property
     def position(self) -> InvocationPosition:
-        return _isolated_position(self.run_id, "model_step", self.model_step_ordinal)
+        return InvocationPosition(f"model-decision:{self.model_decision_id}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -409,14 +418,17 @@ class InitialReadDispatchLineage:
     """The non-model initial Read and its exact dependency position."""
 
     run_id: RunId
+    operation_id: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.run_id, RunId):
             raise TypeError("initial Read dispatch run id must be RunId")
+        if type(self.operation_id) is not str or not self.operation_id.strip():
+            raise ValueError("initial Read requires its stable operation identity")
 
     @property
     def position(self) -> InvocationPosition:
-        return _isolated_position(self.run_id, "initial_read", None)
+        return _initial_read_position(self.operation_id)
 
 
 type ToolDispatchLineage = DispatchLineage | IsolatedDispatchLineage | InitialReadDispatchLineage
@@ -661,6 +673,7 @@ class ThreadStopKind(StrEnum):
     protocol_error = "protocol_error"
     provider_error = "provider_error"
     configuration_error = "configuration_error"
+    model_decision_uncertain = "model_decision_uncertain"
 
 
 @dataclass(frozen=True, slots=True)
@@ -713,22 +726,25 @@ def _require_ordinal(value: int) -> None:
         raise ValueError("model step ordinal must be a positive integer")
 
 
-def _isolated_position(
-    run_id: RunId,
-    origin: Literal["initial_read", "model_step"],
-    model_step_ordinal: int | None,
-) -> InvocationPosition:
+def _require_decision_id(value: str) -> None:
+    if (
+        type(value) is not str
+        or len(value) != 64
+        or any(char not in "0123456789abcdef" for char in value)
+    ):
+        raise ValueError("model decision identity must be lowercase SHA-256")
+
+
+def _initial_read_position(operation_id: str) -> InvocationPosition:
     digest = hashlib.sha256(
         canonical_json_bytes(
             {
-                "model_step_ordinal": model_step_ordinal,
-                "namespace": "llm-agent-kernel-isolated-position-v1",
-                "origin": origin,
-                "run_id": str(run_id),
+                "namespace": "llm-agent-kernel-initial-read-v2",
+                "operation_id": operation_id,
             }
         )
     ).hexdigest()
-    return InvocationPosition(f"llm-agent-kernel-isolated-v1:{digest}")
+    return InvocationPosition(f"llm-agent-kernel-initial-read-v2:{digest}")
 
 
 def _require_closed_objects(value: object) -> None:

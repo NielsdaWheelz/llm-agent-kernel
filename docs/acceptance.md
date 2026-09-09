@@ -84,8 +84,9 @@ assigned to exactly one implementation slice.
   cancellation and failure paths.
 - **K015** — Quota exhaustion, expected provider failure, cancellation, resume
   incompatibility, and runtime invariant failure remain distinct. There is at
-  most one safe cold-bootstrap fallback before a successful terminal and no
-  fallback after host tool dispatch.
+  most one safe cold open for session acquisition before model arming. After
+  provider invocation, absence of accepted terminal evidence is durable
+  uncertainty; session/timeout error names never authorize redispatch.
 
 ## Definitions, plans, sessions, and context
 
@@ -185,11 +186,11 @@ assigned to exactly one implementation slice.
   and `EffectId`. The dispatch exposes immutable claim ID, through-checkpoint,
   ordered admitted-input IDs, and model-step ordinal; conflict or uncertain
   recorder state never blind-redispatches.
-- **K032** — `Pure`/`Read` may use attempt-scoped positions and a non-durable
-  recorder. Tests and docs expose that `Read + BilledOnce` can be billed again
-  after crash or discarded one-shot. Isolated initial-Read and model-step
-  lineages carry deterministic, disjoint kernel-derived positions that the host
-  passes unchanged to `llm-tools`.
+- **K032** — Recoverable `Pure`/`Read` use original decision lineage positions;
+  BilledOnce work has a durable llm-tools recorder. Explicitly transient isolated
+  inference may accept nondurable repeated cost. Initial/model positions are
+  deterministic, disjoint, and supplied unchanged to the dependency executor.
+
 - **K033** — Dispatch returns only completed `llm_tools.ToolResult` or durable
   suspended `(host_ref, waiting_for)`; configuration, recorder, executor, and
   position defects are typed exceptions rather than fabricated tool failures.
@@ -332,6 +333,26 @@ assigned to exactly one implementation slice.
   continuation commit, exact recovery, effect reconciliation, and stopped parent
   publication. Kernel fakes are not evidence of those production guarantees.
 
+## Durable paid decisions
+
+- **K059** — Stable scope plus ordinal survives new claim/run UUIDs; the separate
+  request fingerprint binds original authority, lineage, counters, and context.
+- **K060** — Exact normalized terminal acceptance precedes effects and output;
+  completed thread and isolated decisions replay without provider I/O, prior
+  usage recharge, or stale session-reference CAS.
+- **K061** — Any uncertainty after provider invocation remains armed, including
+  missing native identity; lookup precedes poison/attempt exhaustion. Only a
+  positively uninvoked request may be released. No implicit redispatch occurs.
+- **K062** — Recovery cold-boots subsequent work from bounded stored canonical
+  material and retains logical limits; changed authority/claim or substituted
+  journal results prevent effects. Hosts restore their typed evidence atomically.
+- **K063** — Stable accepted model decision IDs and disjoint stable initial-Read
+  positions reach the existing llm-tools recorder; recoverable BilledOnce reads
+  cannot silently rebill. Write action positions and authority remain host-owned.
+- **K064** — Every isolated caller explicitly selects durable or transient
+  semantics; fakes and transient calls make no crash-durability claim. Real
+  Jarvis storage qualifies claim freezing, evidence replay, and paid-read recovery.
+
 ## Slice assignment
 
 | Slice | Acceptance IDs |
@@ -342,3 +363,4 @@ assigned to exactly one implementation slice.
 | 3 — polling, settlement, and admission | K037–K045 |
 | 4 — one-shot, assurance, and release | K046–K052 |
 | 5 — shared generation choreography | K053–K058 |
+| 6 — durable paid decisions | K059–K064 |

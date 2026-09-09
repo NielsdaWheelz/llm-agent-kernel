@@ -7,7 +7,9 @@ Sections 1–15 specify the contained structured AgentRuntime protocol. Section
 16 extends the package with the accepted shared Nexus generation protocol and
 supersedes earlier package-wide restrictions on provider lanes and ordered
 multi-call proposals. The contained protocol's single-call grammar, native
-containment, and host action boundary remain mandatory.
+containment, and host action boundary remain mandatory. Section 17 requires
+original paid-decision journaling and supersedes earlier attempt-local recovery
+and BilledOnce-recomputation allowances.
 
 ## 1. Goals
 
@@ -38,7 +40,7 @@ The distribution is `llm-agent-kernel`; applications import
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`
+  `8fde23ac56571a63c65cfcff55c73a0976f83eb4`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 
@@ -295,7 +297,7 @@ opaque `thread_id`. It is not a provider session.
 
 The host claims one non-empty, bounded batch and returns an `InputClaim` with:
 
-- An opaque stable `claim_id`.
+- An opaque `claim_id` stable for this acquisition, not necessarily for retries.
 - One or more ordered host inputs, each with an opaque stable `input_id`.
 - An opaque consumed checkpoint.
 - Source timestamps and one host `as_of` value.
@@ -330,7 +332,7 @@ saved session reference, a fresh native session, a structured output contract,
 and no `Write` tool. It MAY carry one invocation-local `InitialReadCall` naming
 a canonical `ToolId` plus JSON-compatible arguments. The call is host-selected
 input to orchestration, not a model step or an authority grant. Its result is
-not durable until its caller commits it.
+durable only through its selected decision policy and host-owned result commit.
 
 ## 5. Exact provider surface and containment
 
@@ -574,30 +576,27 @@ constructed from the exact validated plan, cancellation token, and immutable
 dispatch lineage. A thread
 `DispatchLineage` contains:
 
-- The stable `claim_id`.
+- The current attempt's `claim_id` (which need not survive recovery).
 - The current opaque `through_checkpoint`.
 - The ordered `input_id` values admitted through that checkpoint.
-- The model-step ordinal within the claim.
+- The model-step ordinal within the original admitted work.
+- The exact definition fingerprint and accepted stable `model_decision_id`.
 
-An isolated model-proposed call instead carries its run ID, model-step ordinal,
-and a deterministic kernel-derived `InvocationPosition`; it has no application
-claim, checkpoint, or input identities. An isolated initial Read carries its
-run ID and a position from a disjoint `initial_read` domain, with no fictitious
-model-step ordinal. The positions are stable for the invocation and cannot
-collide with each other or with any model-step position for that run. The host
-MUST pass the lineage's exact isolated position to `llm-tools`. The kernel does
-not persist lineage. It supplies the lineage that was true immediately before
-dispatch so the host can bind a durable effect to every thread input that
-preceded it, including input appended mid-loop. For thread dispatch, the host
-supplies `llm-tools` with an `InvocationPosition`:
+An isolated model-proposed call carries its attempt run ID, model-step ordinal,
+accepted stable model-decision ID, and exact `position`. Both model-derived
+lineages expose `InvocationPosition("model-decision:" + model_decision_id)`.
+An initial Read carries its attempt run ID and the caller's stable operation ID;
+its position hashes that operation in a disjoint initial-read domain. The host
+MUST use these exact positions for recoverable `Pure`/`Read` work. A `BilledOnce`
+read requires a durable llm-tools recorder; its original result is replayed and
+an uncertain occupied position requires explicit recovery.
 
-- For a `Write`, host code first creates or resolves its durable effect/action
-  record and uses that stable record ID for both `InvocationPosition` and
-  `EffectId`.
-- For `Pure` or `Read`, the host may use an attempt-scoped position and a
-  non-durable recorder. A `BilledOnce` read may therefore be billed again after
-  a crash or discarded one-shot; this is an accepted v1 cost, not an
-  exactly-once claim.
+For a `Write`, host code first creates or resolves its existing durable action
+record after current policy/approval. That action ID remains both
+`InvocationPosition` and `EffectId`. The new model decision journal never
+creates, approves, replaces, or weakens an action. Explicitly transient isolated
+inference may use a nondurable Read recorder, with the corresponding repeated
+cost accepted by that caller. No durable caller may silently take that path.
 
 Invocation positions MUST be unique for distinct calls and stable whenever a
 call may be resumed or replayed. A same-position/different-input conflict is a
@@ -787,7 +786,7 @@ conclusion and consume the current claimed input:
 - Kernel model-step or cooperative elapsed-limit exhaustion.
 - Provider quota exhaustion.
 - Explicit owner cancellation/stop when host policy says the input is complete.
-- A repeated provider failure after the one permitted safe bootstrap fallback.
+- An accepted failed provider terminal with a determinate failure reason.
 
 They MUST NOT automatically rearm the same logical input. Configuration defects
 park the input, trip the host circuit breaker, and require operator correction;
@@ -796,7 +795,9 @@ they do not become model-visible tool failures.
 A process interruption may leave the claim unconsumed. The host supplies a
 durable attempt number on the next claim. Once the configured no-progress
 attempt ceiling is exceeded, admission persists a stopped/parked conclusion
-without calling the provider.
+without calling the provider, except that the decision journal is consulted
+first: an armed unknown decision parks unconsumed and a completed decision
+retains its original replay authority.
 
 ### 9.3 Run admission
 
@@ -906,9 +907,11 @@ load/acquire compatible continuing provider session, or cold bootstrap
 loop within KernelLimits:
   poll and append compatible host input, or handle preemption
   build only new continuation material, or one cold bootstrap
-  consume one complete AgentRuntime streamed turn while inspecting every event
+  replay the latest accepted paid decision, or durably arm its frozen request
+  before consuming one complete AgentRuntime stream and inspecting every event
   reject native tool/permission events without projecting a terminal
-  map typed terminal failure, or persist returned AgentSessionRef by generation CAS
+  durably commit the exact normalized terminal before dependent effects
+  map typed terminal failure, or CAS the returned live session ref (never a replayed ref)
   validate one complete structured step
 
   if call_tool:
@@ -926,8 +929,10 @@ loop within KernelLimits:
 on deterministic no-progress stop:
   settle a host-authored stopped conclusion; do not rearm this input
 
-on shutdown/invariant interruption:
-  release without arming; canonical unconsumed input drives explicit recovery
+on interruption after model dispatch was armed:
+  retain paid uncertainty and discard native continuation; never auto-redispatch
+on configuration defect:
+  park unconsumed input; require explicit correction
 
 always settle/refund admission on clean exit; release the live provider lease
 on startup, release only orphaned concurrency slots;
@@ -940,7 +945,8 @@ No database transaction remains open across provider or external tool I/O.
 
 An isolated one-shot:
 
-- Requires `SessionMode.isolated` and a structured output contract.
+- Requires `SessionMode.isolated`, a structured output contract, and an explicit
+  `DurableIsolatedDecisions` or `TransientModelDecisions` choice.
 - Validates its invocation input projection against the definition policy
   before plan rendering, admission, provider I/O, or tool I/O.
 - Requires a HostTable plan containing no `ToolEffect.Write` binding.
@@ -976,9 +982,10 @@ context. It is not a hook, retry mechanism, list of calls, dependency graph,
 workflow engine, authority mechanism, or permission to execute commentary.
 `AgentText` remains observational and non-executable.
 
-`Read + BilledOnce` may be billed again if the caller fails before committing
-the result. Provider-internal session state may exist during the invocation but
-the kernel never saves its reference or treats it as canonical.
+Only explicitly transient `Read + BilledOnce` work accepts repeated cost after
+a crash. Recoverable work uses stable positions and durable llm-tools records.
+Isolated provider state is never saved as a reusable native reference or treated
+as canonical.
 
 ## 12. Outcomes
 
@@ -993,7 +1000,9 @@ Thread outcomes are:
 - `budget_exhausted`: a kernel limit stopped and concluded the input.
 - `quota_exhausted`: subscription quota stopped and concluded the input.
 - `protocol_error`: repair allowance stopped and concluded the input.
-- `provider_error`: the selected provider failed after its one safe fallback.
+- `provider_error`: an accepted normalized terminal records provider failure.
+- `model_decision_uncertain`: an armed paid dispatch has no accepted terminal;
+  thread input remains parked and unconsumed.
 - `configuration_error`: a dependency/port/containment invariant failed and the
   input was parked for operator correction.
 
@@ -1046,7 +1055,7 @@ The release suite covers both single-run interior behavior and composed seams:
 7. `Write` execution has stable action-owned position/effect ID, immutable
    claim/checkpoint/input/step lineage, and a durable recorder; conflicts and
    uncertain positions never redispatch blindly.
-8. `Pure`/`Read` one-shot behavior and the accepted BilledOnce recomputation
+8. `Pure`/`Read` one-shot behavior and explicitly transient BilledOnce recomputation
    cost are explicit and tested.
 9. Mid-loop human input is polled and appears once before the next model turn;
    stop/preemption prevents later dispatch.
@@ -1093,8 +1102,8 @@ The release suite covers both single-run interior behavior and composed seams:
     or explicitly requested, rejects widening requests before any external
     boundary, and participates completely in deterministic fingerprinting for
     thread and isolated empty-plan runs.
-27. With no initial Read, one-shot behavior is byte-for-byte and behaviorally
-    unchanged. With one, plan/binding/input validation precedes admission and
+27. With no initial Read, no host-selected Read or initial-Read position is
+    introduced. Both paths obey the explicit paid-decision contract in section 17. With one, plan/binding/input validation precedes admission and
     I/O; admission and cancellation precede one exact shared tool budget and
     dispatch; initial/model positions are deterministic and disjoint; the typed
     completed observation precedes provider I/O; failures, bounds, commentary,
@@ -1208,3 +1217,60 @@ ordered event acknowledgment, real recorder replay, task cancellation, durable
 continuation identity, effect uncertainty, and stop publication against their
 own stores. These checks MUST retain the contained AgentRuntime conformance
 suite. Paid/live provider qualification remains a separate explicit gate.
+
+## 17. Durable paid decisions
+
+ADR [0009](docs/decisions/0009-durable-paid-decisions.md) supersedes earlier
+attempt-local inference and BilledOnce-recomputation allowances for recoverable
+runs. It does not change the contained model grammar or host action barrier.
+
+### 17.1 Explicit recovery contract
+
+`run_thread` requires `ModelDecisionJournal`. `run_one_shot` requires a closed
+choice: `DurableIsolatedDecisions(IsolatedDecisionScope(operation_id), journal)`
+or explicit `TransientModelDecisions()`. A durable isolated operation ID names
+actual host work and MUST survive crashes, retries, and new attempt UUIDs.
+
+Thread `ModelDecisionScope` names the thread and original first input. Its
+ordinal counts paid decisions in that original work, including protocol repairs.
+`ModelDecisionRequest` hashes scope and ordinal into `decision_id`, and hashes
+all original authority, input/checkpoint/as-of, logical counters, canonical
+context, and exact submitted context into a separate `request_fingerprint`.
+Definition identity includes the authenticated frozen catalog selection:
+`model_key`, reasoning key, `agent_definition_revision`, and row fingerprint.
+Consumers discover that catalog before constructing `ProviderConfiguration`;
+the kernel supplies no model/reasoning/catalog defaults.
+
+`latest` returns only `ModelDecisionArmed`, `ModelDecisionCompleted`, or no
+record. `arm` durably accepts one original request under current host ownership.
+`complete` durably accepts the exact normalized terminal from the fully drained
+provider stream, before tool dispatch, conclusion settlement, or successful
+reference CAS. It cannot substitute either request or terminal.
+
+### 17.2 Recovery and uncertainty
+
+Host claim selection consults the journal before retry/poison handling, freezes
+and restores original ordered inputs/checkpoint/as-of, and gives existing
+committed action recovery priority. An armed decision parks unconsumed input
+with `model_decision_uncertain`. A completed decision replays without provider
+I/O or charging its prior usage again. Authority or claim drift fails closed.
+
+Replay uses no obsolete native session reference. Any subsequent provider turn
+cold-boots from the stored canonical text, accepted model evidence, and current
+tool observations. Canonical snapshots and newly submitted context are each
+bounded by `max_new_context_bytes`; exhaustion never clips evidence. Logical
+turn and repair bounds survive recovery. Current-invocation metrics count only
+new paid dispatches; host rolling admission retains crash capacity charges.
+
+Once the provider method is invoked, an exception without an accepted terminal
+retains uncertainty, even when named `TurnNotStarted`, `SessionMismatch`, or
+`SessionUnavailable`. None proves the backend was not invoked. The only
+`release_undispatched` path is a kernel-observed stop after arm and before
+provider invocation. Cancellation and cleanup never rearm uncertain work.
+
+The journal adapter atomically persists any existing bounded host role evidence
+required to validate a replayed result. It restores that evidence before replay;
+the kernel does not own its schema and canonical prompt text grants no authority.
+BilledOnce tools use original lineage positions and a durable llm-tools recorder.
+Writes still require the original host action/effect record and policy barrier.
+The journal owns no scheduler, effect, action approval, or reconciliation policy.

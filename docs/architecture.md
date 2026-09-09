@@ -338,9 +338,10 @@ Bridges a validated proposal to the host dispatcher and `llm-tools`. It never
 implements a second executor or tool budget.
 
 Every thread dispatch carries immutable claim ID, current checkpoint, ordered
-admitted input IDs, and model-step ordinal. An isolated dispatch carries only
-its run ID, ordinal, and kernel-derived position. An isolated initial Read
-carries its run ID and a position derived from a separate `initial_read` domain,
+admitted input IDs, model-step ordinal, definition fingerprint, and accepted
+model-decision ID. An isolated dispatch carries its attempt run ID, ordinal,
+accepted model-decision ID, and exact position. An isolated initial Read
+carries its run ID and stable operation ID in a separate initial-Read domain,
 with no fabricated model step. The host must pass these isolated positions
 unchanged into `llm-tools`; they are deterministic and non-colliding within one
 run. The host may persist lineage with an effect; the kernel otherwise treats
@@ -378,9 +379,10 @@ interrupt outside recorder/reconciliation semantics.
 
 For `Write`, the host creates or resolves a durable action/effect row before
 executor entry. Its stable ID is both the `InvocationPosition` and `EffectId`.
-For `Pure` and `Read`, the host may use an attempt-scoped position and
-non-durable recorder. A `Read + BilledOnce` operation can therefore rebill after
-a crash; v1 accepts that cost instead of adding a generic durable read cache.
+For recoverable `Pure` and `Read`, the host uses the original decision lineage
+position. `Read + BilledOnce` requires the existing llm-tools durable recorder
+contract; uncertainty prevents redispatch and completed results replay. Only
+explicitly transient isolated inference accepts nondurable repeated cost.
 
 Dispatch returns:
 
@@ -398,37 +400,23 @@ tool-loop retry signal.
 ## State transitions
 
 ```text
-START
-  |
-  +-- no work / busy / denied admission ----------------------> RETURN
-  |
-  v
-CLAIM --> PROVE PLAN --> BUILD EXACT BUDGET --> ADMIT --> OPEN/RESUME
-                                                        |
-                                                        v
-                                                     POLL --> MODEL TURN
-                                                        typed failure |
-                                              bounded fallback or STOP
-                                                               |
-                                         CAS SESSION REF --> VALIDATE
-                                                           invalid |
-                                               bounded correction
-                                                           |
-                                                           +--> POLL
-
-VALIDATE -- call_tool --> POLL --> SERIAL DISPATCH
-                                      /       \
-                               completed    suspended
-                                   |            |
-                              observation     SETTLE --> RETURN
-                                   |
-                                   +------------------> POLL
-
-VALIDATE -- say/finish --> POLL FOR PREEMPTION --> SETTLE --> RETURN
-
-deterministic exhaustion/quota/stop --> host-authored stopped conclusion
-process interruption/invariant defect --> release or park; never auto-rearm
+CLAIM -> ORIGINAL JOURNAL LOOKUP
+           | armed unknown -> PARK UNCONSUMED
+           | completed     -> ADMIT -> REPLAY ORIGINAL TERMINAL
+           | no decision   -> ADMIT -> OPEN -> ARM -> PROVIDER
+                                                   | error -> UNCERTAIN
+                                                   | complete stream
+                                                   v
+                                                COMMIT ORIGINAL TERMINAL
+                                                   |
+                                                CAS LIVE SESSION REF
+                                                   |
+REPLAY ORIGINAL TERMINAL ----------------------> VALIDATE STEP
+                                                   | invalid -> bounded repair
+                                                   | call -> POLL -> SERIAL TOOL
+                                                   | say/finish -> POLL -> SETTLE
 ```
+
 
 The isolated opt-in prelude is narrower:
 
@@ -495,3 +483,8 @@ parallel steps, semantic discovery in the kernel, provider-native application
 tools, MCP application tools, model-authored progress, generic durable read
 observations, stateless provider generation, and kernel-owned workflow/schema
 infrastructure.
+
+The accepted [paid-decision extension](../SPEC.md#17-durable-paid-decisions)
+adds original request/terminal journaling, explicit isolated recovery policy,
+and stable Read positions. Slice 6 owns K059–K064; application durable-store
+qualification is required in addition to process-local kernel tests.

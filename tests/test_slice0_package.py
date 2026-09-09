@@ -17,11 +17,11 @@ def test_package_metadata_locks_qualified_git_dependencies() -> None:
     assert project["project"]["requires-python"] == ">=3.12"
     assert project["project"]["dependencies"][:3] == [
         "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@9e6d155f3b64f03495911435b7cae8b8d131f9a2",
-        "provider-runtime[codex-sdk] @ git+https://github.com/NielsdaWheelz/llm-calling.git@4ddced3bb5487ce988858c4c6d45d2e5ee0acad9",
+        "provider-runtime[codex-sdk] @ git+https://github.com/NielsdaWheelz/llm-calling.git@8fde23ac56571a63c65cfcff55c73a0976f83eb4",
         "openai-codex==0.144.4",
     ]
     assert packages["provider-runtime"]["source"]["git"].endswith(
-        "?rev=4ddced3bb5487ce988858c4c6d45d2e5ee0acad9#4ddced3bb5487ce988858c4c6d45d2e5ee0acad9"
+        "?rev=8fde23ac56571a63c65cfcff55c73a0976f83eb4#8fde23ac56571a63c65cfcff55c73a0976f83eb4"
     )
     assert packages["llm-tools"]["source"]["git"].endswith(
         "?rev=9e6d155f3b64f03495911435b7cae8b8d131f9a2#9e6d155f3b64f03495911435b7cae8b8d131f9a2"

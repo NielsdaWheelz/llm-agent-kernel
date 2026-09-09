@@ -75,6 +75,7 @@ from llm_agent_kernel.context import (
     continuation_context,
     run_context,
 )
+from llm_agent_kernel.decisions import TransientModelDecisions
 from llm_agent_kernel.definitions import (
     KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
@@ -739,6 +740,7 @@ async def test_live_one_shot_uses_initial_read_before_first_provider_turn() -> N
     )
     try:
         outcome = await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("live-initial-read"),
             definition=definition,
             inputs=(

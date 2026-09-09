@@ -95,6 +95,8 @@ from llm_agent_kernel import (
     run_one_shot,
     run_thread,
 )
+from llm_agent_kernel.decisions import TransientModelDecisions
+from llm_agent_kernel.fakes import InMemoryModelDecisionJournal
 
 AS_OF = datetime(2026, 9, 2, 12, 0, tzinfo=UTC)
 RUN_LIMITS = RunLimits(8, 8, 32_768, 32_768, 1, 30.0)
@@ -312,6 +314,7 @@ async def _run_thread(
     context_source: StaticContextSource | None = None,
 ):
     return await run_thread(
+        decisions=InMemoryModelDecisionJournal(),
         run_id=RunId(run_id),
         thread_id=ThreadId("thread-1"),
         owner_token=OwnerToken("owner-1"),
@@ -433,6 +436,7 @@ async def test_discarded_billed_once_read_can_dispatch_again(tmp_path: Path) -> 
     admission = InMemoryAdmissionPort()
     try:
         first = await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("isolated-first"),
             definition=definition,
             inputs=(_input("read", "read the value"),),
@@ -445,6 +449,7 @@ async def test_discarded_billed_once_read_can_dispatch_again(tmp_path: Path) -> 
             budget_factory=_BudgetFactory(),
         )
         second = await run_one_shot(
+            decisions=TransientModelDecisions(),
             run_id=RunId("isolated-second"),
             definition=definition,
             inputs=(_input("read", "read the value"),),
@@ -470,10 +475,21 @@ async def test_discarded_billed_once_read_can_dispatch_again(tmp_path: Path) -> 
         ReplayPolicy.BilledOnce,
         ReplayPolicy.BilledOnce,
     ]
-    assert [call.lineage for call in dispatcher.calls] == [
-        IsolatedDispatchLineage(RunId("isolated-first"), 1),
-        IsolatedDispatchLineage(RunId("isolated-second"), 1),
-    ]
+    lineages = [call.lineage for call in dispatcher.calls]
+    assert all(isinstance(lineage, IsolatedDispatchLineage) for lineage in lineages)
+    assert [
+        lineage.run_id for lineage in lineages if isinstance(lineage, IsolatedDispatchLineage)
+    ] == [RunId("isolated-first"), RunId("isolated-second")]
+    assert (
+        len(
+            {
+                lineage.position
+                for lineage in lineages
+                if isinstance(lineage, IsolatedDispatchLineage)
+            }
+        )
+        == 2
+    )
     assert len(runtime.closed) == 2
     assert admission.live_slots == 0
 
