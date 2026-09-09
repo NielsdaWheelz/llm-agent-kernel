@@ -40,7 +40,7 @@ completed Codex `final_answer` wins, the last phase-unknown completion is the
 fallback, and commentary is never executable. Provider-runtime owns that
 selection; the kernel does not concatenate or select messages.
 The qualified provider-runtime pin
-`c9ecf4d974efba2af1aed09dbdb42e76a480d4f8` owns a WebSocket/Unix-socket
+`834ea544f1d7437ce2a32b17d4cc813e75a06fa2` owns a WebSocket/Unix-socket
 connection to the externally supervised Codex App Server behind the stable
 `codex`/`sdk` route, strictly projects native authority including retained
 custom-exec, verifies exact server version `0.153.4`, and makes unknown protocol

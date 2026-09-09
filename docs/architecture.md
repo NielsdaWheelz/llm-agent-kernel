@@ -105,7 +105,7 @@ the kernel's Codex-compatible closed-object wire envelope through
   verify inherited group ownership, and are `0750`;
 - no additional directories, copied environment, network, MCP, or approval;
 - native built-ins and Web disabled;
-- the Codex `allowed_tools=("*",)` SDK sentinel only where required by the
+- the Codex `allowed_tools=("*",)` provider sentinel only where required by the
   pinned runtime.
 
 The provider directly owns its WebSocket/Unix-socket connection to the shared

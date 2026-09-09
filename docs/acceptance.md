@@ -8,7 +8,7 @@ assigned to exactly one implementation slice.
 - **K001** — The package supports Python 3.12 or newer, imports as
   `llm_agent_kernel`, and performs no I/O or authority grant on import.
 - **K002** — Runtime locks qualified immutable git revisions of
-  `provider-runtime` (`c9ecf4d974efba2af1aed09dbdb42e76a480d4f8`) and
+  `provider-runtime` (`834ea544f1d7437ce2a32b17d4cc813e75a06fa2`) and
   `llm-tools`; the provider attaches only to an
   externally supervised Codex App Server at exact version `0.153.4`. Ordinary
   CI never imports mutable sibling worktrees or an uncertified provider release.
