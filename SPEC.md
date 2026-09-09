@@ -1,7 +1,13 @@
-# llm-agent-kernel v1 specification
+# llm-agent-kernel specification
 
 Normative terms **MUST**, **MUST NOT**, **SHOULD**, and **MAY** have their usual
 RFC 2119 meanings.
+
+Sections 1–15 specify the contained structured AgentRuntime protocol. Section
+16 extends the package with the accepted shared Nexus generation protocol and
+supersedes earlier package-wide restrictions on provider lanes and ordered
+multi-call proposals. The contained protocol's single-call grammar, native
+containment, and host action boundary remain mandatory.
 
 ## 1. Goals
 
@@ -1117,3 +1123,88 @@ The release suite covers both single-run interior behavior and composed seams:
 
 Deferred features require measured need, an ADR, and preservation of the
 provider containment, plan-tightening, admission, and effect boundaries above.
+
+## 16. Shared generation protocol
+
+[ADR 0008](docs/decisions/0008-shared-generation-orchestration.md) admits Nexus as
+a second consumer. `llm_agent_kernel.generation.run_generation` MUST own its
+portable native-child and ordered-tool loop. A consumer MUST NOT retain a second
+loop under an adapter. Frozen application selections, provider request/event
+projection, native transport, tool execution, durable transactions, authority,
+and delivery retain their established owners.
+
+### 16.1 Values and boundaries
+
+`GenerationTurn` carries a positive absolute ordinal and a typed frozen native
+request. A fresh invocation starts at ordinal one. A recovered invocation MUST
+start with `GenerationContinuation`, which carries its source ordinal, typed
+host continuation payload, and a nonempty ordered tuple of calls with unique
+provider correlation IDs. These IDs correlate results; they MUST NOT become
+effect identities or grant authority.
+
+`GenerationDriver.stream` MUST await the supplied arming callback exactly once
+after native admission and before native model dispatch. The host lifecycle
+MUST durably record uncertainty under its current claim before that callback
+returns. A pre-admission refusal MUST NOT arm a child. The driver validates
+native request/event identity, handles in-flight cancellation, and closes
+transport resources when its async generator is closed.
+
+The closed stream values are `GenerationObservation`, `GenerationProposal`,
+and `GenerationTerminal`. Their nonnegative sequences MUST strictly increase;
+gaps from native projection are permitted. Observations are non-authoritative
+progress. Proposals are buffered. The complete stream MUST end after exactly
+one terminal; any later event or exception prevents terminal commitment and
+dependent dispatch. A continuation MUST name the current ordinal and contain
+exactly the observed ordered calls, including their payloads.
+
+### 16.2 Durable decisions and acknowledgment
+
+`GenerationLifecycle.complete` MUST atomically commit the accepted child
+terminal and exact successor decision before returning. It MAY resolve the
+host terminal and drop continuation; it MUST NOT substitute terminal identity
+or continuation. The kernel MUST await this result before publishing buffered
+proposals or terminal evidence, and MUST await each observer acknowledgment
+before executing dependent tools. Acknowledgment failure propagates without
+dispatching those tools.
+
+A starting continuation MUST have been reopened and validated against durable
+host state. Tools MUST execute through existing authority and recorder paths
+using stable positions. The kernel MUST execute calls serially, verify each
+returned correlation ID, and never automatically retry a failed boundary.
+Uncertain external effects remain subject to host reconciliation.
+
+Before preparing a successor, `GenerationLifecycle.open` MUST verify that the
+accepted continuation's identity and canonical bytes exactly match its durable
+record and current claim. It MUST raise on disagreement. The driver then
+purely prepares the next absolute ordinal from that exact payload and ordered
+tool results. No host transaction may remain open across provider/tool I/O.
+
+### 16.3 Cancellation and limits
+
+`max_turns` MUST be a positive integer and bounds absolute child ordinals,
+including resumed work. It does not replace llm-tools tool/attempt/byte or
+deadline accounting. If no successor turn is available, the kernel MUST stop
+before initiating tools whose result cannot be continued.
+
+Cooperative cancellation MUST be checked before a provider turn, dispatch
+arming, each tool, continuation reopening, and successor preparation. Native
+transport owns in-flight cancellation. Python task cancellation MUST propagate
+and close the stream; it MUST NOT be converted to fabricated provider evidence.
+
+`GenerationCompleted` means an accepted final native child exists. Its native
+terminal may be successful, failed, incomplete, or cancelled. `GenerationStopped`
+is a separate orchestration outcome with reason `cancelled` or `turn_limit`,
+last accepted terminal when available, and last accepted/source ordinal. The
+host MUST persist and publish its stopped parent outcome separately, preserve
+child truth, and retire any pending successor atomically with that stop. A
+resume has no retained terminal value unless supplied by durable host evidence;
+`last_terminal=None` MUST NOT be presented as native success.
+
+### 16.4 Qualification
+
+Ordinary tests MUST use network-disabled deterministic providers and explicit
+process-local lifecycle fakes. Consumers MUST qualify native admission timing,
+ordered event acknowledgment, real recorder replay, task cancellation, durable
+continuation identity, effect uncertainty, and stop publication against their
+own stores. These checks MUST retain the contained AgentRuntime conformance
+suite. Paid/live provider qualification remains a separate explicit gate.

@@ -7,6 +7,10 @@ This repository specifies and contains `llm-agent-kernel`, imported as
 
 - V1 runtime implementation and packaging are present. Keep changes within the
   reusable kernel boundary and prove them through the conformance suite.
+- The accepted Nexus generation extension in SPEC section 16 and ADR 0008
+  permits additional native provider lanes and ordered multi-call proposals.
+  Earlier v1-only restrictions below apply to the contained AgentRuntime
+  protocol, not to that explicitly qualified generation protocol.
 - `SPEC.md` is normative. Architecture, acceptance, slices, and ADRs must agree
   with it.
 - The public `llm-tools` seams in SPEC section 2 are qualified and locked at the

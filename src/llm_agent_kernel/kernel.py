@@ -807,6 +807,7 @@ async def run_thread(
                         current_checkpoint,
                         tuple(item.input_id for item in admitted_inputs),
                         state.model_step_ordinal,
+                        definition.fingerprint,
                     )
                     event(
                         EventKind.tool_dispatch,

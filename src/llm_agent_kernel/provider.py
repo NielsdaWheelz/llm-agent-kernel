@@ -19,11 +19,11 @@ from provider_runtime.agent_runtime import (
     AgentRuntime,
     AgentSession,
     AgentSessionRef,
-    AgentSessionRequest,
     AgentTerminal,
     AgentText,
     AgentToolUse,
     AgentUsage,
+    CodexCatalogSessionRequest,
     ContentPart,
     JsonSchemaAgentOutput,
     NewSession,
@@ -361,20 +361,20 @@ class CodexProvider:
         definition: AgentDefinition,
         cwd: Path,
         saved_ref: AgentSessionRef | None,
-    ) -> AgentSessionRequest:
+    ) -> CodexCatalogSessionRequest:
         provider = definition.provider
         if provider.policy != CONTAINMENT_POLICY or provider.native != CODEX_NATIVE_OPTIONS:
             raise ProviderConfigurationError("definition does not use the v1 containment posture")
         if provider.additional_dirs or provider.mcp_servers or provider.policy.environment:
             raise ProviderConfigurationError("definition exposes forbidden provider resources")
-        return AgentSessionRequest(
-            backend="codex",
-            transport="sdk",
+        return CodexCatalogSessionRequest(
             auth=provider.auth,
             open=NewSession() if saved_ref is None else ResumeSession(saved_ref),
             cwd=os.fspath(cwd),
             policy=provider.policy,
-            model=provider.model,
+            model_key=provider.model_key,
+            agent_definition_revision=provider.agent_definition_revision,
+            row_fingerprint=provider.row_fingerprint,
             reasoning=provider.reasoning,
             system=(TextContent(KERNEL_BASE_INSTRUCTION), *provider.system),
             developer=provider.developer,

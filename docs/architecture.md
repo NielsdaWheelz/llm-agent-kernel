@@ -2,6 +2,15 @@
 
 ## System boundary
 
+The contained AgentRuntime architecture below remains one explicit protocol.
+[ADR 0008](decisions/0008-shared-generation-orchestration.md) adds the portable
+Nexus generation protocol in `generation.py`: native child dispatch, complete
+stream validation, durable decision acknowledgment, ordered tools, and exact
+continuation reopening. Host-specific native request/event payloads remain
+typed. Both protocols enforce original decisions before recoverable effects,
+ordered execution, cancellation boundaries, and honest terminal outcomes;
+neither owns application storage or a provider SDK.
+
 `llm-agent-kernel` coordinates four independently owned systems:
 
 ```text

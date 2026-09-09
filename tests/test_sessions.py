@@ -95,7 +95,10 @@ def _definition() -> AgentDefinition:
         maximum_profile=maximum,
         provider=ProviderConfiguration(
             auth=CredentialRef(kind="local_account", profile_key="main"),
-            model="gpt-5",
+            model_key="gpt-5",
+            reasoning="low",
+            agent_definition_revision="test-catalog-v1",
+            row_fingerprint="a" * 64,
         ),
         session_compatibility_revision="session-test-v1",
     )

@@ -166,7 +166,9 @@ def _definition(
         mode,
         StructuredOutput("answer", StructuredResult) if structured else ConversationalOutput(),
         maximum,
-        ProviderConfiguration(CredentialRef("local_account", "test"), "gpt-5"),
+        ProviderConfiguration(
+            CredentialRef("local_account", "test"), "gpt-5", "low", "test-catalog-v1", "a" * 64
+        ),
         "composed-test-v1",
         limits or KernelLimits(),
     )

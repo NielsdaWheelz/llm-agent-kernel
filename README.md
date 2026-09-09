@@ -8,7 +8,12 @@ observations, and durable host conclusions. Reasoning never grants authority:
 the native provider containment policy and the host-selected frozen
 `llm-tools` plan jointly define what a run can do.
 
-Jarvis is the first consumer, but the package is not Jarvis-specific.
+Jarvis uses the contained structured AgentRuntime protocol. Nexus uses the
+shared generation protocol: native child dispatch, durable terminal and
+continuation acknowledgment, ordered host tools, and explicit stopped outcomes.
+Native provider transports, application storage, and tool authority retain
+their existing owners. See [ADR 0008](docs/decisions/0008-shared-generation-orchestration.md)
+and [SPEC section 16](SPEC.md#16-shared-generation-protocol).
 
 ## Status
 
@@ -32,9 +37,12 @@ locators identify those algorithms as `plain-text-v2` and
 `html-visible-text-v2`; Web contracts, policy identities, kernel limits, and
 kernel orchestration behavior do not change.
 
-V1 uses the real subscription-backed
+The contained v1 protocol uses the real subscription-backed
 `provider_runtime.agent_runtime.AgentRuntime` lane. It does not use stateless
 generation, MCP application tools, or provider-native application tools.
+The separate `llm_agent_kernel.generation` protocol accepts typed native
+generation payloads through qualified host drivers; its bounded loop is shared
+without translating them into the contained v1 grammar.
 The corrected provider owns the Codex App Server byte stream while preserving
 the public `(backend="codex", transport="sdk")` route and exact
 `openai-codex==0.144.4` SDK/CLI pair. Native Code Mode is contained and detected,

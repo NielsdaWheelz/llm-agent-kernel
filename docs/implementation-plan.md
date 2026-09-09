@@ -3,6 +3,13 @@
 Implementation begins only after an explicit request. Each slice closes one
 boundary and passes its assigned acceptance criteria before the next begins.
 
+The 2026-09-09 Nexus implementation is authorized by ADR 0008. Slice 5 owns
+K053–K058: first establish the portable behavior reds, then move Nexus's
+native-child and ordered-tool choreography into `generation.py`, qualify the
+consumer adapters and durable stores, and remove the local duplicate loop.
+Preserve the full contained AgentRuntime suite throughout. The library suite
+does not replace consumer durability or paid/live qualification.
+
 ## Slice 0: dependency truth and package contract
 
 The pinned `llm-tools` revision provides:

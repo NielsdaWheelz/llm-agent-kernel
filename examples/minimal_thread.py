@@ -164,7 +164,13 @@ async def main() -> None:
         SessionMode.continuing,
         ConversationalOutput(),
         maximum,
-        ProviderConfiguration(CredentialRef("local_account", "example"), "scripted"),
+        ProviderConfiguration(
+            CredentialRef("local_account", "example"),
+            "scripted",
+            "low",
+            "scripted-catalog-v1",
+            "a" * 64,
+        ),
         "minimal-example-v1",
     )
 

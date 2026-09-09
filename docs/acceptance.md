@@ -308,6 +308,30 @@ assigned to exactly one implementation slice.
   fresh plus close/reopen/resumed sessions. No fresh Claude qualification is
   required when its provider implementation is unchanged.
 
+## Shared generation extension
+
+- **K053** — Typed native payloads cross portable generation ports without
+  application schema, provider SDK, tool-executor, or storage ownership moving
+  into the kernel. A fresh child starts at one; recovery starts from a
+  host-validated durable continuation.
+- **K054** — Admission refusal never arms a child. Arming occurs exactly once
+  before native dispatch evidence; any unknown, reordered, missing-terminal,
+  or post-terminal stream event prevents durable terminal acceptance.
+- **K055** — The whole stream is validated and its exact terminal/ordered
+  continuation committed before proposal/terminal acknowledgment and dependent
+  effects. Failed commit, acknowledgment, or continuation identity prevents
+  subsequent work.
+- **K056** — Ordered tools retain original arguments and correlation IDs;
+  existing host authority and llm-tools positions/recorders own effect identity
+  and replay. No automatic retry or later call follows an uncertain failure.
+- **K057** — Cancellation is checked between effect boundaries. Native
+  cancellation remains transport-owned; task cancellation closes the stream.
+  Cancelled/exhausted orchestration returns an explicit stopped outcome, never
+  synthetic native success. Absolute turn bounds survive resumption.
+- **K058** — Nexus durable-store integration qualifies atomic terminal and
+  continuation commit, exact recovery, effect reconciliation, and stopped parent
+  publication. Kernel fakes are not evidence of those production guarantees.
+
 ## Slice assignment
 
 | Slice | Acceptance IDs |
@@ -317,3 +341,4 @@ assigned to exactly one implementation slice.
 | 2 — strict serial protocol and tool boundary | K025–K036 |
 | 3 — polling, settlement, and admission | K037–K045 |
 | 4 — one-shot, assurance, and release | K046–K052 |
+| 5 — shared generation choreography | K053–K058 |

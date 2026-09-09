@@ -217,6 +217,9 @@ def _definition(
             ProviderConfiguration(
                 CredentialRef("local_account", "test"),
                 "gpt-5",
+                "low",
+                "test-catalog-v1",
+                "a" * 64,
             ),
             "kernel-test-v1",
             limits or KernelLimits(),
@@ -1359,6 +1362,7 @@ async def test_serial_dispatch_lineage_includes_mid_loop_input(tmp_path: Path) -
     assert len(dispatch.calls) == 1
     lineage = dispatch.calls[0].lineage
     assert isinstance(lineage, DispatchLineage)
+    assert lineage.definition_fingerprint == definition.fingerprint
     assert lineage.input_ids == (InputId("input-1"), InputId("input-2"))
     assert lineage.through_checkpoint == Checkpoint("checkpoint-2")
     appended = runtime.turns[1].input[0]
@@ -2183,7 +2187,9 @@ async def test_initial_read_tool_in_maximum_but_not_selected_plan_is_ungranted(
         SessionMode.isolated,
         StructuredOutput("answer", StructuredResult),
         maximum,
-        ProviderConfiguration(CredentialRef("local_account", "test"), "gpt-5"),
+        ProviderConfiguration(
+            CredentialRef("local_account", "test"), "gpt-5", "low", "test-catalog-v1", "a" * 64
+        ),
         "ungranted-test-v1",
     )
     runtime = _Runtime([])

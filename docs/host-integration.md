@@ -5,6 +5,17 @@ must implement persistence and product policy outside this package; replacing a
 store with an in-memory adapter changes the recovery guarantee and is not a
 deployment option for continuing effectful work.
 
+The shared generation protocol is specified separately in
+[SPEC section 16](../SPEC.md#16-shared-generation-protocol). Its host lifecycle
+must arm native children, atomically commit terminal and exact successor
+decision, and reopen the same canonical bytes under the current claim. Its
+observer must acknowledge events before dependent tools run. Resume must use
+the original durable decision and existing tool recorder positions. The host
+must atomically retire pending continuation and persist a distinct stopped
+parent outcome when the kernel returns `GenerationStopped`; it must preserve
+the real child terminal evidence. No in-memory lifecycle fake proves these
+obligations.
+
 ## Required durable facts
 
 The checkpoint store is canonical for ordered input, exclusive claim ownership,

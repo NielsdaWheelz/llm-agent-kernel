@@ -27,13 +27,13 @@ from provider_runtime.agent_runtime import (
     AgentRuntime,
     AgentSession,
     AgentSessionRef,
-    AgentSessionRequest,
     AgentTerminal,
     AgentTerminalStatus,
     AgentText,
     AgentToolUse,
     AgentUsage,
     ApprovalRequest,
+    CodexCatalogSessionRequest,
     CredentialRef,
     JsonSchemaAgentOutput,
     NewSession,
@@ -118,7 +118,10 @@ def _definition(mode: SessionMode = SessionMode.continuing) -> AgentDefinition:
         maximum_profile=maximum,
         provider=ProviderConfiguration(
             auth=CredentialRef(kind="local_account", profile_key="main"),
-            model="gpt-5",
+            model_key="gpt-5",
+            reasoning="low",
+            agent_definition_revision="test-catalog-v1",
+            row_fingerprint="a" * 64,
         ),
         session_compatibility_revision="provider-test-v1",
     )
@@ -126,7 +129,7 @@ def _definition(mode: SessionMode = SessionMode.continuing) -> AgentDefinition:
 
 class _RecordingRuntime:
     def __init__(self) -> None:
-        self.requests: list[AgentSessionRequest] = []
+        self.requests: list[CodexCatalogSessionRequest] = []
         self.scripts: list[tuple[AgentEvent, ...]] = []
         self.closed: list[AgentSession] = []
         self.stream_calls = 0
@@ -137,7 +140,7 @@ class _RecordingRuntime:
         self.stream_error: BaseException | None = None
         self.open_cwd_checks: list[tuple[bool, bool, int]] = []
 
-    async def open_session(self, request: AgentSessionRequest) -> AgentSession:
+    async def open_session(self, request: CodexCatalogSessionRequest) -> AgentSession:
         self.requests.append(request)
         cwd = Path(request.cwd)
         self.open_cwd_checks.append(
@@ -593,3 +596,38 @@ async def test_isolated_session_is_never_cached(tmp_path: Path) -> None:
 
     assert runtime.closed == [lease.session]
     assert not lease.cwd.exists()
+
+
+@pytest.mark.parametrize("mode", (SessionMode.continuing, SessionMode.isolated))
+async def test_catalog_selection_is_frozen_into_every_contained_session(
+    tmp_path: Path, mode: SessionMode
+) -> None:
+    runtime = _RecordingRuntime()
+    configuration = ProviderConfiguration(
+        auth=CredentialRef("local_account", "main"),
+        model_key="selected-model",
+        reasoning="low",
+        agent_definition_revision="catalog-revision",
+        row_fingerprint="a" * 64,
+    )
+    definition = replace(_definition(mode), provider=configuration)
+    provider = CodexProvider(_runtime(runtime), cwd_parent=tmp_path)
+    try:
+        if mode is SessionMode.continuing:
+            await provider.acquire_continuing(definition, None)
+        else:
+            await provider.open_isolated(definition)
+        request = runtime.requests[0]
+        assert request.model_key == configuration.model_key
+        assert request.reasoning == configuration.reasoning
+        assert request.agent_definition_revision == configuration.agent_definition_revision
+        assert request.row_fingerprint == configuration.row_fingerprint
+        assert (
+            replace(
+                definition,
+                provider=replace(configuration, row_fingerprint="b" * 64),
+            ).fingerprint
+            != definition.fingerprint
+        )
+    finally:
+        await provider.shutdown()

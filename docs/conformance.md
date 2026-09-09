@@ -5,6 +5,14 @@ static/API or documentation proof. `Consumer qualification` and `Paid live`
 identify obligations that this process-local library suite cannot honestly
 claim to prove.
 
+The generation extension has deterministic proof in `tests/test_generation.py`
+for K053–K057: exact ordered proposals, terminal-tail rejection, durable
+commit and observer acknowledgment before tools, correlation identity, original
+resume decisions, no implicit retries, cancellation, cleanup, and absolute
+turn exhaustion. K058 remains **consumer qualification** against Nexus's actual
+transactions, encrypted continuation records, recorder, and stopped outcomes.
+No paid/live calls are part of these tests.
+
 | Acceptance | Status | Primary evidence or remaining qualification |
 | --- | --- | --- |
 | K001 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies`; `test_import_has_no_filesystem_or_network_side_effect` |
