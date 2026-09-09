@@ -37,6 +37,12 @@ workflow system, tool platform, or persistent multi-agent graph.
 The distribution is `llm-agent-kernel`; applications import
 `llm_agent_kernel`. It supports Python 3.12 and newer.
 
+Importing `llm_agent_kernel.generation` MUST NOT initialize `llm_tools` or the
+contained structured-agent runtime. The existing flat `llm_agent_kernel` API
+retains its concrete exported objects and static types. Accessing that flat API
+or requesting its full export inventory initializes the structured-agent stack;
+dependency import failures therefore surface on that first access.
+
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:

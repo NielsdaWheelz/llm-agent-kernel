@@ -7,6 +7,9 @@ assigned to exactly one implementation slice.
 
 - **K001** — The package supports Python 3.12 or newer, imports as
   `llm_agent_kernel`, and performs no I/O or authority grant on import.
+  Importing `llm_agent_kernel.generation` does not initialize `llm_tools`;
+  the flat structured-agent API preserves its concrete types, exported objects,
+  and introspection when requested.
 - **K002** — Runtime locks qualified immutable git revisions of
   `provider-runtime` and `llm-tools` plus the exact Codex SDK/runtime version
   certified by the provider revision; ordinary CI never imports mutable sibling

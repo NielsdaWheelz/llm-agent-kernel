@@ -24,7 +24,7 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`
+  `8fde23ac56571a63c65cfcff55c73a0976f83eb4`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - provider-certified `openai-codex==0.144.4`
 
@@ -43,6 +43,9 @@ generation, MCP application tools, or provider-native application tools.
 The separate `llm_agent_kernel.generation` protocol accepts typed native
 generation payloads through qualified host drivers; its bounded loop is shared
 without translating them into the contained v1 grammar.
+Importing that submodule does not initialize `llm_tools`. The existing flat
+`llm_agent_kernel` API loads the structured-agent stack on first public-symbol
+access or full package introspection, preserving its exported types and objects.
 The corrected provider owns the Codex App Server byte stream while preserving
 the public `(backend="codex", transport="sdk")` route and exact
 `openai-codex==0.144.4` SDK/CLI pair. Native Code Mode is contained and detected,
