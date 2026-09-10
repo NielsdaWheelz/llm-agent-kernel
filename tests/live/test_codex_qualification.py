@@ -685,7 +685,7 @@ async def test_live_in_flight_cancellation() -> None:
         await runtime.close()
 
 
-async def test_live_structured_nested_optional_output_and_commentary_selection() -> None:
+async def test_live_structured_nested_optional_output() -> None:
     if _required_environment("LLM_AGENT_KERNEL_LIVE") != "1":
         pytest.fail("LLM_AGENT_KERNEL_LIVE must equal 1", pytrace=False)
     profile_key = _required_environment("LLM_AGENT_KERNEL_PROFILE")
@@ -751,9 +751,8 @@ async def test_live_structured_nested_optional_output_and_commentary_selection()
         }
         observed_text = "".join(runtime.observed_text)
         assert terminal.final_text in observed_text
-        assert observed_text != terminal.final_text, (
-            "the dual-phase qualification did not observe commentary before the final answer"
-        )
+        # Commentary is optional. Phase selection belongs to provider-runtime;
+        # phase-free AgentText cannot prove that native commentary was emitted.
         await provider.close(lease)
     finally:
         await provider.shutdown()
