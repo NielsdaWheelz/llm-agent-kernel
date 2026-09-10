@@ -47,10 +47,10 @@ completed Codex `final_answer` wins, the last phase-unknown completion is the
 fallback, and commentary is never executable. Provider-runtime owns that
 selection; the kernel does not concatenate or select messages.
 The qualified provider-runtime pin
-`7d2ddfc53c6b4341c475f0f55259a8751951aa9f` owns a WebSocket/Unix-socket
+`70e33e99a8c03f0304c9136203c38bade2c5e1cd` owns a WebSocket/Unix-socket
 connection to the externally supervised Codex App Server behind the stable
 `codex`/`sdk` route, strictly projects native authority including retained
-custom-exec, verifies exact server version `0.153.4`, and makes unknown protocol
+custom-exec, validates protocol shape without native-version admission, and makes unknown protocol
 a fatal `ProtocolDefect`. It owns no Codex process, account home, private SDK,
 or bundled binary.
 
@@ -73,7 +73,7 @@ Deliver:
 - The exact `AgentRuntime` open/stream/close adapter, not a synthetic stateless
   provider façade or the event-discarding `run_turn` convenience projection.
 - `JsonSchemaAgentOutput` mapping for one Codex-compatible closed-object wire
-  envelope over the exact pinned shared App Server protocol.
+  envelope over the audited shared App Server protocol.
 - Fully fingerprinted `AgentSessionRequest`, `PermissionPolicy`, native options,
   empty cwd lifecycle, and empty environment/MCP/network configuration. Default
   cwds remain private `0500`; explicit group sharing requires a setgid parent,

@@ -46,9 +46,9 @@ dependency import failures therefore surface on that first access.
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `7d2ddfc53c6b4341c475f0f55259a8751951aa9f`
+  `70e33e99a8c03f0304c9136203c38bade2c5e1cd`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
-- The externally supervised Codex App Server: exactly `0.153.4`
+- An externally supervised Codex App Server, updated by the host to latest stable.
 
 The provider owns the documented Codex App Server protocol over WebSocket on
 the configured Unix socket. The public `backend="codex", transport="sdk"`
@@ -58,23 +58,30 @@ environment and socket access. Neither kernel nor provider starts a server or
 owns its account home. The provider normalizes native cumulative accounting
 into invocation-local usage before the public agent-runtime boundary. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
-root `ProviderRuntime.generate` lane. The exact dependency and server pins
-prevent an unqualified transitive upgrade of the native protocol boundary.
+root `ProviderRuntime.generate` lane. Library dependencies remain exact Git
+pins. Native Codex is host-owned and has no version admission gate: the host
+resolves latest stable only during explicit install/update, not at invocation.
+Version-only apply preserves healthy servers; planned restart is explicit and
+may interrupt turns. Normal crash recovery may load the installed update.
+CLI/server versions may differ; compatibility is not presumed.
 
-The provider verifies server version `0.153.4` at initialization. In the disabled-
-builtins posture it classifies every documented App Server message and retained
+The provider validates initialization protocol shape, not native version
+equality. In the disabled-builtins posture it classifies audited App Server messages and retained
 custom-call shape. Native authority activity becomes typed tool or permission
 events; malformed, reordered, or unknown protocol becomes fatal
 `ProtocolDefect`. Native Code Mode is contained and detected, not proven absent
 before its first observable event. Strict protocol drift intentionally breaks
-availability until audited. A private read-only provider cwd prevents mutation
+availability until audited. A version observation is diagnostic, not evidence
+that an unseen release preserves containment. The one-user host accepts this
+upstream-breakage/repair trade-off without a compatibility reader or fallback.
+A private read-only provider cwd prevents mutation
 within that scope but is not by itself a host-confidentiality boundary.
 
 The same provider baseline defines `AgentTerminal.final_text` as the
 provider-selected authoritative assistant response rather than the
 concatenation of `AgentText` observations. For Codex, the last completed
 `phase=final_answer` message wins. If none exists, the last completed message
-with unknown phase is the compatibility fallback for the pinned server.
+with unknown phase is the audited native terminal-selection rule.
 Commentary is ineligible for terminal selection and MUST NOT be interpreted as
 executable structured output. Provider-runtime owns this message selection;
 the kernel MUST NOT duplicate it.

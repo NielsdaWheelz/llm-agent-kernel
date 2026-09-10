@@ -101,8 +101,8 @@ close_session(AgentSession)
 
 The adapter owns live-session leases, consumes and inspects every streamed
 event, and maps typed runtime terminals. Provider-runtime connects to an
-externally supervised Codex App Server over a configured Unix socket, verifies
-exact server version `0.153.4`, and owns neither its process nor its account
+externally supervised Codex App Server over a configured Unix socket, validates
+protocol shape without native-version admission, and owns neither its process nor its account
 home. It never uses the convenience `AgentRuntime.run_turn` projection because
 that method discards the event history required for containment. It publishes
 the kernel's Codex-compatible closed-object wire envelope through
@@ -141,7 +141,7 @@ Provider-runtime also owns authoritative assistant-message selection.
 `AgentTerminal.final_text` is the selected response, not the concatenation of
 `AgentText` observations. For Codex, the last completed
 `phase=final_answer` message wins; otherwise the last completed phase-unknown
-message is the pinned-protocol compatibility rule. Commentary is never eligible
+message is the audited native terminal-selection rule. Commentary is never eligible
 for terminal selection or structured execution. The kernel adds no selection
 or concatenation layer: it ignores `AgentText` for logical validation and uses
 only the successful terminal's independently validated structured value.
