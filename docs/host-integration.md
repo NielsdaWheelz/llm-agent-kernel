@@ -6,7 +6,7 @@ store with an in-memory adapter changes the recovery guarantee and is not a
 deployment option for continuing effectful work.
 
 For Codex, the host supplies provider-runtime revision
-`a14432276142872785b19460d4dc4a6d9650c8ff`, one
+`7d2ddfc53c6b4341c475f0f55259a8751951aa9f`, one
 absolute Unix-socket endpoint per credential profile, and an externally
 supervised App Server at exactly `0.153.4`. Provider-runtime connects to that
 service and never starts, kills, or owns it. There is no private Codex SDK,
@@ -19,6 +19,17 @@ one absolute setgid parent, construct `CodexProvider` with
 parent's group. The provider verifies inherited group ownership and publishes
 the child at mode `0750`; it neither creates the parent nor changes group
 membership.
+
+The shared generation protocol is specified separately in
+[SPEC section 16](../SPEC.md#16-shared-generation-protocol). Its host lifecycle
+must arm native children, atomically commit terminal and exact successor
+decision, and reopen the same canonical bytes under the current claim. Its
+observer must acknowledge events before dependent tools run. Resume must use
+the original durable decision and existing tool recorder positions. The host
+must atomically retire pending continuation and persist a distinct stopped
+parent outcome when the kernel returns `GenerationStopped`; it must preserve
+the real child terminal evidence. No in-memory lifecycle fake proves these
+obligations.
 
 ## Required durable facts
 
@@ -403,3 +414,29 @@ uv build
 uv run pip-audit
 git diff --check
 ```
+
+## Shared-kernel paid-decision cutover
+
+The current contract is [SPEC section 17](../SPEC.md#17-durable-paid-decisions).
+Thread calls supply the host-backed `decisions` journal. Isolated calls supply
+`DurableIsolatedDecisions(IsolatedDecisionScope(stable_operation_id), journal)`
+or explicitly `TransientModelDecisions()`. Historical migration examples above
+predate these required arguments and are not the current invocation contract.
+
+Persist original request and normalized terminal separately from native session
+references and Write actions. Restore original claim inputs/checkpoint/as-of
+before retries; consult armed uncertainty before no-progress limits. Preserve
+action recovery priority. Store existing typed role evidence atomically with
+the terminal and restore it for replay; do not parse prompt history as authority.
+
+`DispatchLineage` now requires definition fingerprint and model decision ID.
+Both model-derived lineages expose the exact accepted decision `position` for
+Read recorders. Initial Reads require the stable isolated operation ID and use
+a disjoint position. Recoverable BilledOnce reads need a durable llm-tools
+recorder. Write positions remain the host action IDs, admitted after existing
+policy/approval; the kernel model journal never replaces them.
+
+An exception after provider entry retains paid uncertainty, including a stop
+before the first provider event. Do not automatically release or redispatch it.
+This explicit availability cost prevents duplicate billing. No table here is
+an outbox, scheduler, approval system, or general-purpose workflow engine.

@@ -32,8 +32,6 @@ from provider_runtime.agent_runtime import (
     McpConfigurationError,
     McpUnavailable,
     SdkUnavailable,
-    SessionMismatch,
-    SessionUnavailable,
     TextContent,
     TurnNotStarted,
     UnsupportedCapability,
@@ -45,6 +43,7 @@ from .context import (
     ToolObservation,
     bootstrap_context,
     continuation_context,
+    recorded_model_context,
     run_context,
 )
 from .coordination import (
@@ -77,6 +76,19 @@ from .coordination import (
     ToolBudgetFactoryPort,
     ToolDispatchDefect,
     ToolDispatchPort,
+)
+from .decisions import (
+    DurableIsolatedDecisions,
+    IsolatedDecisionScope,
+    IsolatedModelDecisions,
+    ModelDecisionArmed,
+    ModelDecisionCompleted,
+    ModelDecisionDefect,
+    ModelDecisionJournal,
+    ModelDecisionRequest,
+    ModelDecisionScope,
+    ModelDecisionUncertain,
+    TransientModelDecisions,
 )
 from .definitions import (
     NO_RESULT,
@@ -200,6 +212,9 @@ class _RunState:
         self.output_usage_incomplete = False
         self.visible_bytes = 0
         self.model_step_ordinal = 0
+        self.model_decision_ordinal = 0
+        self.model_decision_id: str | None = None
+        self.pending_model_decision = False
         self.outcome_type: str | None = None
 
     def elapsed(self) -> float:
@@ -241,12 +256,13 @@ async def _claim_and_admit(
     owner_token: OwnerToken,
     definition: AgentDefinition,
     checkpoints: InputCheckpointPort,
+    decisions: ModelDecisionJournal,
     admission: AdmissionPort,
     budget_factory: ToolBudgetFactoryPort,
     cancellation: CancellationToken,
     state: _RunState,
     event: Callable[..., None],
-) -> tuple[InputClaim, AdmissionToken, BudgetState] | ThreadOutcome:
+) -> tuple[InputClaim, AdmissionToken, BudgetState, ModelDecisionCompleted | None] | ThreadOutcome:
     claim_result = await checkpoints.claim(thread_id, owner_token)
     if not isinstance(claim_result, ClaimNoWork | ClaimBusy | ClaimDeferred | ClaimAcquired):
         raise KernelConfigurationDefect("checkpoint port returned an unknown claim result")
@@ -263,6 +279,25 @@ async def _claim_and_admit(
     claim = claim_result.claim
     current_checkpoint = claim.through_checkpoint
     admitted_inputs = list(claim.inputs)
+
+    try:
+        recorded = await decisions.latest(ModelDecisionScope(thread_id, claim.inputs[0].input_id))
+        if isinstance(recorded, ModelDecisionArmed):
+            await _park_claim(checkpoints, claim, "paid model decision is uncertain")
+            event(EventKind.outcome, outcome_type="model_decision_uncertain")
+            return ThreadStopped(
+                state.metrics(consumed=False), ThreadStopKind.model_decision_uncertain
+            )
+        if recorded is not None:
+            if not isinstance(recorded, ModelDecisionCompleted):
+                raise ModelDecisionDefect("journal returned an unknown model decision")
+            _require_recorded_request(recorded.request, thread_id, definition, claim)
+    except (ModelDecisionDefect, TypeError, ValueError):
+        await _park_claim(checkpoints, claim, "model decision journal disagrees with claim")
+        return ThreadStopped(state.metrics(consumed=False), ThreadStopKind.configuration_error)
+    except BaseException:
+        await _release_claim(checkpoints, claim, "model decision lookup interrupted")
+        raise
 
     try:
         require_host_plan(claim.plan, definition.maximum_profile)
@@ -304,7 +339,7 @@ async def _claim_and_admit(
         event(EventKind.outcome, outcome_type=kind.value)
         return ThreadStopped(state.metrics(consumed=True), kind)
 
-    if claim.attempt_number > definition.limits.max_no_progress_attempts:
+    if recorded is None and claim.attempt_number > definition.limits.max_no_progress_attempts:
         return await early_stop(ThreadStopKind.provider_error, StopReason.provider_error)
 
     try:
@@ -344,6 +379,9 @@ async def _claim_and_admit(
         event(EventKind.outcome, outcome_type="deferred")
         return ThreadDeferred(state.metrics(consumed=False), result.until)
     if isinstance(result, AdmissionRejected):
+        if recorded is not None:
+            await _park_claim(checkpoints, claim, "admission rejected a recoverable model decision")
+            return ThreadStopped(state.metrics(consumed=False), ThreadStopKind.budget_exhausted)
         return await early_stop(ThreadStopKind.budget_exhausted, StopReason.budget_exhausted)
 
     token = result.token
@@ -356,7 +394,7 @@ async def _claim_and_admit(
             await admission.settle(token, AdmissionUsage(0, ProviderUsage(), state.elapsed()))
         event(EventKind.outcome, outcome_type="configuration_error")
         return ThreadStopped(state.metrics(consumed=False), ThreadStopKind.configuration_error)
-    return claim, token, budgets
+    return claim, token, budgets, recorded
 
 
 async def run_thread(
@@ -366,6 +404,7 @@ async def run_thread(
     owner_token: OwnerToken,
     definition: AgentDefinition,
     checkpoints: InputCheckpointPort,
+    decisions: ModelDecisionJournal,
     admission: AdmissionPort,
     sessions: SessionCoordinator,
     context_source: ContextSourcePort,
@@ -408,6 +447,7 @@ async def run_thread(
         owner_token=owner_token,
         definition=definition,
         checkpoints=checkpoints,
+        decisions=decisions,
         admission=admission,
         budget_factory=budget_factory,
         cancellation=cancellation,
@@ -416,17 +456,18 @@ async def run_thread(
     )
     if not isinstance(start, tuple):
         return start
-    claim, token, budgets = start
+    claim, token, budgets, replay = start
     current_checkpoint = claim.through_checkpoint
+    current_as_of = claim.as_of
     admitted_inputs = list(claim.inputs)
     session: ContinuingSessionState | None = None
-    appended_batches: list[tuple[tuple[HostInput, ...], datetime, Checkpoint]] = []
     pending_content: list[TextContent] = []
     previous_lease_usage = ProviderUsage()
     observations: list[ToolObservation] = []
     repairs = 0
-    dispatched = False
     speculative_session_discarded = False
+    canonical_content: list[str] = []
+    canonical_pending_prefix = 0
 
     async def release_claim(reason: str) -> None:
         await _release_claim(checkpoints, claim, reason)
@@ -489,7 +530,7 @@ async def run_thread(
         return ThreadStopped(state.metrics(consumed=False), ThreadStopKind.cancelled)
 
     async def poll() -> NoNewInput | AppendInputs | Preempt:
-        nonlocal current_checkpoint
+        nonlocal current_checkpoint, current_as_of
         result = await checkpoints.poll(claim, current_checkpoint)
         if isinstance(result, NoNewInput):
             return result
@@ -500,8 +541,8 @@ async def run_thread(
             raise KernelConfigurationDefect("checkpoint port returned an unknown poll result")
         _validate_append(result, current_checkpoint, admitted_inputs)
         current_checkpoint = result.new_checkpoint
+        current_as_of = result.new_as_of
         admitted_inputs.extend(result.inputs)
-        appended_batches.append((result.inputs, result.new_as_of, result.new_checkpoint))
         source = await context_source.continuation(
             definition,
             claim,
@@ -554,178 +595,230 @@ async def run_thread(
             ThreadStopKind.configuration_error,
         )
 
-    async def provider_turn(
-        remaining: float,
-    ) -> AgentTerminal | ThreadOutcome | None:
-        nonlocal previous_lease_usage, session
-        if session is None:
-            raise KernelConfigurationDefect("provider turn requires a live session")
-        state.provider_turns += 1
-        event(EventKind.provider_turn, provider_turn=state.provider_turns, phase="started")
-        emit_diagnostic(
-            diagnostics,
-            run_id,
-            DiagnosticKind.provider_input,
-            "\n".join(part.text for part in pending_content),
-        )
-        try:
-            terminal = await sessions.run_observed_turn(
-                session,
-                tuple(pending_content),
-                cancellation,
-                timeout_seconds=remaining,
-            )
-            pending_content.clear()
-            await account_session_usage()
-        except _PROVIDER_CONFIGURATION_ERRORS:
-            raise KernelConfigurationDefect(
-                "provider configuration cannot satisfy the definition"
-            ) from None
-        except (SessionMismatch, SessionUnavailable) as error:
-            await account_session_usage()
-            if cancellation.cancelled:
-                return await cancelled()
-            if not dispatched and session.fallback_available:
-                session = await sessions.cold_fallback(session, error)
-                previous_lease_usage = ProviderUsage()
-                source = await context_source.bootstrap(definition, claim)
-                projection = bootstrap_context(
-                    definition,
-                    claim.inputs,
-                    claim.as_of,
-                    claim.plan,
-                    source,
-                    prior_visible_bytes=state.visible_bytes,
-                    input_projection=input_projection,
-                )
-                state.visible_bytes = projection.cumulative_visible_bytes
-                pending_content[:] = [TextContent(projection.rendered)]
-                for batch, batch_as_of, batch_checkpoint in appended_batches:
-                    source = await context_source.continuation(
-                        definition,
-                        claim,
-                        batch,
-                        batch_checkpoint,
-                    )
-                    projection = continuation_context(
-                        definition,
-                        claim.plan,
-                        source,
-                        inputs=batch,
-                        as_of=batch_as_of,
-                        prior_visible_bytes=state.visible_bytes,
-                        input_projection=input_projection,
-                    )
-                    state.visible_bytes = projection.cumulative_visible_bytes
-                    pending_content.append(TextContent(projection.rendered))
-                return None
-            return await stop(ThreadStopKind.provider_error, StopReason.provider_error)
-        except TurnNotStarted as error:
-            state.provider_turns -= 1
-            await account_session_usage()
-            if error.reason == "cancelled":
-                return await cancelled()
-            return await stop(
-                ThreadStopKind.budget_exhausted,
-                StopReason.budget_exhausted,
-            )
-        except AgentRuntimeError:
-            await account_session_usage()
-            if cancellation.cancelled:
-                return await cancelled()
-            return await stop(ThreadStopKind.provider_error, StopReason.provider_error)
-
-        event(
-            EventKind.provider_turn,
-            provider_turn=state.provider_turns,
-            phase="finished",
-            status=terminal.status,
-        )
-        if terminal.status == "cancelled":
-            emit_diagnostic(
-                diagnostics,
-                run_id,
-                DiagnosticKind.provider_terminal,
-                terminal.final_text,
-            )
+    async def dispatch_step(step: ValidatedToolCall) -> ThreadOutcome | None:
+        if cancellation.cancelled:
             return await cancelled()
-        if terminal.status == "failed":
-            emit_diagnostic(
-                diagnostics,
-                run_id,
-                DiagnosticKind.provider_terminal,
-                terminal.final_text,
-            )
-            kind, reason = _failed_terminal_stop(terminal)
-            return await stop(kind, reason)
-        if terminal.status != "succeeded":
-            raise KernelConfigurationDefect("provider returned an unknown terminal status")
-
-        session = await sessions.store_terminal_ref(session, terminal)
-        emit_diagnostic(
-            diagnostics,
-            run_id,
-            DiagnosticKind.provider_terminal,
-            terminal.final_text,
-        )
+        before_dispatch = await poll()
+        if isinstance(before_dispatch, Preempt):
+            return await preempt()
+        if isinstance(before_dispatch, AppendInputs):
+            return None
+        if cancellation.cancelled:
+            return await cancelled()
         if _kernel_budget_exhausted(definition, state):
             return await stop(
                 ThreadStopKind.budget_exhausted,
                 StopReason.budget_exhausted,
             )
+        assert state.model_decision_id is not None
+        lineage = DispatchLineage(
+            claim.claim_id,
+            current_checkpoint,
+            tuple(item.input_id for item in admitted_inputs),
+            state.model_step_ordinal,
+            definition.fingerprint,
+            state.model_decision_id,
+        )
+        event(
+            EventKind.tool_dispatch,
+            tool_id=str(step.tool_id),
+            model_step_ordinal=state.model_step_ordinal,
+            plan_revision=claim.plan.plan_revision,
+            implementation_revision=step.binding.implementation_revision,
+        )
+        dispatch = await dispatcher.dispatch(
+            binding=step.binding,
+            validated_input=step.arguments,
+            plan=claim.plan,
+            budgets=budgets,
+            cancellation=cancellation,
+            lineage=lineage,
+        )
+        if isinstance(dispatch, DispatchSuspended):
+            if isinstance(await poll_before_settlement(), Preempt):
+                cancellation.cancel()
+                return await preempt()
+            await _settle_claim(
+                checkpoints,
+                claim,
+                current_checkpoint,
+                SuspensionConclusion(dispatch.host_ref, dispatch.waiting_for),
+            )
+            event(
+                EventKind.suspension,
+                waiting_for=dispatch.waiting_for.value,
+            )
+            state.outcome_type = "suspended"
+            return ThreadSuspended(
+                state.metrics(consumed=True),
+                dispatch.host_ref,
+                dispatch.waiting_for,
+            )
+        if not isinstance(dispatch, DispatchCompleted):
+            raise KernelConfigurationDefect("dispatcher returned an unknown result variant")
+        observations.append(
+            ToolObservation(
+                step.binding,
+                dispatch.result,
+                state.model_step_ordinal,
+            )
+        )
+        if cancellation.cancelled:
+            return await cancelled()
+        if isinstance(await poll(), Preempt):
+            return await preempt()
+        if cancellation.cancelled:
+            return await cancelled()
+        if _kernel_budget_exhausted(definition, state):
+            return await stop(
+                ThreadStopKind.budget_exhausted,
+                StopReason.budget_exhausted,
+            )
+        source = await context_source.continuation(
+            definition,
+            claim,
+            (),
+            current_checkpoint,
+        )
+        projection = continuation_context(
+            definition,
+            claim.plan,
+            source,
+            observations=(observations[-1],),
+            prior_visible_bytes=state.visible_bytes,
+        )
+        state.visible_bytes = projection.cumulative_visible_bytes
+        pending_content.append(TextContent(projection.rendered))
+        return None
+
+    async def provider_turn(
+        remaining: float,
+    ) -> AgentTerminal | ThreadOutcome | None:
+        nonlocal session, replay, canonical_pending_prefix
+        replayed = replay is not None
+        if replay is not None:
+            terminal = replay.terminal
+            state.model_decision_id = replay.request.decision_id
+            state.model_decision_ordinal = replay.request.ordinal
+            replay = None
+            pending_content.clear()
+        else:
+            if session is None:
+                session = await sessions.acquire_continuing(thread_id, definition, recovering=True)
+                state.visible_bytes += sum(
+                    len(part.text.encode()) for part in pending_content[:canonical_pending_prefix]
+                )
+                if cancellation.cancelled:
+                    return await cancelled()
+            canonical_content.extend(
+                part.text for part in pending_content[canonical_pending_prefix:]
+            )
+            canonical_pending_prefix = 0
+            _require_decision_context(definition, state.visible_bytes, canonical_content)
+            request = ModelDecisionRequest(
+                scope=ModelDecisionScope(thread_id, claim.inputs[0].input_id),
+                ordinal=state.model_decision_ordinal + 1,
+                definition_fingerprint=definition.fingerprint,
+                plan_revision=claim.plan.plan_revision,
+                input_ids=tuple(item.input_id for item in admitted_inputs),
+                through_checkpoint=current_checkpoint,
+                as_of=current_as_of,
+                model_step_ordinal_before=state.model_step_ordinal,
+                protocol_repairs=repairs,
+                canonical_content=tuple(canonical_content),
+                submitted_content=tuple(part.text for part in pending_content),
+            )
+            await decisions.arm(request)
+            state.pending_model_decision = True
+            if cancellation.cancelled:
+                await decisions.release_undispatched(request)
+                state.pending_model_decision = False
+                return await cancelled()
+            state.model_decision_ordinal += 1
+            state.provider_turns += 1
+            event(EventKind.provider_turn, provider_turn=state.provider_turns, phase="started")
+            emit_diagnostic(
+                diagnostics,
+                run_id,
+                DiagnosticKind.provider_input,
+                "\n".join(part.text for part in pending_content),
+            )
+            try:
+                terminal = await sessions.run_observed_turn(
+                    session,
+                    tuple(pending_content),
+                    cancellation,
+                    timeout_seconds=remaining,
+                )
+            except AgentRuntimeError as error:
+                await account_session_usage()
+                raise ModelDecisionUncertain("model dispatch lacks a durable terminal") from error
+            committed = await decisions.complete(request, terminal)
+            if committed != ModelDecisionCompleted(request, terminal):
+                raise ModelDecisionDefect("journal substituted a completed model decision")
+            state.pending_model_decision = False
+            state.model_decision_id = request.decision_id
+            pending_content.clear()
+            await account_session_usage()
+
+        canonical_content.append(recorded_model_context(terminal))
+        if replayed:
+            pending_content[:] = [TextContent(text) for text in canonical_content]
+            canonical_pending_prefix = len(pending_content)
+        event(
+            EventKind.provider_turn,
+            provider_turn=state.provider_turns,
+            phase="replayed" if replayed else "finished",
+            status=terminal.status,
+        )
+        if terminal.status == "cancelled":
+            return await cancelled()
+        if terminal.status == "failed":
+            kind, reason = _failed_terminal_stop(terminal)
+            return await stop(kind, reason)
+        if terminal.status != "succeeded":
+            raise KernelConfigurationDefect("provider returned an unknown terminal status")
+        if not replayed:
+            assert session is not None
+            session = await sessions.store_terminal_ref(session, terminal)
+        emit_diagnostic(diagnostics, run_id, DiagnosticKind.provider_terminal, terminal.final_text)
+        if _kernel_budget_exhausted(definition, state):
+            return await stop(ThreadStopKind.budget_exhausted, StopReason.budget_exhausted)
         return terminal
 
     try:
         try:
             if cancellation.cancelled:
                 return await cancelled()
-            session = await sessions.acquire_continuing(
+            if replay is not None:
+                state.model_step_ordinal = replay.request.model_step_ordinal_before
+                state.model_decision_ordinal = replay.request.ordinal - 1
+                repairs = replay.request.protocol_repairs
+            (
+                session,
+                canonical_content,
+                pending_content,
+                state.visible_bytes,
+            ) = await _thread_context(
                 thread_id,
                 definition,
-                recovering=claim.attempt_number > 1,
+                claim,
+                replay,
+                sessions,
+                context_source,
+                input_projection,
             )
-            if cancellation.cancelled:
-                return await cancelled()
-
-            if session.cold_bootstrap:
-                source = await context_source.bootstrap(definition, claim)
-                projection = bootstrap_context(
-                    definition,
-                    claim.inputs,
-                    claim.as_of,
-                    claim.plan,
-                    source,
-                    prior_visible_bytes=state.visible_bytes,
-                    input_projection=input_projection,
-                )
-            else:
-                source = await context_source.continuation(
-                    definition,
-                    claim,
-                    claim.inputs,
-                    claim.through_checkpoint,
-                )
-                projection = run_context(
-                    definition,
-                    claim.inputs,
-                    claim.as_of,
-                    claim.plan,
-                    source,
-                    prior_visible_bytes=state.visible_bytes,
-                    input_projection=input_projection,
-                )
-            state.visible_bytes = projection.cumulative_visible_bytes
-            pending_content.insert(0, TextContent(projection.rendered))
+            canonical_pending_prefix = len(pending_content)
 
             while True:
                 if cancellation.cancelled:
                     return await cancelled()
-                if state.provider_turns >= definition.limits.max_provider_turns:
+                if state.model_decision_ordinal >= definition.limits.max_provider_turns:
                     return await stop(
                         ThreadStopKind.budget_exhausted,
                         StopReason.budget_exhausted,
                     )
-                if isinstance(await poll(), Preempt):
+                if replay is None and isinstance(await poll(), Preempt):
                     return await preempt()
                 if cancellation.cancelled:
                     return await cancelled()
@@ -787,99 +880,9 @@ async def run_thread(
                 )
 
                 if isinstance(step, ValidatedToolCall):
-                    if cancellation.cancelled:
-                        return await cancelled()
-                    before_dispatch = await poll()
-                    if isinstance(before_dispatch, Preempt):
-                        return await preempt()
-                    if isinstance(before_dispatch, AppendInputs):
-                        continue
-                    if cancellation.cancelled:
-                        return await cancelled()
-                    if _kernel_budget_exhausted(definition, state):
-                        return await stop(
-                            ThreadStopKind.budget_exhausted,
-                            StopReason.budget_exhausted,
-                        )
-                    dispatched = True
-                    lineage = DispatchLineage(
-                        claim.claim_id,
-                        current_checkpoint,
-                        tuple(item.input_id for item in admitted_inputs),
-                        state.model_step_ordinal,
-                    )
-                    event(
-                        EventKind.tool_dispatch,
-                        tool_id=str(step.tool_id),
-                        model_step_ordinal=state.model_step_ordinal,
-                        plan_revision=claim.plan.plan_revision,
-                        implementation_revision=step.binding.implementation_revision,
-                    )
-                    dispatch = await dispatcher.dispatch(
-                        binding=step.binding,
-                        validated_input=step.arguments,
-                        plan=claim.plan,
-                        budgets=budgets,
-                        cancellation=cancellation,
-                        lineage=lineage,
-                    )
-                    if isinstance(dispatch, DispatchSuspended):
-                        if isinstance(await poll_before_settlement(), Preempt):
-                            cancellation.cancel()
-                            return await preempt()
-                        await _settle_claim(
-                            checkpoints,
-                            claim,
-                            current_checkpoint,
-                            SuspensionConclusion(dispatch.host_ref, dispatch.waiting_for),
-                        )
-                        event(
-                            EventKind.suspension,
-                            waiting_for=dispatch.waiting_for.value,
-                        )
-                        state.outcome_type = "suspended"
-                        return ThreadSuspended(
-                            state.metrics(consumed=True),
-                            dispatch.host_ref,
-                            dispatch.waiting_for,
-                        )
-                    if not isinstance(dispatch, DispatchCompleted):
-                        raise KernelConfigurationDefect(
-                            "dispatcher returned an unknown result variant"
-                        )
-                    observations.append(
-                        ToolObservation(
-                            step.binding,
-                            dispatch.result,
-                            state.model_step_ordinal,
-                        )
-                    )
-                    if cancellation.cancelled:
-                        return await cancelled()
-                    if isinstance(await poll(), Preempt):
-                        return await preempt()
-                    if cancellation.cancelled:
-                        return await cancelled()
-                    if _kernel_budget_exhausted(definition, state):
-                        return await stop(
-                            ThreadStopKind.budget_exhausted,
-                            StopReason.budget_exhausted,
-                        )
-                    source = await context_source.continuation(
-                        definition,
-                        claim,
-                        (),
-                        current_checkpoint,
-                    )
-                    projection = continuation_context(
-                        definition,
-                        claim.plan,
-                        source,
-                        observations=(observations[-1],),
-                        prior_visible_bytes=state.visible_bytes,
-                    )
-                    state.visible_bytes = projection.cumulative_visible_bytes
-                    pending_content.append(TextContent(projection.rendered))
+                    dispatched_outcome = await dispatch_step(step)
+                    if dispatched_outcome is not None:
+                        return dispatched_outcome
                     continue
 
                 if cancellation.cancelled:
@@ -914,8 +917,19 @@ async def run_thread(
                 state.outcome_type = "completed"
                 return ThreadCompleted(state.metrics(consumed=True))
         except asyncio.CancelledError:
+            if state.pending_model_decision:
+                await discard_speculative_session()
             await release_claim("kernel task cancelled")
             raise
+        except ModelDecisionUncertain:
+            try:
+                await discard_speculative_session()
+            finally:
+                await park_claim("paid model decision is uncertain")
+            state.outcome_type = ThreadStopKind.model_decision_uncertain.value
+            return ThreadStopped(
+                state.metrics(consumed=False), ThreadStopKind.model_decision_uncertain
+            )
         except _PROVIDER_CONFIGURATION_ERRORS:
             return await configuration_failure(
                 "provider configuration defect",
@@ -937,6 +951,7 @@ async def run_thread(
             ContextSourceDefect,
             ExecutorConfigurationDefect,
             KernelConfigurationDefect,
+            ModelDecisionDefect,
             PlanValidationError,
             PositionConflictDefect,
             ProviderDefect,
@@ -977,6 +992,61 @@ async def run_thread(
                 )
 
 
+async def _thread_context(
+    thread_id: ThreadId,
+    definition: AgentDefinition,
+    claim: InputClaim,
+    replay: ModelDecisionCompleted | None,
+    sessions: SessionCoordinator,
+    context_source: ContextSourcePort,
+    input_projection: InputProjectionRequest | None,
+) -> tuple[ContinuingSessionState | None, list[str], list[TextContent], int]:
+    if replay is not None:
+        canonical = list(replay.request.canonical_content)
+        return None, canonical, [TextContent(text) for text in canonical], 0
+    session = await sessions.acquire_continuing(
+        thread_id,
+        definition,
+        recovering=claim.attempt_number > 1,
+    )
+    try:
+        source = await context_source.bootstrap(definition, claim)
+        bootstrap = bootstrap_context(
+            definition,
+            claim.inputs,
+            claim.as_of,
+            claim.plan,
+            source,
+            input_projection=input_projection,
+        )
+        if session.cold_bootstrap:
+            projection = bootstrap
+        else:
+            source = await context_source.continuation(
+                definition,
+                claim,
+                claim.inputs,
+                claim.through_checkpoint,
+            )
+            projection = run_context(
+                definition,
+                claim.inputs,
+                claim.as_of,
+                claim.plan,
+                source,
+                input_projection=input_projection,
+            )
+        return (
+            session,
+            [bootstrap.rendered],
+            [TextContent(projection.rendered)],
+            projection.cumulative_visible_bytes,
+        )
+    except BaseException:
+        await sessions.release(session)
+        raise
+
+
 async def run_one_shot(
     *,
     run_id: RunId,
@@ -986,6 +1056,7 @@ async def run_one_shot(
     plan: FrozenToolPlan,
     source_sections: PromptSections,
     admission: AdmissionPort,
+    decisions: IsolatedModelDecisions,
     provider: ProviderSessionPort,
     dispatcher: ToolDispatchPort,
     budget_factory: ToolBudgetFactoryPort,
@@ -1041,6 +1112,32 @@ async def run_one_shot(
         state.outcome_type = "completed"
         return OneShotCompleted(state.metrics(consumed=False), result)
 
+    if not isinstance(decisions, DurableIsolatedDecisions | TransientModelDecisions):
+        raise TypeError("one-shot requires an explicit durable or transient decision policy")
+    journal = decisions.journal if isinstance(decisions, DurableIsolatedDecisions) else None
+    replay: ModelDecisionCompleted | None = None
+    if isinstance(decisions, DurableIsolatedDecisions):
+        recorded = await decisions.journal.latest(decisions.scope)
+        if isinstance(recorded, ModelDecisionArmed):
+            return stopped(ThreadStopKind.model_decision_uncertain)
+        if recorded is not None:
+            if not isinstance(recorded, ModelDecisionCompleted):
+                return stopped(ThreadStopKind.configuration_error)
+            request = recorded.request
+            if (
+                request.scope != decisions.scope
+                or request.definition_fingerprint != definition.fingerprint
+                or request.plan_revision != plan.plan_revision
+                or request.input_ids != tuple(item.input_id for item in inputs)
+                or request.as_of != as_of
+                or request.through_checkpoint is not None
+                or request.ordinal > definition.limits.max_provider_turns
+            ):
+                return stopped(ThreadStopKind.configuration_error)
+            replay = recorded
+            state.model_step_ordinal = request.model_step_ordinal_before
+            state.model_decision_ordinal = request.ordinal - 1
+
     projection = None
     if validated_initial_read is None:
         try:
@@ -1090,8 +1187,12 @@ async def run_one_shot(
         return stopped(ThreadStopKind.configuration_error)
     lease: ProviderSessionLease | None = None
     previous_lease_usage = ProviderUsage()
-    repairs = 0
+    repairs = 0 if replay is None else replay.request.protocol_repairs
     pending_content: list[TextContent] = []
+    canonical_content: list[str] = []
+    canonical_pending_prefix = 0
+    armed_request: ModelDecisionRequest | None = None
+    recovery_bootstrap_pending = replay is not None
 
     async def account_lease_usage() -> None:
         nonlocal previous_lease_usage
@@ -1105,11 +1206,16 @@ async def run_one_shot(
         try:
             if cancellation.cancelled:
                 return stopped(ThreadStopKind.cancelled)
-            if validated_initial_read is not None:
+            if validated_initial_read is not None and replay is None:
                 budgets = _create_tool_budget(budget_factory, plan)
                 if cancellation.cancelled:
                     return stopped(ThreadStopKind.cancelled)
-                lineage = InitialReadDispatchLineage(run_id)
+                lineage = InitialReadDispatchLineage(
+                    run_id,
+                    decisions.scope.operation_id
+                    if isinstance(decisions, DurableIsolatedDecisions)
+                    else f"transient:{run_id}",
+                )
                 event(
                     EventKind.tool_dispatch,
                     tool_id=str(validated_initial_read.binding.spec.id),
@@ -1152,35 +1258,100 @@ async def run_one_shot(
                     input_projection=input_projection,
                 )
                 state.visible_bytes = projection.cumulative_visible_bytes
-            assert projection is not None
-            assert budgets is not None
-            pending_content.append(TextContent(projection.rendered))
-            lease = await provider.open_isolated(definition)
+            if replay is not None:
+                canonical_content[:] = replay.request.canonical_content
+                pending_content[:] = [TextContent(text) for text in canonical_content]
+                state.visible_bytes = 0
+            else:
+                assert projection is not None
+                canonical_content.append(projection.rendered)
+                pending_content.append(TextContent(projection.rendered))
+            canonical_pending_prefix = len(pending_content)
+            if budgets is None:
+                budgets = _create_tool_budget(budget_factory, plan)
 
             while True:
                 if cancellation.cancelled:
                     return stopped(ThreadStopKind.cancelled)
-                if state.provider_turns >= definition.limits.max_provider_turns:
+                if state.model_decision_ordinal >= definition.limits.max_provider_turns:
                     return stopped(ThreadStopKind.budget_exhausted)
                 remaining = definition.limits.max_cooperative_seconds - state.elapsed()
                 if remaining <= 0:
                     return stopped(ThreadStopKind.budget_exhausted)
-                state.provider_turns += 1
-                event(EventKind.provider_turn, provider_turn=state.provider_turns, phase="started")
-                emit_diagnostic(
-                    diagnostics,
-                    run_id,
-                    DiagnosticKind.provider_input,
-                    "\n".join(part.text for part in pending_content),
-                )
-                terminal = await provider.run_observed_turn(
-                    lease,
-                    tuple(pending_content),
-                    cancellation,
-                    timeout_seconds=remaining,
-                )
-                pending_content.clear()
-                await account_lease_usage()
+                replayed = replay is not None
+                if replay is not None:
+                    terminal = replay.terminal
+                    state.model_decision_id = replay.request.decision_id
+                    state.model_decision_ordinal = replay.request.ordinal
+                    replay = None
+                    pending_content.clear()
+                else:
+                    if lease is None:
+                        if recovery_bootstrap_pending:
+                            state.visible_bytes += sum(
+                                len(part.text.encode())
+                                for part in pending_content[:canonical_pending_prefix]
+                            )
+                            recovery_bootstrap_pending = False
+                        lease = await provider.open_isolated(definition)
+                    canonical_content.extend(
+                        part.text for part in pending_content[canonical_pending_prefix:]
+                    )
+                    canonical_pending_prefix = 0
+                    _require_decision_context(definition, state.visible_bytes, canonical_content)
+                    current_request = ModelDecisionRequest(
+                        scope=decisions.scope
+                        if isinstance(decisions, DurableIsolatedDecisions)
+                        else IsolatedDecisionScope(f"transient:{run_id}"),
+                        ordinal=state.model_decision_ordinal + 1,
+                        definition_fingerprint=definition.fingerprint,
+                        plan_revision=plan.plan_revision,
+                        input_ids=tuple(item.input_id for item in inputs),
+                        through_checkpoint=None,
+                        as_of=as_of,
+                        model_step_ordinal_before=state.model_step_ordinal,
+                        protocol_repairs=repairs,
+                        canonical_content=tuple(canonical_content),
+                        submitted_content=tuple(part.text for part in pending_content),
+                    )
+                    state.model_decision_id = current_request.decision_id
+                    if isinstance(decisions, DurableIsolatedDecisions):
+                        armed_request = current_request
+                        await decisions.journal.arm(armed_request)
+                        if cancellation.cancelled:
+                            await decisions.journal.release_undispatched(armed_request)
+                            armed_request = None
+                            return stopped(ThreadStopKind.cancelled)
+                    state.provider_turns += 1
+                    state.model_decision_ordinal += 1
+                    event(
+                        EventKind.provider_turn, provider_turn=state.provider_turns, phase="started"
+                    )
+                    emit_diagnostic(
+                        diagnostics,
+                        run_id,
+                        DiagnosticKind.provider_input,
+                        "\n".join(part.text for part in pending_content),
+                    )
+                    terminal = await provider.run_observed_turn(
+                        lease,
+                        tuple(pending_content),
+                        cancellation,
+                        timeout_seconds=remaining,
+                    )
+                    if journal is not None and armed_request is not None:
+                        committed = await journal.complete(armed_request, terminal)
+                        if committed != ModelDecisionCompleted(armed_request, terminal):
+                            raise ModelDecisionDefect(
+                                "journal substituted a completed model decision"
+                            )
+                        armed_request = None
+                    pending_content.clear()
+                    await account_lease_usage()
+                canonical_content.append(recorded_model_context(terminal))
+                if replayed:
+                    pending_content[:] = [TextContent(text) for text in canonical_content]
+                    canonical_pending_prefix = len(pending_content)
                 event(
                     EventKind.provider_turn,
                     provider_turn=state.provider_turns,
@@ -1244,6 +1415,7 @@ async def run_one_shot(
                         plan_revision=plan.plan_revision,
                         implementation_revision=step.binding.implementation_revision,
                     )
+                    assert state.model_decision_id is not None
                     dispatch = await dispatcher.dispatch(
                         binding=step.binding,
                         validated_input=step.arguments,
@@ -1253,6 +1425,7 @@ async def run_one_shot(
                         lineage=IsolatedDispatchLineage(
                             run_id,
                             state.model_step_ordinal,
+                            state.model_decision_id,
                         ),
                     )
                     if isinstance(dispatch, DispatchSuspended):
@@ -1288,6 +1461,8 @@ async def run_one_shot(
             await account_lease_usage()
             return stopped(ThreadStopKind.configuration_error)
         except TurnNotStarted as error:
+            if armed_request is not None:
+                return stopped(ThreadStopKind.model_decision_uncertain)
             state.provider_turns -= 1
             await account_lease_usage()
             if error.reason == "cancelled":
@@ -1295,6 +1470,8 @@ async def run_one_shot(
             return stopped(ThreadStopKind.budget_exhausted)
         except AgentRuntimeError:
             await account_lease_usage()
+            if armed_request is not None:
+                return stopped(ThreadStopKind.model_decision_uncertain)
             if cancellation.cancelled:
                 return stopped(ThreadStopKind.cancelled)
             return stopped(ThreadStopKind.provider_error)
@@ -1304,6 +1481,7 @@ async def run_one_shot(
             ContextSourceDefect,
             ExecutorConfigurationDefect,
             KernelConfigurationDefect,
+            ModelDecisionDefect,
             PlanValidationError,
             PositionConflictDefect,
             ProviderDefect,
@@ -1337,6 +1515,32 @@ async def run_one_shot(
                     EventKind.outcome,
                     outcome_type=state.outcome_type or "interrupted",
                 )
+
+
+def _require_decision_context(
+    definition: AgentDefinition, visible_bytes: int, canonical: list[str]
+) -> None:
+    limit = definition.limits.max_new_context_bytes
+    if visible_bytes > limit or sum(len(text.encode()) for text in canonical) > limit:
+        raise ContextLimitExceeded("durable model context exceeds its bounded request limit")
+
+
+def _require_recorded_request(
+    request: ModelDecisionRequest,
+    thread_id: ThreadId,
+    definition: AgentDefinition,
+    claim: InputClaim,
+) -> None:
+    if (
+        request.scope != ModelDecisionScope(thread_id, claim.inputs[0].input_id)
+        or request.definition_fingerprint != definition.fingerprint
+        or request.plan_revision != claim.plan.plan_revision
+        or request.input_ids != tuple(item.input_id for item in claim.inputs)
+        or request.through_checkpoint != claim.through_checkpoint
+        or request.as_of != claim.as_of
+        or request.ordinal > definition.limits.max_provider_turns
+    ):
+        raise ModelDecisionDefect("durable decision authority or original claim changed")
 
 
 def _add_delta(total: int | None, current: int | None, previous: int | None) -> int | None:

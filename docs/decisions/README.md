@@ -9,3 +9,5 @@
 | [0005](0005-codex-agent-lane-and-serial-steps.md) | Use the Codex AgentRuntime lane and one serial tool step | Accepted |
 | [0006](0006-bound-work-across-runs.md) | Bound work across runs | Accepted |
 | [0007](0007-configuration-defect-parking.md) | Park configuration defects atomically | Accepted |
+| [0008](0008-shared-generation-orchestration.md) | Share ordered generation choreography with Nexus | Accepted |
+| [0009](0009-durable-paid-decisions.md) | Retain original paid decisions and uncertainty | Accepted |

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from llm_tools import BudgetState, FrozenToolPlan, PromptSections, ToolBinding
-from provider_runtime.agent_runtime import AgentSessionRef
+from provider_runtime.agent_runtime import AgentSessionRef, AgentTerminal
 
 from .cancellation import CancellationToken
 from .coordination import (
@@ -50,6 +50,15 @@ from .coordination import (
     StoredSessionRef,
     StoreSessionRefResult,
     ToolDispatchPort,
+)
+from .decisions import (
+    DecisionScope,
+    ModelDecisionArmed,
+    ModelDecisionCompleted,
+    ModelDecisionDefect,
+    ModelDecisionJournal,
+    ModelDecisionRecord,
+    ModelDecisionRequest,
 )
 from .definitions import (
     AgentDefinition,
@@ -532,10 +541,45 @@ class RecordingEventSink(EventSink):
         self.events.append(event)
 
 
+class InMemoryModelDecisionJournal(ModelDecisionJournal):
+    """Process-local contract fake; retain the instance to simulate a restart."""
+
+    def __init__(self) -> None:
+        self.records: dict[DecisionScope, list[ModelDecisionRecord]] = {}
+
+    async def latest(self, scope: DecisionScope) -> ModelDecisionRecord | None:
+        records = self.records.get(scope, [])
+        return records[-1] if records else None
+
+    async def arm(self, request: ModelDecisionRequest) -> None:
+        records = self.records.setdefault(request.scope, [])
+        expected = 1 if not records else records[-1].request.ordinal + 1
+        if request.ordinal != expected or (records and isinstance(records[-1], ModelDecisionArmed)):
+            raise ModelDecisionDefect("decision is already armed or its ordinal disagrees")
+        records.append(ModelDecisionArmed(request))
+
+    async def complete(
+        self, request: ModelDecisionRequest, terminal: AgentTerminal
+    ) -> ModelDecisionCompleted:
+        records = self.records.get(request.scope, [])
+        if not records or records[-1] != ModelDecisionArmed(request):
+            raise ModelDecisionDefect("completion does not match the armed decision")
+        result = ModelDecisionCompleted(request, terminal)
+        records[-1] = result
+        return result
+
+    async def release_undispatched(self, request: ModelDecisionRequest) -> None:
+        records = self.records.get(request.scope, [])
+        if not records or records[-1] != ModelDecisionArmed(request):
+            raise ModelDecisionDefect("undispatched release does not match the armed decision")
+        records.pop()
+
+
 __all__ = [
     "DispatchRecord",
     "InMemoryAdmissionPort",
     "InMemoryInputCheckpointPort",
+    "InMemoryModelDecisionJournal",
     "InMemorySessionRefPort",
     "RecordingEventSink",
     "ScriptedToolDispatchPort",

@@ -66,6 +66,7 @@ from llm_agent_kernel import (
     ThreadId,
     run_thread,
 )
+from llm_agent_kernel.fakes import InMemoryModelDecisionJournal
 
 
 def sections(kind: str, text: str) -> PromptSections:
@@ -164,7 +165,13 @@ async def main() -> None:
         SessionMode.continuing,
         ConversationalOutput(),
         maximum,
-        ProviderConfiguration(CredentialRef("local_account", "example"), "scripted"),
+        ProviderConfiguration(
+            CredentialRef("local_account", "example"),
+            "scripted",
+            "low",
+            "scripted-catalog-v1",
+            "a" * 64,
+        ),
         "minimal-example-v1",
     )
 
@@ -185,6 +192,7 @@ async def main() -> None:
         provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=Path(directory))
         try:
             outcome = await run_thread(
+                decisions=InMemoryModelDecisionJournal(),
                 run_id=RunId("run-1"),
                 thread_id=ThreadId("thread-1"),
                 owner_token=OwnerToken("owner-1"),

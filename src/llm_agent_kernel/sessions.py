@@ -8,8 +8,6 @@ from provider_runtime.agent_runtime import (
     AgentSessionRef,
     AgentTerminal,
     ContentPart,
-    SessionMismatch,
-    SessionUnavailable,
 )
 from provider_runtime.types import CancelSignal
 
@@ -28,10 +26,6 @@ class StaleSessionReference(SessionRefStateDefect):
     """Another owner changed session-reference state at a CAS boundary."""
 
 
-class ColdBootstrapUnavailable(SessionRefStateDefect):
-    """A continuing run is not eligible for another cold bootstrap."""
-
-
 @dataclass(frozen=True, slots=True)
 class ContinuingSessionState:
     """One thread run's live lease and next expected reference generation."""
@@ -42,7 +36,6 @@ class ContinuingSessionState:
     expected_generation: int | None
     stored_ref: AgentSessionRef | None
     cold_bootstrap: bool
-    fallback_available: bool
 
 
 class SessionCoordinator:
@@ -97,7 +90,6 @@ class SessionCoordinator:
             expected_generation=expected_generation,
             stored_ref=saved_ref,
             cold_bootstrap=lease.cold_bootstrap,
-            fallback_available=not lease.cold_bootstrap and not lease.fallback_used,
         )
 
     async def store_terminal_ref(
@@ -139,7 +131,6 @@ class SessionCoordinator:
             state,
             expected_generation=stored.generation,
             stored_ref=stored.ref,
-            fallback_available=False,
         )
 
     async def run_observed_turn(
@@ -159,45 +150,6 @@ class SessionCoordinator:
 
     async def accumulated_usage(self, state: ContinuingSessionState) -> ProviderUsage:
         return await self._provider.accumulated_usage(state.lease)
-
-    async def cold_fallback(
-        self,
-        state: ContinuingSessionState,
-        error: SessionMismatch | SessionUnavailable,
-    ) -> ContinuingSessionState:
-        if not isinstance(error, SessionMismatch | SessionUnavailable):
-            raise TypeError("cold fallback requires a resume incompatibility")
-        if not state.fallback_available:
-            raise ColdBootstrapUnavailable("the one safe cold bootstrap is not available")
-
-        if state.expected_generation is not None:
-            try:
-                result = await self._references.discard(
-                    state.thread_id,
-                    state.definition.fingerprint,
-                    state.expected_generation,
-                )
-            except BaseException:
-                await self._provider.discard(state.lease)
-                raise
-            if isinstance(result, StaleSessionRef):
-                await self._discard_for_stale(state)
-                raise StaleSessionReference(
-                    "session reference changed while preparing a cold bootstrap"
-                )
-            if not isinstance(result, DiscardedSessionRef):
-                await self._provider.discard(state.lease)
-                raise SessionRefStateDefect("session reference discard returned an unknown result")
-        await self._provider.discard(state.lease)
-        lease = await self._provider.acquire_continuing(state.definition, None)
-        return replace(
-            state,
-            lease=lease,
-            expected_generation=None,
-            stored_ref=None,
-            cold_bootstrap=True,
-            fallback_available=False,
-        )
 
     async def discard_before_replay(self, state: ContinuingSessionState) -> None:
         """Discard every ref that may name speculative provider history."""
@@ -241,7 +193,6 @@ class SessionCoordinator:
 
 
 __all__ = [
-    "ColdBootstrapUnavailable",
     "ContinuingSessionState",
     "SessionCoordinator",
     "StaleSessionReference",

@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import ast
+import json
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from typing import TYPE_CHECKING, assert_type
+
+if TYPE_CHECKING:
+    from llm_agent_kernel import AgentDefinition, DispatchLineage, ModelDecisionJournal
+    from llm_agent_kernel.decisions import ModelDecisionJournal as DefinedModelDecisionJournal
+    from llm_agent_kernel.definitions import AgentDefinition as DefinedAgentDefinition
+    from llm_agent_kernel.definitions import DispatchLineage as DefinedDispatchLineage
+
+    assert_type(AgentDefinition, type[DefinedAgentDefinition])
+    assert_type(DispatchLineage, type[DefinedDispatchLineage])
+    assert_type(ModelDecisionJournal, type[DefinedModelDecisionJournal])
 
 ROOT = Path(__file__).parents[1]
 
@@ -17,10 +29,10 @@ def test_package_metadata_locks_qualified_git_dependencies() -> None:
     assert project["project"]["requires-python"] == ">=3.12"
     assert project["project"]["dependencies"][:2] == [
         "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@9e6d155f3b64f03495911435b7cae8b8d131f9a2",
-        "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@a14432276142872785b19460d4dc4a6d9650c8ff",
+        "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@7d2ddfc53c6b4341c475f0f55259a8751951aa9f",
     ]
     assert packages["provider-runtime"]["source"]["git"].endswith(
-        "?rev=a14432276142872785b19460d4dc4a6d9650c8ff#a14432276142872785b19460d4dc4a6d9650c8ff"
+        "?rev=7d2ddfc53c6b4341c475f0f55259a8751951aa9f#7d2ddfc53c6b4341c475f0f55259a8751951aa9f"
     )
     assert packages["llm-tools"]["source"]["git"].endswith(
         "?rev=9e6d155f3b64f03495911435b7cae8b8d131f9a2#9e6d155f3b64f03495911435b7cae8b8d131f9a2"
@@ -43,6 +55,53 @@ def test_import_has_no_filesystem_or_network_side_effect(tmp_path: Path) -> None
         text=True,
     )
     assert list(tmp_path.iterdir()) == []
+
+
+def test_generation_import_does_not_initialize_the_tool_runtime(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            "import json, sys; import llm_agent_kernel.generation; "
+            "print(json.dumps(sorted(name for name in sys.modules "
+            "if name == 'llm_tools' or name.startswith('llm_tools.'))))",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout) == [], "generation imported the structured-agent tool runtime"
+
+
+def test_flat_public_api_preserves_exports_identity_and_introspection(tmp_path: Path) -> None:
+    script = """
+import typing
+import llm_agent_kernel
+from llm_agent_kernel import AgentDefinition, DispatchLineage, ModelDecisionJournal, run_thread
+from llm_agent_kernel.definitions import AgentDefinition as DefinedAgentDefinition
+from llm_agent_kernel.decisions import ModelDecisionJournal as DefinedModelDecisionJournal
+from llm_agent_kernel.kernel import run_thread as defined_run_thread
+
+assert AgentDefinition is DefinedAgentDefinition
+assert ModelDecisionJournal is DefinedModelDecisionJournal
+assert run_thread is defined_run_thread
+assert typing.get_type_hints(DispatchLineage)
+assert set(llm_agent_kernel.__all__) <= set(dir(llm_agent_kernel))
+from llm_agent_kernel import *
+for name in llm_agent_kernel.__all__:
+    assert globals()[name] is getattr(llm_agent_kernel, name), name
+assert not hasattr(llm_agent_kernel, "not_a_public_kernel_export")
+"""
+    subprocess.run(
+        [sys.executable, "-I", "-c", script],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_runtime_uses_no_private_dependency_imports() -> None:
