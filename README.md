@@ -24,9 +24,9 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `7d2ddfc53c6b4341c475f0f55259a8751951aa9f`
+  `70e33e99a8c03f0304c9136203c38bade2c5e1cd`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
-- an externally supervised Codex App Server at exactly `0.153.4`
+- an externally supervised Codex App Server, updated to latest stable by the host
 
 The `llm-tools` pin preserves the revisioned `web.search` whole-operation
 deadline and all of its v2 contract and policy identities. It also advances
@@ -49,11 +49,18 @@ access or full package introspection, preserving its exported types and objects.
 
 The provider attaches to the host-owned Codex App Server over its configured
 Unix socket while preserving the public `(backend="codex", transport="sdk")`
-route. It never spawns or terminates that shared service. The client verifies
-the exact `0.153.4` server version and fails closed on protocol drift. Native
+route. It never spawns or terminates that shared service. The client validates
+protocol shape, not a native version pin, and fails closed on protocol drift. Native
 Code Mode is contained and detected, not proven absent before its first
 observable event. An empty read-only cwd is not by itself a
 host-confidentiality boundary.
+
+Native Codex updates occur only through the host's existing install/update
+workflow. Version-only apply leaves healthy servers running; planned restart can
+interrupt turns and normal crash recovery may load the update. The installed
+CLI may be newer. Upstream breakage and prompt repair are
+accepted, not hidden by a compatibility parser or private fallback. Exact
+library dependency locks and containment checks remain mandatory.
 
 Every new, resumed, reconstructed, continuing, and isolated Codex session
 receives one kernel-owned base instruction before any application system
@@ -77,10 +84,10 @@ settlement conservatively retains its token reservation.
 
 `AgentTerminal.final_text` is the provider-selected authoritative assistant
 response, not a concatenation of streamed `AgentText` observations. For the
-pinned Codex route, the last completed `phase=final_answer` message wins; when
+Codex route, the last completed `phase=final_answer` message wins; when
 there is no such message, the last completed phase-unknown message is the
-compatibility fallback. Commentary remains observable provider output but is
-never executable structured output. The kernel continues to ignore
+audited native terminal-selection rule. Commentary remains observable provider
+output but is never executable structured output. The kernel continues to ignore
 `AgentText` for logical-step execution and independently validates only the
 terminal structured value.
 

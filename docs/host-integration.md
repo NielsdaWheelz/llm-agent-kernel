@@ -6,11 +6,19 @@ store with an in-memory adapter changes the recovery guarantee and is not a
 deployment option for continuing effectful work.
 
 For Codex, the host supplies provider-runtime revision
-`7d2ddfc53c6b4341c475f0f55259a8751951aa9f`, one
+`70e33e99a8c03f0304c9136203c38bade2c5e1cd`, one
 absolute Unix-socket endpoint per credential profile, and an externally
-supervised App Server at exactly `0.153.4`. Provider-runtime connects to that
+supervised App Server. Provider-runtime connects to that
 service and never starts, kills, or owns it. There is no private Codex SDK,
 bundled executable, account-home enrollment, or process fallback.
+
+The host's existing installer selects latest stable native Codex during explicit
+install/update. No invocation-time fetch or native-version admission gate exists.
+Library Git pins remain exact. Version-only apply leaves healthy servers running;
+planned restart may interrupt turns and normal crash recovery may load the update.
+Installed CLI and running servers can therefore differ.
+Versions are diagnostic, not proof of protocol compatibility or containment.
+Actual drift fails closed and requires an owning-boundary fix and proof.
 
 Kernel cognition directories are private `0500` by default. A host that needs a
 trusted local terminal client to enter the same empty directory must provision
@@ -341,7 +349,7 @@ checkpoint, action/recorder, admission, and delivery implementations under
 process termination at each boundary. It must also pin its compatibility-
 revision policy and qualify plan-aware budget construction against every
 selectable plan. Jarvis must run its paid Codex account qualification for the
-exact provider-runtime revision and shared App Server `0.153.4` on at least one
+exact provider-runtime revision and observed shared App Server on at least one
 currently supported local-account route, including conversational, structured
 nested/nullable result, commentary-plus-final-answer behavior when observed,
 JSON-string arguments, continuation, close/reopen/resume, invocation-local
@@ -352,13 +360,13 @@ timing, and trace identifiers. Provider-native
 transcripts remain unredacted third-party data at rest; deleting a local
 reference does not promise provider deletion.
 
-The `0.153.4` shared-server live qualification is `NOT_RUN` until explicitly
+The shared-server live qualification is `NOT_RUN` until explicitly
 authorized. Historical private-runtime results are not carried forward across
 this provider-facing boundary change.
 
 A dependency-only `llm-tools` propagation may carry that paid provider
-qualification forward only when the exact `provider-runtime` and App Server
-pins, kernel provider adapter, containment request, and structured-output wire
+qualification forward only when the exact `provider-runtime`, observed server
+build, kernel provider adapter, containment request, and structured-output wire
 are unchanged and the complete deterministic suite still passes. The
 `web.read` extraction propagation meets those conditions. Any provider-facing
 change requires the paid matrix to run again.

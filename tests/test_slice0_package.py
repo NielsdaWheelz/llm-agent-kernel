@@ -29,10 +29,10 @@ def test_package_metadata_locks_qualified_git_dependencies() -> None:
     assert project["project"]["requires-python"] == ">=3.12"
     assert project["project"]["dependencies"][:2] == [
         "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@9e6d155f3b64f03495911435b7cae8b8d131f9a2",
-        "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@7d2ddfc53c6b4341c475f0f55259a8751951aa9f",
+        "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@70e33e99a8c03f0304c9136203c38bade2c5e1cd",
     ]
     assert packages["provider-runtime"]["source"]["git"].endswith(
-        "?rev=7d2ddfc53c6b4341c475f0f55259a8751951aa9f#7d2ddfc53c6b4341c475f0f55259a8751951aa9f"
+        "?rev=70e33e99a8c03f0304c9136203c38bade2c5e1cd#70e33e99a8c03f0304c9136203c38bade2c5e1cd"
     )
     assert packages["llm-tools"]["source"]["git"].endswith(
         "?rev=9e6d155f3b64f03495911435b7cae8b8d131f9a2#9e6d155f3b64f03495911435b7cae8b8d131f9a2"
