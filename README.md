@@ -24,7 +24,7 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `70e33e99a8c03f0304c9136203c38bade2c5e1cd`
+  `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - an externally supervised Codex App Server, updated to latest stable by the host
 

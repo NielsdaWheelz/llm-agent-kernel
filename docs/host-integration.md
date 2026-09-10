@@ -6,11 +6,16 @@ store with an in-memory adapter changes the recovery guarantee and is not a
 deployment option for continuing effectful work.
 
 For Codex, the host supplies provider-runtime revision
-`70e33e99a8c03f0304c9136203c38bade2c5e1cd`, one
+`69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`, one
 absolute Unix-socket endpoint per credential profile, and an externally
 supervised App Server. Provider-runtime connects to that
 service and never starts, kills, or owns it. There is no private Codex SDK,
 bundled executable, account-home enrollment, or process fallback.
+
+This provider revision accepts native compaction's exact estimated-context
+report without charging it as usage. Cumulative accounting and containment stay
+strict. Qualify real same-thread automatic compaction and resumed usage on the
+observed native server; deterministic wire fixtures alone are not live evidence.
 
 The host's existing installer selects latest stable native Codex during explicit
 install/update. No invocation-time fetch or native-version admission gate exists.
@@ -377,6 +382,11 @@ local-account route. The continuation probe must prove same-lease per-turn
 addition and close/reopen/resume without historical recharge; the structured
 probe must exercise authoritative final-answer selection when commentary is
 observed; and the separately gated in-flight cancellation probe must also run.
+The structured-output probe requests commentary but does not require the model
+to emit it. Phase-free `AgentText` cannot prove a native phase transition;
+provider-runtime owns the separate native commentary/final-selection proof.
+Absence of commentary is not a structured-output failure or a dual-phase pass.
+
 Quota exhaustion runs only against a qualification profile that is already
 exhausted and MUST NOT be induced for release testing. The retired `gpt-5.4`
 local-account route is neither a release gate nor a permitted probe.

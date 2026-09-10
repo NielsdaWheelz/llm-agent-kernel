@@ -46,7 +46,7 @@ dependency import failures therefore surface on that first access.
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `70e33e99a8c03f0304c9136203c38bade2c5e1cd`
+  `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - An externally supervised Codex App Server, updated by the host to latest stable.
 
@@ -56,7 +56,10 @@ literal names this route; it does not select a bundled SDK or private server.
 The host deployment owns server installation, supervision, account enrollment,
 environment and socket access. Neither kernel nor provider starts a server or
 owns its account home. The provider normalizes native cumulative accounting
-into invocation-local usage before the public agent-runtime boundary. V1 selects only
+into invocation-local usage before the public agent-runtime boundary. It distinguishes
+native compaction's synthetic context estimate from actual cumulative usage;
+estimates are not charged. Compaction remains native-owned, without a new kernel
+accounting or lifecycle API. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
 root `ProviderRuntime.generate` lane. Library dependencies remain exact Git
 pins. Native Codex is host-owned and has no version admission gate: the host
