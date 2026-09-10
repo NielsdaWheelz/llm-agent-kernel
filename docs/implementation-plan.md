@@ -46,10 +46,13 @@ authoritative assistant response. `AgentText` is observational, the last
 completed Codex `final_answer` wins, the last phase-unknown completion is the
 fallback, and commentary is never executable. Provider-runtime owns that
 selection; the kernel does not concatenate or select messages.
-The corrected pin directly owns the Codex App Server stream behind the stable
+The qualified provider-runtime pin
+`7d2ddfc53c6b4341c475f0f55259a8751951aa9f` owns a WebSocket/Unix-socket
+connection to the externally supervised Codex App Server behind the stable
 `codex`/`sdk` route, strictly projects native authority including retained
-custom-exec, and makes unknown protocol a fatal `ProtocolDefect` without
-changing the exact Codex 0.144.4 Python/CLI pair.
+custom-exec, verifies exact server version `0.153.4`, and makes unknown protocol
+a fatal `ProtocolDefect`. It owns no Codex process, account home, private SDK,
+or bundled binary.
 
 Then deliver:
 
@@ -70,10 +73,11 @@ Deliver:
 - The exact `AgentRuntime` open/stream/close adapter, not a synthetic stateless
   provider façade or the event-discarding `run_turn` convenience projection.
 - `JsonSchemaAgentOutput` mapping for one Codex-compatible closed-object wire
-  envelope, with the provider-certified Codex SDK/runtime version pinned
-  directly by the distribution.
+  envelope over the exact pinned shared App Server protocol.
 - Fully fingerprinted `AgentSessionRequest`, `PermissionPolicy`, native options,
-  private cwd lifecycle, and empty environment/MCP/network configuration.
+  empty cwd lifecycle, and empty environment/MCP/network configuration. Default
+  cwds remain private `0500`; explicit group sharing requires a setgid parent,
+  inherited group ownership, and mode `0750`.
 - One bounded kernel-owned structured-agent base instruction before application
   system material, with immutable revision/digest fingerprint coverage and
   automatic cold-bootstrap rotation.

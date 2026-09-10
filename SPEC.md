@@ -46,22 +46,22 @@ dependency import failures therefore surface on that first access.
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `8fde23ac56571a63c65cfcff55c73a0976f83eb4`
+  `7d2ddfc53c6b4341c475f0f55259a8751951aa9f`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
-- The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
+- The externally supervised Codex App Server: exactly `0.153.4`
 
-The provider baseline owns the documented Codex App Server stdio protocol
-directly while preserving the public `backend="codex", transport="sdk"`
-compatibility route. It normalizes any provider-native cumulative accounting
+The provider owns the documented Codex App Server protocol over WebSocket on
+the configured Unix socket. The public `backend="codex", transport="sdk"`
+literal names this route; it does not select a bundled SDK or private server.
+The host deployment owns server installation, supervision, account enrollment,
+environment and socket access. Neither kernel nor provider starts a server or
+owns its account home. The provider normalizes native cumulative accounting
 into invocation-local usage before the public agent-runtime boundary. V1 selects only
 `provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
-root `ProviderRuntime.generate` lane. The kernel distribution directly pins the
-Codex SDK version certified by that immutable provider revision so a later
-transitive release cannot silently invalidate the native-tool containment
-qualification.
+root `ProviderRuntime.generate` lane. The exact dependency and server pins
+prevent an unqualified transitive upgrade of the native protocol boundary.
 
-The corrected provider requires the `openai-codex` Python package, CLI bundle,
-and executable-reported version to remain exactly `0.144.4`. In the disabled-
+The provider verifies server version `0.153.4` at initialization. In the disabled-
 builtins posture it classifies every documented App Server message and retained
 custom-call shape. Native authority activity becomes typed tool or permission
 events; malformed, reordered, or unknown protocol becomes fatal
@@ -74,7 +74,7 @@ The same provider baseline defines `AgentTerminal.final_text` as the
 provider-selected authoritative assistant response rather than the
 concatenation of `AgentText` observations. For Codex, the last completed
 `phase=final_answer` message wins. If none exists, the last completed message
-with unknown phase is the compatibility fallback for the pinned SDK.
+with unknown phase is the compatibility fallback for the pinned server.
 Commentary is ineligible for terminal selection and MUST NOT be interpreted as
 executable structured output. Provider-runtime owns this message selection;
 the kernel MUST NOT duplicate it.
@@ -139,7 +139,7 @@ schema compilation, prompt-section rendering, or recorder semantics.
 
 ### 3.1 Provider-runtime owns
 
-- Codex local-account authentication.
+- Subscription-backed access through the host-enrolled Codex account.
 - Native session creation, resume, turns, interruption, references, and close.
 - Session-scoped `PermissionPolicy`, native options, model, reasoning, cwd, and
   structured-output lowering.
@@ -150,7 +150,8 @@ schema compilation, prompt-section rendering, or recorder semantics.
   failures.
 - Projection of provider-native cumulative accounting into progressive,
   invocation-local usage without charging restored historical usage.
-- Child process, private state-root, environment, and sandbox lifecycle.
+- Protocol connection, native session policy, and subscription closure; closing
+  a client never terminates the shared server or unrelated threads.
 
 ### 3.2 llm-tools owns
 
@@ -374,9 +375,11 @@ tools. `mcp_servers` MUST be empty.
 
 The Codex request MUST use:
 
-- `backend = "codex"` and the qualified SDK transport.
+- `backend = "codex"`, `transport = "sdk"`, and the configured shared Unix socket.
 - Local-account credential reference.
-- A private empty absolute cwd with read-only filesystem policy.
+- An empty absolute cwd with read-only filesystem policy: private `0500`, or
+  explicit group-shared `0750` beneath the host-provisioned setgid parent with
+  inherited group ownership verified.
 - No additional directories.
 - Network disabled.
 - Approval mode `deny`.
@@ -385,7 +388,7 @@ The Codex request MUST use:
   separately setting `CodexNativeOptions(builtin_tools="disabled")`.
 - Native Web search disabled.
 
-The sentinel reflects a limitation in Codex's public SDK; it is not authority.
+The sentinel is the pinned provider-runtime request contract; it is not authority.
 Safety is the conjunction of native-feature disablement, empty read-only cwd,
 disabled network/environment, denial of provider approval, and host refusal to
 accept native tool activity.

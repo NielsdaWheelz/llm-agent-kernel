@@ -16,7 +16,7 @@ No paid/live calls are part of these tests.
 | Acceptance | Status | Primary evidence or remaining qualification |
 | --- | --- | --- |
 | K001 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies`; `test_import_has_no_filesystem_or_network_side_effect`; `test_generation_import_does_not_initialize_the_tool_runtime`; `test_flat_public_api_preserves_exports_identity_and_introspection` |
-| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks exact provider-runtime `8fde23ac56571a63c65cfcff55c73a0976f83eb4`, unchanged llm-tools, and `openai-codex==0.144.4`; `uv.lock` changes only the provider source revision. `test_slice0_contracts.py::test_dependency_provider_event_contracts_are_exact`, `test_dependency_web_search_operation_deadline_api_is_revisioned`, `test_dependency_web_read_revision_refreezes_exact_host_table_plan`, and `test_dependency_web_read_v2_extraction_locators_are_exact` exercise the exact public provider and Web APIs and identities. |
+| K002 | Deterministic | `test_slice0_package.py::test_package_metadata_locks_qualified_git_dependencies` checks exact provider-runtime `7d2ddfc53c6b4341c475f0f55259a8751951aa9f`, the immutable llm-tools revision, absence of retired private Codex packages, and the direct WebSocket client required by the shared `0.153.4` App Server route. `test_slice0_contracts.py::test_dependency_provider_event_contracts_are_exact`, `test_dependency_web_search_operation_deadline_api_is_revisioned`, `test_dependency_web_read_revision_refreezes_exact_host_table_plan`, and `test_dependency_web_read_v2_extraction_locators_are_exact` exercise the exact public provider and Web APIs and identities. |
 | K003 | Deterministic | `test_slice0_contracts.py::test_dependency_pure_validation_and_host_table_publication`; `test_dependency_rejects_cross_catalog_implementation_substitution`; `test_dependency_web_search_operation_deadline_api_is_revisioned`; `test_dependency_web_read_revision_refreezes_exact_host_table_plan`; `test_dependency_web_read_v2_extraction_locators_are_exact`; `test_tools.py::test_redispatchable_write_timeout_requires_host_reconciliation_before_retry` |
 | K004 | Deterministic | `test_tools.py::test_tool_validation_is_pure_strict_and_uses_the_plan_owned_binding`; `test_protocol.py::test_invalid_tool_input_is_one_protocol_failure_before_dispatch` |
 | K005 | Deterministic | `test_slice0_package.py::test_runtime_uses_no_private_dependency_imports`; `test_kernel_does_not_reimplement_llm_tools_owners` |
@@ -24,7 +24,7 @@ No paid/live calls are part of these tests.
 | K007 | Contract + consumer qualification | The fakes identify themselves as process-local test doubles; `docs/host-integration.md` enumerates the durable host facts. A real consumer must qualify its stores. |
 | K008 | Deterministic | `test_slice0_package.py::test_production_never_calls_event_discarding_run_turn_projection`; `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn`; `test_kernel.py::test_commentary_agent_text_never_reaches_logical_validation_or_dispatch` |
 | K009 | Deterministic | `test_protocol.py::test_conversational_provider_schema_is_one_closed_required_object`; `test_structured_provider_schema_requires_optional_and_nested_fields`; `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown`; `test_kernel.py::test_whole_step_repair_is_effect_free_and_bounded` |
-| K010 | Deterministic | `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown`; `test_every_new_resumed_threaded_and_isolated_session_replaces_the_coding_prompt`; `test_reconstructed_session_keeps_the_kernel_base_instruction` check the complete containment request, private cwd, mandatory first system value, separate application material, and every open/resume path. |
+| K010 | Deterministic | `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown`; `test_explicit_shared_runtime_cwd_is_empty_and_group_readable`; `test_every_new_resumed_threaded_and_isolated_session_replaces_the_coding_prompt`; `test_reconstructed_session_keeps_the_kernel_base_instruction` check the complete containment request, default-private and explicit group-shared cwd modes, mandatory first system value, separate application material, and every open/resume path. |
 | K011 | Deterministic | `test_provider.py::test_exact_request_mapping_private_cwd_cache_and_shutdown` checks the pinned sentinel while `test_tools.py::test_host_plan_proof_precedes_exact_dependency_publication` proves application authority comes from the plan. |
 | K012 | Deterministic | `test_provider.py::test_native_authority_event_discards_without_returning_terminal`; `test_runtime_error_kinds_remain_distinct_and_close_the_session`; `test_kernel.py::test_native_authority_event_fail_stops_without_host_action`; `test_provider_protocol_defect_discards_without_terminal_or_host_effect`; `test_inert_provider_observation_still_allows_terminal_conclusion` cover retained custom-exec, a terminal after authority, fatal `ProtocolDefect`, zero host action/conclusion, and inert observations. |
 | K013 | Deterministic | `test_provider.py::test_observed_turn_uses_latest_snapshot_terminal_precedence_and_one_add_per_turn`; `test_observed_turn_uses_latest_progressive_snapshot_when_terminal_usage_is_absent`; `test_resumed_session_charges_only_invocation_local_usage`; `test_missing_later_turn_usage_makes_the_run_total_unavailable`; `test_typed_non_success_terminal_is_preserved_and_session_is_closed`; `test_kernel.py::test_commentary_agent_text_never_reaches_logical_validation_or_dispatch`; `test_six_turn_resumed_session_settles_invocation_local_usage_once_per_turn` |
@@ -66,7 +66,7 @@ No paid/live calls are part of these tests.
 | K049 | Contract | `SECURITY.md` and `docs/host-integration.md` state the third-party transcript/deletion limits, behavioral-not-authority prompt boundary, Code Mode detection limit, intentional availability failure on drift, and read-only-versus-confidentiality boundary. |
 | K050 | Deterministic library injection + consumer qualification | `test_kernel.py::test_claim_reservation_and_release_defects_never_reach_provider`; `test_mismatched_claimed_plan_budget_parks_before_rendering_or_io`; `test_checkpoint_boundary_rejects_unknown_closed_results`; `test_stale_session_cas_permits_no_dispatch_or_settlement`; `test_dispatch_and_checkpoint_defects_park_without_fabricated_success`; `test_usage_settlement_defect_is_not_hidden_after_canonical_conclusion`; `test_initial_read_dispatch_defects_settle_admission_and_open_no_provider`; `tests/test_sessions.py::test_unknown_session_ref_results_fail_closed_before_semantic_action`; provider terminal/native failures and suspension are separately injected. Recorder/effect-commit and durable-store process-death injection must be repeated against the consumer implementations. |
 | K051 | Deterministic library seam + consumer qualification | `test_composed_conformance.py` covers suspension/resolution, billed-once rerun, poison/no-rearm, orphan recovery/attempt two, finalization/follow-up, post-terminal preemption/recovery, appended steering followed by no-work, and an explicit three-claim progression through the attempt ceiling. Production durable-store process-death races remain consumer qualifications. |
-| K052 | Deterministic contract + opt-in paid probes | `test_slice0_package.py::test_production_never_calls_event_discarding_run_turn_projection`; opt-in `tests/live/test_codex_qualification.py::test_live_codex_stream_continuation_and_cancellation`; `test_live_synthetic_read_call_observation_and_close_reopen_resume`; `test_live_adversarial_shell_is_structured_or_contained_without_host_effect`; `test_live_structured_nested_optional_output_and_commentary_selection`; `test_live_one_shot_uses_initial_read_before_first_provider_turn`; `test_live_json_encoded_tool_arguments`; `test_live_in_flight_cancellation`; `test_live_quota_exhaustion`. The current route is `gpt-5.6-terra`; retired `gpt-5.4` is not invoked. Continuation proves same-lease addition and close/reopen/resume without historical recharge; synthetic Read proves natural language `call_tool`, typed next-turn observation use, and no native exec; the adversarial probe requires structured containment or a fatal zero-host-effect stop; the structured and initial-Read probes retain their prior obligations. Ordinary CI neither runs paid probes nor records private payloads; quota requires its additional gate and an already-exhausted profile. No fresh Claude run is required for this Codex-only provider change. |
+| K052 | Deterministic contract; shared-server live gate `NOT_RUN` | `test_slice0_package.py::test_production_never_calls_event_discarding_run_turn_projection`; opt-in `tests/live/test_codex_qualification.py::test_live_codex_stream_continuation_and_cancellation`; `test_live_synthetic_read_call_observation_and_close_reopen_resume`; `test_live_adversarial_shell_is_structured_or_contained_without_host_effect`; `test_live_structured_nested_optional_output_and_commentary_selection`; `test_live_one_shot_uses_initial_read_before_first_provider_turn`; `test_live_json_encoded_tool_arguments`; `test_live_in_flight_cancellation`; `test_live_quota_exhaustion`. The probes require the exact external `0.153.4` Unix-socket endpoint and explicit group-shared cognition parent. Ordinary CI neither runs paid probes nor records private payloads. The shared-server gate requires explicit approval and is not satisfied by earlier private-runtime evidence. |
 
 The dependency timeout test specifically proves that `Write` plus
 `ReDispatchable` returns `RecoveryRequired` after timeout and remains blocked
@@ -80,7 +80,7 @@ public Web API and extraction canaries, the recomposed v2 `web.read` HostTable
 publication, and the fetched dependency suite. The `web.read` implementation and
 extraction locator identities rotate, while its contract and policy identities
 and all `web-search-v2` identities remain unchanged. No kernel source,
-`provider-runtime`, `openai-codex`, provider adapter, request containment, or
+`provider-runtime`, shared App Server version, provider adapter, request containment, or
 structured-output wire changes. The paid `gpt-5.6-terra` and `gpt-5.4`
 qualification recorded for that unchanged provider surface was applicable to
 that historical release. Current route requirements are governed by K052.
@@ -96,7 +96,7 @@ turn; its lease total spans kernel turns but never resumed history. The six-turn
 resumed-session integration settles within an exactly sized reservation, and
 missing usage retains the token reservation. No kernel runtime, persistence,
 session-reference, authority, containment, replay, recovery, provider request,
-structured-output wire, `llm-tools`, or Codex SDK change is introduced; existing
+structured-output wire, `llm-tools`, or App Server protocol change is introduced; existing
 native sessions remain compatible without a compatibility-revision rotation.
 
 Paid release qualification on 2026-09-04 passed the conversational
@@ -118,7 +118,7 @@ phase-unknown completion is the fallback, and commentary is never executable.
 The unchanged kernel adapter neither concatenates nor selects `AgentText`; only
 the independently validated terminal structured value can become a model step.
 No kernel runtime, provider wire, authority, containment, usage, recovery,
-persistence, session-reference, `llm-tools`, or Codex SDK change is introduced,
+persistence, session-reference, `llm-tools`, or App Server protocol change is introduced,
 and existing native sessions remain compatible without a kernel compatibility
 rotation.
 
@@ -172,11 +172,11 @@ No already-exhausted qualification profile was supplied, so quota exhaustion
 was not run and no account was deliberately exhausted.
 
 The sealed structured-agent instruction release from kernel
-`09a1af093479aa92f3e783f4b4a7cc38e301a4a7` pins provider-runtime
-`8fde23ac56571a63c65cfcff55c73a0976f83eb4` while preserving llm-tools
-`9e6d155f3b64f03495911435b7cae8b8d131f9a2` and both Codex packages at
-`0.144.4`. The 682-byte kernel base instruction replaces the coding-agent base
-prompt before application system material. Identity
+`09a1af093479aa92f3e783f4b4a7cc38e301a4a7` used the retired private Codex
+`0.144.4` lane. Its containment evidence is historical and does not qualify the
+current shared `0.153.4` App Server boundary. The 682-byte kernel base
+instruction replaces the coding-agent base prompt before application system
+material. Identity
 `llm-agent-kernel-contained-structured-agent-v1:sha256:1817c90f24bf9149f20f94b69f825d9be0b78df8bb46b1d24ed2691cf71b80e7`
 rotates every definition fingerprint and saved-session namespace without a
 consumer compatibility bump. Deterministic evidence covers empty and hostile
@@ -191,7 +191,7 @@ but did not pass as a whole: two unrelated platform-sensitive checks failed on
 recorded rather than counted as release evidence; the focused containment suite
 is the applicable dependency result.
 
-Paid release qualification on 2026-09-07 passed seven enabled
+Historical paid release qualification on 2026-09-07 passed seven enabled
 `gpt-5.6-terra` probes: conversational continuation and close/reopen/resume,
 fresh and resumed natural-language synthetic Read calls with typed next-turn
 observation use and no native tool event, adversarial shell/exec containment
@@ -201,7 +201,9 @@ JSON-string tool arguments. The suite used a temporary mode-700 qualification
 profile and removed it after the run. Quota exhaustion was skipped because no
 already-exhausted qualification profile was supplied; no account was
 deliberately exhausted. Provider-runtime's Claude implementation was unchanged,
-so no fresh Claude qualification was run or claimed.
+so no fresh Claude qualification was run or claimed. These private-runtime
+results are not counted as current shared-server evidence; that gate remains
+`NOT_RUN`.
 
 The accepted [paid-decision extension](../SPEC.md#17-durable-paid-decisions)
 adds original request/terminal journaling, explicit isolated recovery policy,
