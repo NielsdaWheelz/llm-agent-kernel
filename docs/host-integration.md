@@ -6,7 +6,7 @@ store with an in-memory adapter changes the recovery guarantee and is not a
 deployment option for continuing effectful work.
 
 For Codex, the host supplies provider-runtime revision
-`834ea544f1d7437ce2a32b17d4cc813e75a06fa2`, one
+`a14432276142872785b19460d4dc4a6d9650c8ff`, one
 absolute Unix-socket endpoint per credential profile, and an externally
 supervised App Server at exactly `0.153.4`. Provider-runtime connects to that
 service and never starts, kills, or owns it. There is no private Codex SDK,

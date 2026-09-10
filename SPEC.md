@@ -32,7 +32,7 @@ The distribution is `llm-agent-kernel`; applications import
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `834ea544f1d7437ce2a32b17d4cc813e75a06fa2`
+  `a14432276142872785b19460d4dc4a6d9650c8ff`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - The externally supervised Codex App Server: exactly `0.153.4`
 
