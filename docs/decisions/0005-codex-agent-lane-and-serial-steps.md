@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-02
-- Amended: 2026-09-07
+- Amended: 2026-09-09
 
 ## Context
 
@@ -25,8 +25,9 @@ projection, because the latter exposes only the terminal and cannot support the
 required native-authority fail-stop.
 
 Provider-native built-ins, native Web, MCP, network, copied environment,
-writeable filesystem, and provider approvals are disabled. The cwd is private,
-empty, and read-only. Any native tool-use or permission-request event is a
+writeable filesystem, and provider approvals are disabled. The cwd is empty
+and read-only, private by default or explicitly shared through the documented
+host-provisioned group boundary. Any native tool-use or permission-request event is a
 fail-stop containment violation. The complete policy and native configuration
 participate in the definition fingerprint.
 
@@ -39,8 +40,8 @@ definition fingerprint, automatically rotating saved-session identity when the
 kernel protocol changes. The prompt is behavioral guidance; authority remains
 the provider event fail-stop plus the frozen host plan.
 
-The corrected provider directly owns the documented Codex App Server stream
-behind the preserved `transport="sdk"` compatibility literal. A
+The provider owns the WebSocket/Unix-socket connection to the externally
+supervised Codex App Server behind the preserved `transport="sdk"` route literal. A
 `ProtocolDefect` is fatal and yields no acceptable terminal. Native Code Mode is
 contained/detected rather than proven absent before its first event, and the
 read-only cwd is not a host-confidentiality boundary.
@@ -74,7 +75,7 @@ Benefits:
 
 Costs:
 
-- One-shot work opens a subprocess/session per invocation.
+- One-shot work opens a native session on the shared server per invocation.
 - Serial tools can be slower than safe parallel reads.
 - V1 is not provider-lane-neutral at runtime; future lanes need separate
   qualified adapters and semantics.

@@ -24,9 +24,9 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `8fde23ac56571a63c65cfcff55c73a0976f83eb4`
+  `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
-- provider-certified `openai-codex==0.144.4`
+- an externally supervised Codex App Server, updated to latest stable by the host
 
 The `llm-tools` pin preserves the revisioned `web.search` whole-operation
 deadline and all of its v2 contract and policy identities. It also advances
@@ -46,12 +46,21 @@ without translating them into the contained v1 grammar.
 Importing that submodule does not initialize `llm_tools`. The existing flat
 `llm_agent_kernel` API loads the structured-agent stack on first public-symbol
 access or full package introspection, preserving its exported types and objects.
-The corrected provider owns the Codex App Server byte stream while preserving
-the public `(backend="codex", transport="sdk")` route and exact
-`openai-codex==0.144.4` SDK/CLI pair. Native Code Mode is contained and detected,
-not proven absent before its first observable event. Unknown protocol drift is
-an intentional availability failure, and a private empty read-only cwd is not
-by itself a host-confidentiality boundary.
+
+The provider attaches to the host-owned Codex App Server over its configured
+Unix socket while preserving the public `(backend="codex", transport="sdk")`
+route. It never spawns or terminates that shared service. The client validates
+protocol shape, not a native version pin, and fails closed on protocol drift. Native
+Code Mode is contained and detected, not proven absent before its first
+observable event. An empty read-only cwd is not by itself a
+host-confidentiality boundary.
+
+Native Codex updates occur only through the host's existing install/update
+workflow. Version-only apply leaves healthy servers running; planned restart can
+interrupt turns and normal crash recovery may load the update. The installed
+CLI may be newer. Upstream breakage and prompt repair are
+accepted, not hidden by a compatibility parser or private fallback. Exact
+library dependency locks and containment checks remain mandatory.
 
 Every new, resumed, reconstructed, continuing, and isolated Codex session
 receives one kernel-owned base instruction before any application system
@@ -75,10 +84,10 @@ settlement conservatively retains its token reservation.
 
 `AgentTerminal.final_text` is the provider-selected authoritative assistant
 response, not a concatenation of streamed `AgentText` observations. For the
-pinned Codex route, the last completed `phase=final_answer` message wins; when
+Codex route, the last completed `phase=final_answer` message wins; when
 there is no such message, the last completed phase-unknown message is the
-compatibility fallback. Commentary remains observable provider output but is
-never executable structured output. The kernel continues to ignore
+audited native terminal-selection rule. Commentary remains observable provider
+output but is never executable structured output. The kernel continues to ignore
 `AgentText` for logical-step execution and independently validates only the
 terminal structured value.
 
@@ -114,6 +123,12 @@ plan's budget and rejects any limits mismatch before provider or tool I/O. A
 continuing run composes `CodexProvider` with `SessionCoordinator`; production
 provider work therefore consumes `AgentRuntime.stream_turn` and never the
 event-discarding `run_turn` projection.
+
+`CodexProvider` creates private `0500` temporary session directories by
+default. A host that deliberately exposes those empty paths to another trusted
+local client must opt into `share_cwd_with_group=True`, supply an existing
+setgid parent, and receives per-session directories with the inherited group
+and mode `0750`. The host owns parent provisioning and group membership.
 
 An isolated structured run may opt into one deterministic initial Read:
 

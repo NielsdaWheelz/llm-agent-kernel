@@ -100,22 +100,26 @@ close_session(AgentSession)
 ```
 
 The adapter owns live-session leases, consumes and inspects every streamed
-event, and maps typed runtime terminals. It uses the exact provider-certified
-`openai-codex==0.144.4` SDK/runtime pair and never uses the convenience
-`AgentRuntime.run_turn` projection because that method discards the event
-history required for containment. It publishes the kernel's Codex-compatible
-closed-object wire envelope through `JsonSchemaAgentOutput` and constructs the
-exact containment request:
+event, and maps typed runtime terminals. Provider-runtime connects to an
+externally supervised Codex App Server over a configured Unix socket, validates
+protocol shape without native-version admission, and owns neither its process nor its account
+home. It never uses the convenience `AgentRuntime.run_turn` projection because
+that method discards the event history required for containment. It publishes
+the kernel's Codex-compatible closed-object wire envelope through
+`JsonSchemaAgentOutput` and constructs the exact containment request:
 
 - subscription-backed Codex route;
-- private empty absolute cwd with read-only filesystem policy;
+- empty absolute cwd with read-only filesystem policy; private directories are
+  `0500`, while explicit group-shared directories require a setgid parent,
+  verify inherited group ownership, and are `0750`;
 - no additional directories, copied environment, network, MCP, or approval;
 - native built-ins and Web disabled;
-- the Codex `allowed_tools=("*",)` SDK sentinel only where required by the
+- the Codex `allowed_tools=("*",)` provider sentinel only where required by the
   pinned runtime.
 
-The corrected provider directly owns the Codex App Server stdio stream behind
-the preserved `transport="sdk"` route. The kernel supplies its exact base
+The provider directly owns its WebSocket/Unix-socket connection to the shared
+App Server behind the preserved `transport="sdk"` route; closing the connection
+does not terminate the service or unrelated threads. The kernel supplies its exact base
 instruction as the first system value on every start and resume, which makes
 Codex `baseInstructions` replace the built-in coding-agent prompt. Application
 system values follow without a seam that can remove the kernel value. The
@@ -137,7 +141,7 @@ Provider-runtime also owns authoritative assistant-message selection.
 `AgentTerminal.final_text` is the selected response, not the concatenation of
 `AgentText` observations. For Codex, the last completed
 `phase=final_answer` message wins; otherwise the last completed phase-unknown
-message is the pinned-SDK compatibility fallback. Commentary is never eligible
+message is the audited native terminal-selection rule. Commentary is never eligible
 for terminal selection or structured execution. The kernel adds no selection
 or concatenation layer: it ignores `AgentText` for logical validation and uses
 only the successful terminal's independently validated structured value.
