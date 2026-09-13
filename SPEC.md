@@ -46,7 +46,7 @@ dependency import failures therefore surface on that first access.
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `8fde23ac56571a63c65cfcff55c73a0976f83eb4`
+  `9abaf6b7a1f907fcf1bdbfa33dd7b343e42ffbdb`
 - `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - The provider-certified Codex SDK/runtime pair: `openai-codex==0.144.4`
 

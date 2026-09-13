@@ -24,7 +24,7 @@ below, never from mutable branches or sibling worktrees.
 The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
-  `8fde23ac56571a63c65cfcff55c73a0976f83eb4`
+  `9abaf6b7a1f907fcf1bdbfa33dd7b343e42ffbdb`
 - `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
 - provider-certified `openai-codex==0.144.4`
 
