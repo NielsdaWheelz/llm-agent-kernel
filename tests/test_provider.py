@@ -79,9 +79,9 @@ EXPECTED_KERNEL_BASE_INSTRUCTION = (
 
 def _ref(native_session_id: str, profile_key: str = "main") -> AgentSessionRef:
     return AgentSessionRef(
-        schema_version="agent-session-ref.v1",
+        schema_version="agent-session-ref.v2",
         backend="codex",
-        transport="sdk",
+        transport="app_server",
         native_session_id=native_session_id,
         profile_key=profile_key,
         state_root_fingerprint="1" * 64,
@@ -118,7 +118,7 @@ def _definition(mode: SessionMode = SessionMode.continuing) -> AgentDefinition:
         maximum_profile=maximum,
         provider=ProviderConfiguration(
             auth=CredentialRef(kind="local_account", profile_key="main"),
-            model_key="gpt-5",
+            model_key="gpt-6-sol",
             reasoning="low",
             agent_definition_revision="test-catalog-v1",
             row_fingerprint="a" * 64,
@@ -227,7 +227,7 @@ async def test_exact_request_mapping_private_cwd_cache_and_shutdown(tmp_path: Pa
     request = runtime.requests[0]
 
     assert request.backend == "codex"
-    assert request.transport == "sdk"
+    assert request.transport == "app_server"
     assert request.auth.kind == "local_account"
     assert isinstance(request.open, NewSession)
     assert request.policy == CONTAINMENT_POLICY

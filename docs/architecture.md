@@ -118,7 +118,7 @@ the kernel's Codex-compatible closed-object wire envelope through
   pinned runtime.
 
 The provider directly owns its WebSocket/Unix-socket connection to the shared
-App Server behind the preserved `transport="sdk"` route; closing the connection
+App Server behind the `transport="app_server"` route; closing the connection
 does not terminate the service or unrelated threads. The kernel supplies its exact base
 instruction as the first system value on every start and resume, which makes
 Codex `baseInstructions` replace the built-in coding-agent prompt. Application

@@ -51,7 +51,7 @@ The reviewed dependency baseline is:
 - An externally supervised Codex App Server, updated by the host to latest stable.
 
 The provider owns the documented Codex App Server protocol over WebSocket on
-the configured Unix socket. The public `backend="codex", transport="sdk"`
+the configured Unix socket. The public `backend="codex", transport="app_server"`
 literal names this route; it does not select a bundled SDK or private server.
 The host deployment owns server installation, supervision, account enrollment,
 environment and socket access. Neither kernel nor provider starts a server or

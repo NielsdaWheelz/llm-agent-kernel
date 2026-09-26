@@ -301,14 +301,13 @@ assigned to exactly one implementation slice.
   nested/nullable result, and JSON-string tool-argument behavior without running
   in ordinary CI or recording private payloads. Provider compatibility releases
   qualify at least one currently supported local-account route; the current
-  route is `gpt-5.6-terra`, and retired `gpt-5.4` is not invoked through
-  `local_account`. Qualification includes commentary plus final-answer behavior
+  route is `gpt-6-sol`. Qualification includes commentary plus final-answer behavior
   when observed, same-lease continuation, close/reopen/resume usage accounting
   without historical recharge, and in-flight cancellation. Contract and
   consumer tests prove that production calls `stream_turn`, never `run_turn`,
   and validates only terminal structured output.
   Provider-facing releases that add initial one-shot context run a paid
-  `gpt-5.6-terra` kernel probe proving that a known initial Read observation is
+  `gpt-6-sol` kernel probe proving that a known initial Read observation is
   present and usable before the first structured provider result. A release
   changing the kernel base instruction runs a paid synthetic Read through
   natural-language `call_tool`, projects its typed observation into the next

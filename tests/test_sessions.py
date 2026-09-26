@@ -54,9 +54,9 @@ from llm_agent_kernel.sessions import (
 
 def _ref(native_session_id: str) -> AgentSessionRef:
     return AgentSessionRef(
-        schema_version="agent-session-ref.v1",
+        schema_version="agent-session-ref.v2",
         backend="codex",
-        transport="sdk",
+        transport="app_server",
         native_session_id=native_session_id,
         profile_key="main",
         state_root_fingerprint="1" * 64,
@@ -93,7 +93,7 @@ def _definition() -> AgentDefinition:
         maximum_profile=maximum,
         provider=ProviderConfiguration(
             auth=CredentialRef(kind="local_account", profile_key="main"),
-            model_key="gpt-5",
+            model_key="gpt-6-sol",
             reasoning="low",
             agent_definition_revision="test-catalog-v1",
             row_fingerprint="a" * 64,

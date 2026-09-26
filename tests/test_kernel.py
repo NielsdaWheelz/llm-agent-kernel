@@ -218,7 +218,7 @@ def _definition(
             maximum,
             ProviderConfiguration(
                 CredentialRef("local_account", "test"),
-                "gpt-5",
+                "gpt-6-sol",
                 "low",
                 "test-catalog-v1",
                 "a" * 64,
@@ -249,9 +249,9 @@ def _claim(plan: Any, *, attempt: int = 1) -> InputClaim:
 
 def _ref(name: str = "session-1") -> AgentSessionRef:
     return AgentSessionRef(
-        "agent-session-ref.v1",
+        "agent-session-ref.v2",
         "codex",
-        "sdk",
+        "app_server",
         name,
         "test",
         "1" * 64,
@@ -2204,7 +2204,7 @@ async def test_initial_read_tool_in_maximum_but_not_selected_plan_is_ungranted(
         StructuredOutput("answer", StructuredResult),
         maximum,
         ProviderConfiguration(
-            CredentialRef("local_account", "test"), "gpt-5", "low", "test-catalog-v1", "a" * 64
+            CredentialRef("local_account", "test"), "gpt-6-sol", "low", "test-catalog-v1", "a" * 64
         ),
         "ungranted-test-v1",
     )

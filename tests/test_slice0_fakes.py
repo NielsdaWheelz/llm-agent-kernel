@@ -39,9 +39,9 @@ from llm_agent_kernel.fakes import (
 
 def _ref(native_id: str) -> AgentSessionRef:
     return AgentSessionRef(
-        schema_version="agent-session-ref.v1",
+        schema_version="agent-session-ref.v2",
         backend="codex",
-        transport="sdk",
+        transport="app_server",
         native_session_id=native_id,
         profile_key="personal",
         state_root_fingerprint="a" * 64,

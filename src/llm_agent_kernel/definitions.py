@@ -226,7 +226,7 @@ class ProviderConfiguration:
     policy: PermissionPolicy = CONTAINMENT_POLICY
     native: CodexNativeOptions = CODEX_NATIVE_OPTIONS
     backend: Literal["codex"] = field(default="codex", init=False)
-    transport: Literal["sdk"] = field(default="sdk", init=False)
+    transport: Literal["app_server"] = field(default="app_server", init=False)
     cwd_scope: Literal["private_empty_read_only"] = field(
         default="private_empty_read_only", init=False
     )

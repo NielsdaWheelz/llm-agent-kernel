@@ -169,7 +169,7 @@ def _definition(
         StructuredOutput("answer", StructuredResult) if structured else ConversationalOutput(),
         maximum,
         ProviderConfiguration(
-            CredentialRef("local_account", "test"), "gpt-5", "low", "test-catalog-v1", "a" * 64
+            CredentialRef("local_account", "test"), "gpt-6-sol", "low", "test-catalog-v1", "a" * 64
         ),
         "composed-test-v1",
         limits or KernelLimits(),
@@ -200,9 +200,9 @@ def _claim(
 
 def _ref(index: int) -> AgentSessionRef:
     return AgentSessionRef(
-        "agent-session-ref.v1",
+        "agent-session-ref.v2",
         "codex",
-        "sdk",
+        "app_server",
         f"session-{index}",
         "test",
         "1" * 64,

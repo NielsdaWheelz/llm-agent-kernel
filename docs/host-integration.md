@@ -239,7 +239,7 @@ kernel revision and regenerate their lock to exact provider-runtime revision
 `4ddced3bb5487ce988858c4c6d45d2e5ee0acad9`. Keep `llm-tools` at
 `9e6d155f3b64f03495911435b7cae8b8d131f9a2`. That historical release used the
 retired private-provider lane and does not qualify the current shared App
-Server. The provider route remains `backend="codex", transport="sdk"`; the
+Server. The provider route is `backend="codex", transport="app_server"`; the
 transport literal is the public provider-runtime route name.
 
 The public kernel additions are `KERNEL_BASE_INSTRUCTION`,
@@ -359,7 +359,7 @@ currently supported local-account route, including conversational, structured
 nested/nullable result, commentary-plus-final-answer behavior when observed,
 JSON-string arguments, continuation, close/reopen/resume, invocation-local
 usage, and in-flight cancellation. The target route is
-`gpt-5.6-terra`; retired `gpt-5.4` MUST NOT be invoked through `local_account`.
+`gpt-6-sol`.
 Qualification records contain only sanitized route, revision, status, usage,
 timing, and trace identifiers. Provider-native
 transcripts remain unredacted third-party data at rest; deleting a local
@@ -377,7 +377,7 @@ are unchanged and the complete deterministic suite still passes. The
 change requires the paid matrix to run again.
 
 This provider-runtime propagation changes a provider-facing input and therefore
-requires the paid matrix on the currently supported `gpt-5.6-terra`
+requires the paid matrix on the currently supported `gpt-6-sol`
 local-account route. The continuation probe must prove same-lease per-turn
 addition and close/reopen/resume without historical recharge; the structured
 probe must exercise authoritative final-answer selection when commentary is
@@ -388,27 +388,25 @@ provider-runtime owns the separate native commentary/final-selection proof.
 Absence of commentary is not a structured-output failure or a dual-phase pass.
 
 Quota exhaustion runs only against a qualification profile that is already
-exhausted and MUST NOT be induced for release testing. The retired `gpt-5.4`
-local-account route is neither a release gate nor a permitted probe.
+exhausted and MUST NOT be induced for release testing.
 
 The input-projection release changes model-visible context and definition
-identity, so it also requires the current `gpt-5.6-terra` matrix rather than
+identity, so it also requires the current `gpt-6-sol` matrix rather than
 carrying prior qualification forward. Its structured probe must submit the
 restricted projection with explicitly requested batch `as_of`; the regular
 continuation, JSON-string argument, and separately gated in-flight cancellation
-probes remain required. Retired `gpt-5.4` and deliberately induced quota
-exhaustion remain prohibited.
+probes remain required. Deliberately induced quota exhaustion remains prohibited.
 
 The isolated initial-Read release also changes model-visible first-turn context
-and therefore runs the current `gpt-5.6-terra` matrix rather than carrying prior
+and therefore runs the current `gpt-6-sol` matrix rather than carrying prior
 qualification forward. In addition to continuation, structured
 commentary/final-answer, JSON-string argument, and separately gated in-flight
 cancellation probes, it runs the kernel one-shot entry point with a known typed
 initial Read result and proves that value is usable by the first provider turn.
-Retired `gpt-5.4` and deliberately induced quota exhaustion remain prohibited.
+Deliberately induced quota exhaustion remains prohibited.
 
 The sealed base-instruction release changes every Codex session's model-visible
-system input and therefore runs the current `gpt-5.6-terra` matrix rather than
+system input and therefore runs the current `gpt-6-sol` matrix rather than
 carrying prior qualification forward. It additionally uses one synthetic Read:
 natural language must produce the structured `call_tool`, the typed observation
 must be projected and used by the following turn, normal execution must emit no
@@ -416,8 +414,7 @@ native exec event, and an adversarial shell/exec request must either remain in
 the structured protocol or fail containment with zero host effect. Fresh and
 close/reopen/resumed sessions are required. The changed provider lane is Codex;
 provider-runtime's Claude implementation is unchanged, so no fresh Claude
-qualification is required. Retired `gpt-5.4` and deliberately induced quota
-exhaustion remain prohibited.
+qualification is required. Deliberately induced quota exhaustion remains prohibited.
 
 The library release commands are:
 

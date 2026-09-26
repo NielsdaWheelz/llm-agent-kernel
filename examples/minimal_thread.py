@@ -108,9 +108,9 @@ class ScriptedRuntime:
 
     def __init__(self) -> None:
         self.ref = AgentSessionRef(
-            "agent-session-ref.v1",
+            "agent-session-ref.v2",
             "codex",
-            "sdk",
+            "app_server",
             "scripted-session",
             "example",
             "1" * 64,

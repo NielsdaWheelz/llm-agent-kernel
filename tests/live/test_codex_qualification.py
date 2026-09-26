@@ -9,7 +9,7 @@ profile:
     LLM_AGENT_KERNEL_CODEX_SOCKET=/absolute/codex.sock \
     LLM_AGENT_KERNEL_COGNITION_CWD_PARENT=/absolute/setgid/parent \
     LLM_AGENT_KERNEL_PROFILE=personal \
-    LLM_AGENT_KERNEL_MODEL=gpt-5.6-terra \
+    LLM_AGENT_KERNEL_MODEL=gpt-6-sol \
     LLM_AGENT_KERNEL_REASONING=low \
     uv run pytest -m live tests/live/test_codex_qualification.py
 """
@@ -245,7 +245,7 @@ async def _provider_configuration(profile_key: str) -> ProviderConfiguration:
     reasoning = _required_environment("LLM_AGENT_KERNEL_REASONING")
     config, _cwd_parent = _live_runtime_config(profile_key)
     async with AgentRuntime(config) as runtime:
-        catalog = await runtime.model_catalog("codex", auth)
+        catalog = await runtime.model_catalog("codex", auth, transport="app_server")
     rows = [row for row in catalog.models if row.key == model_key]
     if len(rows) != 1 or reasoning not in {item.key for item in rows[0].reasoning}:
         pytest.fail("live model and reasoning must select one exact catalog option", pytrace=False)

@@ -265,7 +265,7 @@ def _definition(**provider_changes: object) -> AgentDefinition:
     _, profile, _ = _catalog_and_profile()
     provider_values = {
         "auth": CredentialRef("local_account", "personal"),
-        "model_key": "gpt-5",
+        "model_key": "gpt-6-sol",
         "reasoning": "low",
         "agent_definition_revision": "test-catalog-v1",
         "row_fingerprint": "a" * 64,
@@ -483,7 +483,7 @@ def test_input_projection_public_api_is_exact() -> None:
 def test_definition_is_frozen_and_fingerprint_covers_provider_configuration() -> None:
     first = _definition()
     same = _definition()
-    changed = _definition(model_key="gpt-5-high")
+    changed = _definition(model_key="gpt-6-luna")
 
     assert first.fingerprint == same.fingerprint
     assert first.fingerprint != changed.fingerprint
@@ -549,7 +549,7 @@ def test_definition_fingerprint_rotates_for_every_configurable_session_scope() -
         replace(
             first, provider=replace(first.provider, auth=CredentialRef("local_account", "other"))
         ),
-        replace(first, provider=replace(first.provider, model_key="gpt-5-other")),
+        replace(first, provider=replace(first.provider, model_key="gpt-6-luna")),
         replace(first, provider=replace(first.provider, reasoning="high")),
         replace(first, provider=replace(first.provider, agent_definition_revision="catalog-v2")),
         replace(first, provider=replace(first.provider, row_fingerprint="b" * 64)),
@@ -605,7 +605,7 @@ def test_provider_configuration_rejects_authority_widening() -> None:
     with pytest.raises(ValueError, match="containment"):
         ProviderConfiguration(
             auth=CredentialRef("local_account", "personal"),
-            model_key="gpt-5",
+            model_key="gpt-6-sol",
             reasoning="low",
             agent_definition_revision="test-catalog-v1",
             row_fingerprint="a" * 64,

@@ -41,7 +41,7 @@ kernel protocol changes. The prompt is behavioral guidance; authority remains
 the provider event fail-stop plus the frozen host plan.
 
 The provider owns the WebSocket/Unix-socket connection to the externally
-supervised Codex App Server behind the preserved `transport="sdk"` route literal. A
+supervised Codex App Server behind the `transport="app_server"` route literal. A
 `ProtocolDefect` is fatal and yields no acceptable terminal. Native Code Mode is
 contained/detected rather than proven absent before its first event, and the
 read-only cwd is not a host-confidentiality boundary.
