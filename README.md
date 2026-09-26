@@ -25,16 +25,18 @@ The reviewed dependency baselines are:
 
 - `provider-runtime` from `llm-calling` at
   `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`
-- `llm-tools` at `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
+- `llm-tools` at `8d5f48884098ecb0cd95ddc590076a74d04b2bd7`
 - an externally supervised Codex App Server, updated to latest stable by the host
 
 The `llm-tools` pin preserves the revisioned `web.search` whole-operation
-deadline and all of its v2 contract and policy identities. It also advances
-`web.read` to implementation revision `llm-tools-web-read-v2`: plain text is
+deadline and policy identity. Its declared error contract and implementation
+rotate to include explicit upstream credential rejection; affected frozen tool
+plans and host tables must be rebuilt. It retains `web.read` at implementation
+revision `llm-tools-web-read-v2`: plain text is
 decoded without interpreting entity-looking data, while HTML/XHTML performs one
 parser-owned entity decode rather than a second decode after parsing. Evidence
 locators identify those algorithms as `plain-text-v2` and
-`html-visible-text-v2`; Web contracts, policy identities, kernel limits, and
+`html-visible-text-v2`; Web policy identities, kernel limits, and
 kernel orchestration behavior do not change.
 
 The contained v1 protocol uses the real subscription-backed

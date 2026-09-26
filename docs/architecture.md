@@ -368,9 +368,12 @@ That pin advances the dependency-owned `web.read` implementation to
 `llm-tools-web-read-v2`. Plain-text extraction only decodes the declared
 charset and collapses whitespace; HTML/XHTML delegates its one entity-decoding
 pass to the visible-text parser. Their evidence locators are respectively
-`plain-text-v2` and `html-visible-text-v2`. The Web declarations, limits,
+`plain-text-v2` and `html-visible-text-v2`. The `web.read` declaration and limits,
 policy epochs, policy inputs, and policy revisions—including every
-`web-search-v2` value—remain stable. A host that grants `web.read` must
+`web-search-v2` policy value—remain stable. The `web.search` declared error
+contract includes `CredentialRejected` and its implementation is
+`llm-tools-web-search-v3`, so hosts granting it must likewise recompose their
+frozen catalog, profile, plan, and `HostTable`. A host that grants `web.read` must
 recompose and re-freeze the affected catalog, profile, plan, and exact
 `HostTable` publication; the kernel still owns none of those dependency
 implementations or persistent artifacts.

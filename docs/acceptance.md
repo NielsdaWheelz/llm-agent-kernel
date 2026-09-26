@@ -16,7 +16,8 @@ assigned to exactly one implementation slice.
   externally supervised Codex App Server without native-version admission. Ordinary
   CI never imports mutable sibling worktrees or an uncertified provider release.
   The `llm-tools` pin
-  exposes the revisioned `web.search` whole-operation deadline API and the
+  exposes the revisioned `web.search` whole-operation deadline API, the
+  `CredentialRejected` declared error and v3 binding identity, and the
   corrected `web.read` v2 extraction identity. The provider pin exposes
   invocation-local terminal usage and progressive, non-additive invocation
   snapshots without resumed historical usage. It also exposes authoritative

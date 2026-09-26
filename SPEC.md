@@ -47,7 +47,7 @@ The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
   `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`
-- `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
+- `llm-tools`: `8d5f48884098ecb0cd95ddc590076a74d04b2bd7`
 - An externally supervised Codex App Server, updated by the host to latest stable.
 
 The provider owns the documented Codex App Server protocol over WebSocket on
@@ -133,10 +133,17 @@ implementation as `llm-tools-web-read-v2`. Plain-text evidence MUST identify
 collapse without interpreting entities or markup. HTML/XHTML evidence MUST
 identify `html-visible-text-v2`, which uses the parser's single entity-decoding
 pass and MUST NOT interpret the parser output a second time. JSON remains
-`json-canonical-v1`. `WEB_READ_SPEC`, the Web contracts and limits,
+`json-canonical-v1`. `WEB_READ_SPEC`, its contract and limits,
 `web-read-v1` policy epoch, policy inputs, and policy revision remain unchanged;
-`web.search` remains implementation `llm-tools-web-search-v2` with policy epoch
-`web-search-v2` and its existing contract, policy revision, and policy inputs.
+`web.search` keeps policy epoch `web-search-v2`, its policy revision and policy
+inputs. Its binding implementation is `llm-tools-web-search-v3`: its declared
+error contract now includes `CredentialRejected` for an explicit upstream
+credential rejection. Its contract revision rotates to
+`79203b6cf35a6c3bc0244457525739ed752f180fb3e8c4bf5aec5f8ab0bc122f`.
+Consumers MUST recompose and re-freeze affected catalogs, profiles, plans, and
+`HostTable` publications; the kernel passes declared tool results through its
+existing opaque dispatch boundary.
+
 Any host catalog, frozen profile, frozen plan, or `HostTable` publication that
 contains `web.read` MUST be recomposed and re-frozen from the v2 binding. A v1
 frozen identity MUST fail closed against the v2 catalog rather than be reused.

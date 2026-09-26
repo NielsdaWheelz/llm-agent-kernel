@@ -330,9 +330,19 @@ def test_dependency_web_search_operation_deadline_api_is_revisioned() -> None:
     assert WEB_SEARCH_SPEC.limits.deadline_seconds == 15.0
     assert (
         WEB_SEARCH_SPEC.tool_contract_revision
-        == "c46877ad7f12d672c2717fd0895f5bd95983dd5f6ffb6e6c9c4a2c22c573b78e"
+        == "79203b6cf35a6c3bc0244457525739ed752f180fb3e8c4bf5aec5f8ab0bc122f"
     )
-    assert default.implementation_revision == "llm-tools-web-search-v2"
+    assert default.implementation_revision == "llm-tools-web-search-v3"
+    assert WEB_SEARCH_SPEC.declared_error_schema is not None
+    assert {
+        branch["properties"]["type"]["const"]
+        for branch in WEB_SEARCH_SPEC.declared_error_schema.semantic["anyOf"]
+    } == {
+        "CredentialRejected",
+        "InvalidUpstreamResponse",
+        "RateLimited",
+        "UpstreamUnavailable",
+    }
     assert default.policy_epoch == PolicyEpoch("web-search-v2")
     assert (
         default.policy_revision
