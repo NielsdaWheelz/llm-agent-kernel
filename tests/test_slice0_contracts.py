@@ -50,6 +50,7 @@ from llm_tools import (
     web_family,
 )
 from provider_runtime.agent_runtime import (
+    AGENT_BACKEND_CONTRACT_REVISION,
     AgentTerminal,
     AgentText,
     AgentUsage,
@@ -130,6 +131,10 @@ class OptionalResult(BaseModel):
 
 class OpenResult(BaseModel):
     answer: str
+
+
+def test_dependency_codex_catalog_contract_is_v4() -> None:
+    assert AGENT_BACKEND_CONTRACT_REVISION == "provider-runtime.agent-model-catalog.v4"
 
 
 def test_dependency_provider_event_contracts_are_exact() -> None:

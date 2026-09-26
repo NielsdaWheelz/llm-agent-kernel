@@ -46,13 +46,15 @@ dependency import failures therefore surface on that first access.
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`
+  `d245315fd8137912f47b7fe04798d81525cb2304`
 - `llm-tools`: `8d5f48884098ecb0cd95ddc590076a74d04b2bd7`
 - An externally supervised Codex App Server, updated by the host to latest stable.
 
 The provider owns the documented Codex App Server protocol over WebSocket on
 the configured Unix socket. The public `backend="codex", transport="app_server"`
 literal names this route; it does not select a bundled SDK or private server.
+The pinned provider catalog contract is v4 and reports frozen MCP tools
+unavailable; kernel v1 supplies no MCP servers.
 The host deployment owns server installation, supervision, account enrollment,
 environment and socket access. Neither kernel nor provider starts a server or
 owns its account home. The provider normalizes native cumulative accounting
