@@ -46,7 +46,7 @@ dependency import failures therefore surface on that first access.
 The reviewed dependency baseline is:
 
 - `provider-runtime` from the `llm-calling` repository:
-  `d245315fd8137912f47b7fe04798d81525cb2304`
+  `aa4b7e71c9ee0ea19c5f04cb297e7e460d7acb64`
 - `llm-tools`: `8d5f48884098ecb0cd95ddc590076a74d04b2bd7`
 - An externally supervised Codex App Server, updated by the host to latest stable.
 
