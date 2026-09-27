@@ -133,8 +133,8 @@ class OpenResult(BaseModel):
     answer: str
 
 
-def test_dependency_codex_catalog_contract_is_v4() -> None:
-    assert AGENT_BACKEND_CONTRACT_REVISION == "provider-runtime.agent-model-catalog.v4"
+def test_dependency_codex_catalog_contract_is_v5() -> None:
+    assert AGENT_BACKEND_CONTRACT_REVISION == "provider-runtime.agent-model-catalog.v5"
 
 
 def test_dependency_provider_event_contracts_are_exact() -> None:

@@ -28,14 +28,14 @@ def test_package_metadata_locks_qualified_git_dependencies() -> None:
 
     assert project["project"]["requires-python"] == ">=3.12"
     assert project["project"]["dependencies"][:2] == [
-        "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@8d5f48884098ecb0cd95ddc590076a74d04b2bd7",
-        "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@d245315fd8137912f47b7fe04798d81525cb2304",
+        "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@d305da8fb5f5eda89049779c4c4dfa4f1916618c",
+        "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@6a7093f799c88c205c8d797bbb8b14c2a9980db1",
     ]
     assert packages["provider-runtime"]["source"]["git"].endswith(
-        "?rev=d245315fd8137912f47b7fe04798d81525cb2304#d245315fd8137912f47b7fe04798d81525cb2304"
+        "?rev=6a7093f799c88c205c8d797bbb8b14c2a9980db1#6a7093f799c88c205c8d797bbb8b14c2a9980db1"
     )
     assert packages["llm-tools"]["source"]["git"].endswith(
-        "?rev=8d5f48884098ecb0cd95ddc590076a74d04b2bd7#8d5f48884098ecb0cd95ddc590076a74d04b2bd7"
+        "?rev=d305da8fb5f5eda89049779c4c4dfa4f1916618c#d305da8fb5f5eda89049779c4c4dfa4f1916618c"
     )
     provider = packages["provider-runtime"]
     assert "websockets" in {dependency["name"] for dependency in provider["dependencies"]}

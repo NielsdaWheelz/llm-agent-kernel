@@ -11,7 +11,7 @@ assigned to exactly one implementation slice.
   the flat structured-agent API preserves its concrete types, exported objects,
   and introspection when requested.
 - **K002** — Runtime locks qualified immutable git revisions of
-  `provider-runtime` (`d245315fd8137912f47b7fe04798d81525cb2304`) and
+  `provider-runtime` (`6a7093f799c88c205c8d797bbb8b14c2a9980db1`) and
   `llm-tools`; the provider attaches only to an
   externally supervised Codex App Server without native-version admission. Ordinary
   CI never imports mutable sibling worktrees or an uncertified provider release.
