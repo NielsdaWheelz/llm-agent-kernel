@@ -491,6 +491,7 @@ async def run_native(
                     or control.input_id != steering_delivery.delivery_id
                 ):
                     raise NativeDefect("native steer receipt changed its delivery or turn")
+                await journal.record_outcome(request.attempt_id, control)
                 if deliveries[steering_delivery.delivery_id].state != "recorded":
                     state = (
                         "queued"

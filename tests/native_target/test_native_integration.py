@@ -45,6 +45,7 @@ from llm_tools import (
 )
 from llm_tools.testing import InMemoryPositionRecorder, RecordingTelemetry
 from provider_runtime.agent_runtime import (
+    AgentControlReceipt,
     AgentRuntime,
     AgentRuntimeConfig,
     AgentTerminal,
@@ -103,6 +104,8 @@ class Peer:
         self.hold_start = False
         self.silent_start = False
         self.duplicate_after_steer = False
+        self.record_before_steer_ack = False
+        self.release_steer_ack = asyncio.Event()
         self.start_entered = asyncio.Event()
         self.start_request_id = None
         self.connection = None
@@ -195,6 +198,16 @@ class Peer:
                 self.steering.set()
                 if self.hold_steer:
                     continue
+                if self.record_before_steer_ack:
+                    await self.item(
+                        "item/completed",
+                        {
+                            "id": "new-input",
+                            "type": "userMessage",
+                            "clientId": request["params"]["clientUserMessageId"],
+                        },
+                    )
+                    await self.release_steer_ack.wait()
                 result = {"turnId": "turn"}
             elif method == "turn/interrupt":
                 result = {}
@@ -239,14 +252,15 @@ class Peer:
                     },
                 )
             elif method == "turn/steer":
-                await self.item(
-                    "item/completed",
-                    {
-                        "id": "new-input",
-                        "type": "userMessage",
-                        "clientId": request["params"]["clientUserMessageId"],
-                    },
-                )
+                if not self.record_before_steer_ack:
+                    await self.item(
+                        "item/completed",
+                        {
+                            "id": "new-input",
+                            "type": "userMessage",
+                            "clientId": request["params"]["clientUserMessageId"],
+                        },
+                    )
                 if self.duplicate_after_steer:
                     await self.send(
                         {
@@ -287,7 +301,7 @@ class Host:
     def __init__(self, path: Path) -> None:
         self.db = sqlite3.connect(path)
         self.db.executescript(
-            "CREATE TABLE IF NOT EXISTS journal (id TEXT PRIMARY KEY, fingerprint TEXT, definition TEXT, provider_attempt TEXT, terminal TEXT, fenced INTEGER NOT NULL DEFAULT 0); CREATE TABLE IF NOT EXISTS invocation (id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, reply TEXT); CREATE TABLE IF NOT EXISTS message (id TEXT PRIMARY KEY, text TEXT); CREATE TABLE IF NOT EXISTS delivery (id TEXT PRIMARY KEY, state TEXT)"
+            "CREATE TABLE IF NOT EXISTS journal (id TEXT PRIMARY KEY, fingerprint TEXT, definition TEXT, provider_attempt TEXT, terminal TEXT, fenced INTEGER NOT NULL DEFAULT 0); CREATE TABLE IF NOT EXISTS invocation (id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, reply TEXT); CREATE TABLE IF NOT EXISTS message (id TEXT PRIMARY KEY, text TEXT); CREATE TABLE IF NOT EXISTS delivery (id TEXT PRIMARY KEY, state TEXT); CREATE TABLE IF NOT EXISTS control (id TEXT PRIMARY KEY, operation TEXT, disposition TEXT)"
         )
         self.entered = asyncio.Event()
         self.release = asyncio.Event()
@@ -370,7 +384,13 @@ class Host:
     async def record_outcome(self, attempt_id, evidence) -> None:
         from provider_runtime.agent_runtime import AgentTerminal
 
-        if isinstance(evidence, AgentTerminal) and isinstance(
+        if isinstance(evidence, AgentControlReceipt):
+            with self.db:
+                self.db.execute(
+                    "INSERT INTO control VALUES (?,?,?)",
+                    (evidence.request_id, evidence.operation, evidence.disposition),
+                )
+        elif isinstance(evidence, AgentTerminal) and isinstance(
             evidence.evidence, NativeTerminalEvidence
         ):
             with self.db:
@@ -653,6 +673,37 @@ async def test_same_callback_after_recorded_steer_reuses_original_reply_and_line
         assert peer.responses[0]["result"] == peer.responses[1]["result"]
         assert host.invocations["call"].proposal.input_ids == request.input_ids
     finally:
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await provider.shutdown()
+        await runtime.close()
+
+
+async def test_input_recording_before_steer_ack_retains_both_independent_facts(
+    peer, tmp_path
+) -> None:
+    host = Host(tmp_path / "journal.db")
+    peer.record_before_steer_ack = True
+    runtime, provider, lease, definition, request = await setup(peer, host, tmp_path)
+    task = asyncio.create_task(run(host, provider, lease, definition, request, CancellationToken()))
+    try:
+        await asyncio.wait_for(host.entered.wait(), 1)
+        host.append = True
+        await asyncio.wait_for(host.steered.wait(), 1)
+        peer.release_steer_ack.set()
+        await asyncio.sleep(0.05)
+        assert host.db.execute("SELECT state FROM delivery WHERE state='recorded'").fetchone()
+        assert host.db.execute(
+            "SELECT disposition FROM control WHERE operation='steer'"
+        ).fetchone() == ("accepted",)
+        host.release.set()
+        terminal = await asyncio.wait_for(task, 2)
+        assert isinstance(terminal, AgentTerminal)
+        assert terminal.evidence.origin == "native"
+        assert host.calls == 1
+    finally:
+        peer.release_steer_ack.set()
         if not task.done():
             task.cancel()
         await asyncio.gather(task, return_exceptions=True)
