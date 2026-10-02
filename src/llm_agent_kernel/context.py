@@ -59,6 +59,7 @@ class ToolObservation:
     binding: ToolBinding[Any, Any, Any]
     result: ToolResult
     model_step_ordinal: int | None
+    model_text: str
     recomputable: bool = False
     source_references: tuple[str, ...] = ()
     initial_read_position: InvocationPosition | None = field(
@@ -72,6 +73,8 @@ class ToolObservation:
             raise TypeError("an observation requires its exact tool binding")
         if not isinstance(self.result, dict):
             raise TypeError("an observation result must be an llm-tools ToolResult")
+        if type(self.model_text) is not str:
+            raise TypeError("an observation model text must be str")
         if self.initial_read_position is None:
             if type(self.model_step_ordinal) is not int or self.model_step_ordinal <= 0:
                 raise ValueError("observation model-step ordinal must be positive")
@@ -319,11 +322,17 @@ def _observation(observation: ToolObservation) -> PromptSection:
                 str(observation.binding.spec.id),
             ),
         ),
-        body=PromptJson(
-            {
-                "result": observation.result,
-                "source_references": list(observation.source_references),
-            }
+        body=PromptSections(
+            (
+                PromptSection(
+                    PromptSectionKind("model_reply"), (), PromptText(observation.model_text)
+                ),
+                PromptSection(
+                    PromptSectionKind("source_references"),
+                    (),
+                    PromptJson(list(observation.source_references)),
+                ),
+            )
         ),
     )
 

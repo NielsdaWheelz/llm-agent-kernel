@@ -471,12 +471,15 @@ class WaitingFor(StrEnum):
 @dataclass(frozen=True, slots=True)
 class DispatchCompleted:
     result: ToolResult
+    model_text: str
     host_ref: HostRef | None = None
     type: Literal["completed"] = field(default="completed", init=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.result, dict):
             raise TypeError("completed dispatch result must be an llm-tools ToolResult")
+        if type(self.model_text) is not str:
+            raise TypeError("completed dispatch model text must be str")
         if self.host_ref is not None and not isinstance(self.host_ref, HostRef):
             raise TypeError("completed host reference must be HostRef")
 

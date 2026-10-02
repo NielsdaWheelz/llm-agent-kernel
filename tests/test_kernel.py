@@ -36,6 +36,7 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    canonical_json_bytes,
 )
 from provider_runtime.agent_runtime import (
     AgentAccepted,
@@ -577,8 +578,18 @@ async def test_initial_read_precedes_provider_and_shares_budget_with_model_calls
 
     dispatcher = OrderingDispatcher(
         (
-            DispatchCompleted({"type": "Success", "value": {"value": "memory-value"}}),
-            DispatchCompleted({"type": "Success", "value": {"value": "model-value"}}),
+            DispatchCompleted(
+                {"type": "Success", "value": {"value": "memory-value"}},
+                canonical_json_bytes(
+                    {"type": "Success", "value": {"value": "memory-value"}}
+                ).decode(),
+            ),
+            DispatchCompleted(
+                {"type": "Success", "value": {"value": "model-value"}},
+                canonical_json_bytes(
+                    {"type": "Success", "value": {"value": "model-value"}}
+                ).decode(),
+            ),
         )
     )
     owner = _Owner()
@@ -629,6 +640,56 @@ async def test_initial_read_precedes_provider_and_shares_budget_with_model_calls
     assert runtime.opens[0].system[0] == TextContent(KERNEL_BASE_INSTRUCTION)
 
 
+@pytest.mark.parametrize("initial", [True, False])
+async def test_host_model_projection_survives_isolated_initial_and_model_reads(
+    tmp_path: Path, initial: bool
+) -> None:
+    definition, plan, _ = _definition(
+        mode=SessionMode.isolated, structured=True, effect=ToolEffect.Read
+    )
+    scripts = []
+    if not initial:
+        scripts.append(
+            (
+                _terminal(
+                    {
+                        "type": "call_tool",
+                        "tool_id": "test.observe",
+                        "arguments": {"value": "query"},
+                    }
+                ),
+            )
+        )
+    scripts.append((_terminal({"type": "finish", "result": {"answer": "done"}}),))
+    runtime = _Runtime(scripts)
+    original = {"type": "Success", "value": {"value": "original recorder evidence"}}
+    model_text = "authoritative citation [7]"
+    dispatcher = ScriptedToolDispatchPort((DispatchCompleted(original, model_text=model_text),))
+    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
+    outcome = await run_one_shot(
+        decisions=TransientModelDecisions(),
+        run_id=RunId("host-projection"),
+        definition=definition,
+        inputs=(_input(),),
+        as_of=datetime.now(UTC),
+        plan=plan,
+        source_sections=_sections("canonical"),
+        owner=_Owner(),
+        permit=_permit(),
+        provider=provider,
+        dispatcher=dispatcher,
+        budget_factory=_BudgetFactory(),
+        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "query"})
+        if initial
+        else None,
+    )
+    assert isinstance(outcome, OneShotCompleted)
+    sent = "\n".join(cast(TextContent, part).text for part in runtime.turns[-1].input)
+    assert model_text in sent
+    assert "original recorder evidence" not in sent
+    assert dispatcher.calls[0].binding.spec.id == ToolId("test.observe")
+
+
 async def test_declared_initial_read_failure_is_a_typed_first_turn_observation(
     tmp_path: Path,
 ) -> None:
@@ -640,7 +701,14 @@ async def test_declared_initial_read_failure_is_a_typed_first_turn_observation(
     runtime = _Runtime([(_terminal({"type": "finish", "result": {"answer": "no memory"}}),)])
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
     dispatcher = ScriptedToolDispatchPort(
-        (DispatchCompleted({"type": "Failure", "error": {"reason": "not-found"}}),)
+        (
+            DispatchCompleted(
+                {"type": "Failure", "error": {"reason": "not-found"}},
+                canonical_json_bytes(
+                    {"type": "Failure", "error": {"reason": "not-found"}}
+                ).decode(),
+            ),
+        )
     )
 
     outcome = await run_one_shot(
@@ -869,7 +937,14 @@ async def test_initial_read_budget_boundary_is_rendered_without_external_work(
     )
     runtime = _Runtime([(_terminal({"type": "finish", "result": {"answer": "budget closed"}}),)])
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
-    dispatcher = ScriptedToolDispatchPort((DispatchCompleted({"type": "BudgetExceeded"}),))
+    dispatcher = ScriptedToolDispatchPort(
+        (
+            DispatchCompleted(
+                {"type": "BudgetExceeded"},
+                canonical_json_bytes({"type": "BudgetExceeded"}).decode(),
+            ),
+        )
+    )
 
     outcome = await run_one_shot(
         decisions=TransientModelDecisions(),
@@ -936,7 +1011,12 @@ async def test_initial_read_cancellation_before_dispatch_and_after_completion(
             return result
 
     after_dispatcher = CancellingDispatcher(
-        (DispatchCompleted({"type": "Success", "value": {"value": "seen"}}),)
+        (
+            DispatchCompleted(
+                {"type": "Success", "value": {"value": "seen"}},
+                canonical_json_bytes({"type": "Success", "value": {"value": "seen"}}).decode(),
+            ),
+        )
     )
     after = await run_one_shot(
         decisions=TransientModelDecisions(),
@@ -971,7 +1051,14 @@ async def test_initial_read_observation_context_limit_stops_before_provider(
     runtime = _Runtime([])
     provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
     dispatcher = ScriptedToolDispatchPort(
-        (DispatchCompleted({"type": "Success", "value": {"value": "x" * 10_000}}),)
+        (
+            DispatchCompleted(
+                {"type": "Success", "value": {"value": "x" * 10_000}},
+                canonical_json_bytes(
+                    {"type": "Success", "value": {"value": "x" * 10_000}}
+                ).decode(),
+            ),
+        )
     )
     owner = _Owner()
 
@@ -1020,7 +1107,12 @@ async def test_initial_read_dispatch_defects_settle_admission_and_open_no_provid
             raise error
 
     dispatcher = DefectiveDispatcher(
-        (DispatchCompleted({"type": "Success", "value": {"value": "unused"}}),)
+        (
+            DispatchCompleted(
+                {"type": "Success", "value": {"value": "unused"}},
+                canonical_json_bytes({"type": "Success", "value": {"value": "unused"}}).decode(),
+            ),
+        )
     )
     owner = _Owner()
 
@@ -1082,7 +1174,12 @@ async def test_initial_read_commentary_call_is_non_executable_and_usage_settles(
         ]
     )
     dispatcher = ScriptedToolDispatchPort(
-        (DispatchCompleted({"type": "Success", "value": {"value": "memory"}}),)
+        (
+            DispatchCompleted(
+                {"type": "Success", "value": {"value": "memory"}},
+                canonical_json_bytes({"type": "Success", "value": {"value": "memory"}}).decode(),
+            ),
+        )
     )
     owner = _Owner()
 

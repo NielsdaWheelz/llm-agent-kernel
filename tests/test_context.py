@@ -29,6 +29,7 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    canonical_json_bytes,
     render_prompt,
 )
 from provider_runtime.agent_runtime import CredentialRef, TextContent
@@ -283,6 +284,7 @@ def test_tool_only_continuation_gets_no_repeated_input_or_ambient_clock() -> Non
     observation = ToolObservation(
         binding,
         {"type": "Success", "value": {"text": "bounded"}},
+        model_text=canonical_json_bytes({"type": "Success", "value": {"text": "bounded"}}).decode(),
         model_step_ordinal=1,
     )
 
@@ -330,6 +332,9 @@ def test_old_recomputable_read_is_replaced_by_explicit_reference_preserving_mark
     observation = ToolObservation(
         narrow_binding,
         {"type": "Success", "value": {"text": "x" * 2_000}},
+        model_text=canonical_json_bytes(
+            {"type": "Success", "value": {"text": "x" * 2_000}}
+        ).decode(),
         model_step_ordinal=1,
         recomputable=True,
         source_references=("source-42",),
@@ -356,6 +361,9 @@ def test_read_without_a_stable_source_reference_is_not_omittable() -> None:
         ToolObservation(
             binding,
             {"type": "Success", "value": {"text": "temporary"}},
+            model_text=canonical_json_bytes(
+                {"type": "Success", "value": {"text": "temporary"}}
+            ).decode(),
             model_step_ordinal=1,
             recomputable=True,
         )
@@ -370,12 +378,18 @@ def test_write_and_required_context_are_never_silently_truncated() -> None:
         ToolObservation(
             binding,
             {"type": "Success", "value": {"text": "done"}},
+            model_text=canonical_json_bytes(
+                {"type": "Success", "value": {"text": "done"}}
+            ).decode(),
             model_step_ordinal=1,
             recomputable=True,
         )
     observation = ToolObservation(
         binding,
         {"type": "Success", "value": {"text": "effect evidence" * 100}},
+        model_text=canonical_json_bytes(
+            {"type": "Success", "value": {"text": "effect evidence" * 100}}
+        ).decode(),
         model_step_ordinal=1,
     )
 

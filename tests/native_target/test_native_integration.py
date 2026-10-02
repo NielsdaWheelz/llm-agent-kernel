@@ -42,6 +42,7 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    canonical_json_bytes,
 )
 from llm_tools.testing import InMemoryPositionRecorder, RecordingTelemetry
 from provider_runtime.agent_runtime import (
@@ -68,6 +69,7 @@ from llm_agent_kernel import (
     CodexProvider,
     DispatchCompleted,
     HostInput,
+    HostRef,
     InputId,
     InvocationRecord,
     NativeControl,
@@ -447,7 +449,7 @@ class Host:
                 RecordingTelemetry(),
             ),
         )
-        return DispatchCompleted(result)
+        return DispatchCompleted(result, canonical_json_bytes(result).decode())
 
 
 def _sections(text):
@@ -563,6 +565,41 @@ async def test_live_transport_and_progress_while_real_executor_waits(peer, tmp_p
         )
         assert reopened == terminal
         assert peer.starts == 1
+    finally:
+        await provider.shutdown()
+        await runtime.close()
+
+
+async def test_host_projection_is_persisted_and_replied_without_replacing_original_result(
+    peer, tmp_path
+) -> None:
+    model_text = '<section kind="tool_citation" n="7">authoritative citation</section>'
+
+    class CitedHost(Host):
+        async def dispatch(self, **kwargs):
+            original = await super().dispatch(**kwargs)
+            return DispatchCompleted(
+                original.result, model_text=model_text, host_ref=HostRef("original-result")
+            )
+
+    host = CitedHost(tmp_path / "journal.db")
+    host.release.set()
+    runtime, provider, lease, definition, request = await setup(peer, host, tmp_path)
+    try:
+        terminal = await asyncio.wait_for(
+            run(host, provider, lease, definition, request, CancellationToken()), 2
+        )
+        assert isinstance(terminal, AgentTerminal)
+        receipt = host.invocations["call"].reply
+        assert receipt is not None
+        assert isinstance(receipt.result, DispatchCompleted)
+        assert receipt.result.result == {"type": "Success", "value": {"text": "bounded"}}
+        assert receipt.result.host_ref == HostRef("original-result")
+        assert receipt.text == model_text
+        assert host.db.execute("SELECT reply FROM invocation").fetchone() == (model_text,)
+        assert peer.responses[0]["result"]["contentItems"] == [
+            {"type": "inputText", "text": model_text}
+        ]
     finally:
         await provider.shutdown()
         await runtime.close()

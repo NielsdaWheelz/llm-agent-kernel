@@ -48,6 +48,7 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    canonical_json_bytes,
 )
 from provider_runtime.agent_runtime import (
     AgentRuntime,
@@ -380,7 +381,14 @@ async def test_live_one_shot_uses_initial_read_before_first_provider_turn() -> N
     runtime = _ObservingAgentRuntime(runtime_config)
     provider = _shared_provider(runtime, cwd_parent)
     dispatcher = ScriptedToolDispatchPort(
-        (DispatchCompleted({"type": "Success", "value": {"echoed": known_value}}),)
+        (
+            DispatchCompleted(
+                {"type": "Success", "value": {"echoed": known_value}},
+                canonical_json_bytes(
+                    {"type": "Success", "value": {"echoed": known_value}}
+                ).decode(),
+            ),
+        )
     )
     try:
         outcome = await run_one_shot(

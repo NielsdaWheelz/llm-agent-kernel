@@ -667,14 +667,7 @@ def _callback(
 
 def _reply(result: DispatchCompleted | DispatchSuspended | NativeRejected) -> NativeReply:
     if isinstance(result, DispatchCompleted):
-        value = (
-            result.result
-            if result.host_ref is None
-            else {"type": "tool_result", "host_ref": str(result.host_ref), "result": result.result}
-        )
-        return NativeReply(
-            canonical_json_bytes(value).decode(), result.result["type"] == "Success", result
-        )
+        return NativeReply(result.model_text, result.result["type"] == "Success", result)
     if isinstance(result, DispatchSuspended):
         value = {
             "type": "pending_action",
