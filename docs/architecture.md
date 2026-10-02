@@ -1,5 +1,12 @@
 # Architecture
 
+the accepted [native agent target](native-agent-spec.md) extends supervision and
+durable invocation evidence. it is not part of the implemented architecture
+described below; see [the adversarial review](native-agent-review.md) for gaps.
+the target's APIs, schemas and composition are defined in the
+[native contract](native-agent-spec.md#2-ownership-and-protocols), with exact
+[delivery boundaries](native-agent-plan.md). no second application agent loop is planned.
+
 ## System boundary
 
 The contained AgentRuntime architecture below remains one explicit protocol.

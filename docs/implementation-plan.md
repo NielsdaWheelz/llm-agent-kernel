@@ -3,6 +3,13 @@
 Implementation begins only after an explicit request. Each slice closes one
 boundary and passes its assigned acceptance criteria before the next begins.
 
+accepted target: [native agent supervision](native-agent-spec.md#9-delivery-and-acceptance)
+owns n1–n5 and acceptance N001–N020. nexus lifecycle repair can land before
+experimental callback adoption. these slices are not implementation authorization;
+the accepted slices and K001–K064 below retain their current meaning.
+the [native delivery plan](native-agent-plan.md) defines the file boundaries,
+red/green/refactor/deletion sequence and hard cutovers.
+
 The 2026-09-09 Nexus implementation is authorized by ADR 0008. Slice 5 owns
 K053–K058: first establish the portable behavior reds, then move Nexus's
 native-child and ordered-tool choreography into `generation.py`, qualify the

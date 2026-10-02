@@ -11,6 +11,10 @@ containment, and host action boundary remain mandatory. Section 17 requires
 original paid-decision journaling and supersedes earlier attempt-local recovery
 and BilledOnce-recomputation allowances.
 
+section 18 adopts the native supervision target and its linked detailed contract.
+[adr 0010](docs/decisions/0010-native-agent-supervision.md) records the decision.
+this is accepted design, not a claim of implemented or qualified capability.
+
 ## 1. Goals
 
 V1 provides a reusable Python 3.12 kernel that:
@@ -1293,3 +1297,80 @@ the kernel does not own its schema and canonical prompt text grants no authority
 BilledOnce tools use original lineage positions and a durable llm-tools recorder.
 Writes still require the original host action/effect record and policy barrier.
 The journal owns no scheduler, effect, action approval, or reconciliation policy.
+
+## 18. native agent target requirements
+
+status: accepted target contract; implementation and native qualification pending.
+these requirements apply to the planned native callback protocol for jarvis and
+nexus. sections 1–17 describe the existing protocols until their explicit cutovers.
+the [native supervision contract](docs/native-agent-spec.md) is normative for this
+extension, including its delivery dependencies and N001–N020 acceptance criteria.
+
+the accepted codapt-derived kernel contract is the source of truth for shared
+agent behavior. llm-tools, provider-runtime and consumer contracts MUST adapt to
+it where necessary; current APIs and pins do not constrain the target design.
+codapt2 supplies the reference behavior, subject to the explicit choices here.
+dependency changes retain clear ownership and require qualified immutable pins
+at integration; design authority does not move their implementations into the kernel.
+
+- model usage limits are not required. the native protocol MUST NOT require token,
+  spend, cumulative model-turn or task-wide tool-call budgets, reservations for those budgets,
+  or a hard/soft budget selection. usage reporting may remain observational;
+  absent usage MUST NOT itself block work. this supersedes section 9.3's usage
+  reservation requirement for native orchestration and the affected isolated
+  gate/context/memory roles. those roles retain independently selected per-operation
+  request bounds; parent/gate rolling capacity reservations are removed together.
+- neither application requires model-native shell, file or network tools. the
+  target MUST expose application tools through declared contained callbacks and
+  MUST NOT broaden native authority to make an integration work. provider network
+  transport and explicit host tools such as research/storage are separate owners.
+- nexus's existing shell/http route is a migration source, not a permanent second
+  tool interface in the target. qualify callbacks and retire the replaced route;
+  an unsupported callback capability is not permission for a hidden shell fallback.
+- the native recovery policy MUST be explicit and frozen with the request.
+  jarvis selects automatic reasoning recovery from canonical context and recorded
+  tool results after old callback authority is
+  fenced. retain the old attempt's uncertainty; a new attempt does not prove the
+  old one was never submitted or has stopped. recover existing actions first;
+  an uncertain external effect still requires host reconciliation. section 17.2's
+  ban on redispatch does not prohibit this new reasoning attempt in the target.
+  nexus metadata selects `reconcile_only`: an uncertain journal step MUST block
+  redispatch. automatic jarvis recovery cannot override that consumer contract.
+- current ownership, validated invocation, durable action/result, stop and bounded
+  transport-buffer requirements remain necessary. removing usage budgets does not
+  remove the effect boundary or permit concurrent owners of the same work.
+- jarvis main MUST NOT stop merely because a fixed elapsed-time window expired.
+  it continues until completion, a real blocker, required input or owner
+  stop. transport/tool operation timeouts remain distinct from task lifetime;
+  nexus retains its separately selected job deadlines.
+- a pending approval MUST block only that action and work dependent on its outcome.
+  jarvis continues independent work and waits when nothing useful remains.
+  persist the original action and return its pending status to the callback;
+  do not hold the callback or suspend the whole task solely to await approval.
+  later approval/resolution refers to that exact action and becomes ordinary host
+  input. it MUST NOT cause the model to propose the effect again. pending actions
+  MUST NOT be presented as completed, and owner stop still prevents automatic
+  restart. the host retains approval and action-execution policy.
+- owner stop MUST cancel still-pending approvals for the stopped work. approval
+  and stop MUST be serialized against the same durable work/action authority:
+  after stop wins, a stale approval cannot dispatch. already-dispatched actions
+  retain settlement/reconciliation obligations. resumption requires fresh approval
+  of the exact action where policy requires approval; it cannot reactivate a
+  cancelled approval or duplicate an already-dispatched effect.
+- jarvis MUST support brief public progress messages and useful partial answers
+  during ongoing work. deliver substantive findings, changes of direction and
+  blockers without waiting for the final native terminal. such messages are
+  observational: they MUST NOT authorize tools, settle actions, publish a strict
+  structured result or establish task completion. application status comes from
+  recorded outcomes; prompts require truthful descriptions of pending work.
+- ordinary new requests in an active jarvis conversation MUST reach the agent
+  promptly so it can answer or reprioritize. retain unfinished work unless the
+  owner cancels it; do not queue a request merely because its topic differs.
+  steering MUST preserve durable input identity and MUST NOT change the frozen
+  tool authority or output contract. incompatible configuration changes require
+  a correctly admitted subsequent turn. this is input supervision, not a kernel
+  task scheduler or a new persistent work registry.
+
+the [delivery plan](docs/native-agent-plan.md) assigns implementation and proof.
+the [metadata handoff](docs/integrations/nexus-metadata.md) owns the exact concurrent
+consumer requirement and readiness report. no current runtime change is implied.

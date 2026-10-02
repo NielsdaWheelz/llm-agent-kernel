@@ -1,5 +1,10 @@
 # Acceptance criteria
 
+native supervision criteria N001–N020 and their exclusive slice owners
+live in the [native agent spec](native-agent-spec.md#9-delivery-and-acceptance).
+they specify the accepted target and remain `NOT_RUN`. unchanged existing
+protocols retain the baseline criteria below until their explicit cutovers.
+
 These criteria are the implementation's release contract. Every ID is
 assigned to exactly one implementation slice.
 

@@ -15,6 +15,12 @@ This repository specifies and contains `llm-agent-kernel`, imported as
   recoverable work and explicit transient selection for disposable inference.
 - `SPEC.md` is normative. Architecture, acceptance, slices, and ADRs must agree
   with it.
+- SPEC section 18 and ADR 0010 adopt the native target in
+  `docs/native-agent-spec.md`; `docs/native-agent-plan.md` assigns its delivery.
+  Its explicit amendments govern the new protocol and hard cutovers, including
+  prepared provider turns, optional cumulative quotas and owner-only admission.
+  existing v1 restrictions below describe the current contained protocol; they
+  do not veto the accepted target. implementation remains pending.
 - The public `llm-tools` seams in SPEC section 2 are qualified and locked at the
   exact immutable revision recorded there and in `pyproject.toml`/`uv.lock`.
 

@@ -11,3 +11,4 @@
 | [0007](0007-configuration-defect-parking.md) | Park configuration defects atomically | Accepted |
 | [0008](0008-shared-generation-orchestration.md) | Share ordered generation choreography with Nexus | Accepted |
 | [0009](0009-durable-paid-decisions.md) | Retain original paid decisions and uncertainty | Accepted |
+| [0010](0010-native-agent-supervision.md) | supervise native agents with explicit submission and invocation evidence | accepted target; implementation pending |

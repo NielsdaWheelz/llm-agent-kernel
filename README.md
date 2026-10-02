@@ -3,6 +3,13 @@
 `llm-agent-kernel` is a small Python control plane for bounded, tool-using
 agents. Applications import `llm_agent_kernel`.
 
+the accepted target [native agent spec](docs/native-agent-spec.md) and
+[adversarial review](docs/native-agent-review.md) cover selective codapt extraction,
+jarvis callbacks and nexus lifecycle repair. they describe planned work, not
+current capabilities.
+the [implementation plan](docs/native-agent-plan.md) assigns delivery and proof;
+the [metadata handoff](docs/integrations/nexus-metadata.md) records integration readiness.
+
 It turns host-owned durable input into validated model steps, serial tool
 observations, and durable host conclusions. Reasoning never grants authority:
 the native provider containment policy and the host-selected frozen
