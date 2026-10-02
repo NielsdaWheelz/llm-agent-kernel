@@ -51,9 +51,11 @@ class Fixture:
         assert cancellation is self.cancellation
         await arm()
         self.timeline.append(f"provider:{turn.ordinal}")
-        for frame in self.frames[turn.ordinal]:
-            yield frame
-        self.timeline.append(f"stream_closed:{turn.ordinal}")
+        try:
+            for frame in self.frames[turn.ordinal]:
+                yield frame
+        finally:
+            self.timeline.append(f"stream_closed:{turn.ordinal}")
 
     def successor(
         self,
@@ -66,10 +68,12 @@ class Fixture:
     async def arm(self, turn: GenerationTurn[str]) -> None:
         self.timeline.append(f"arm:{turn.ordinal}")
 
-    async def complete(self, turn: GenerationTurn[str], terminal: Terminal) -> Terminal:
+    async def record_terminal(self, turn: GenerationTurn[str], terminal: Terminal) -> None:
         self.timeline.append(f"commit:{turn.ordinal}")
         if self.fail_commit:
             raise RuntimeError("durable commit failed")
+
+    async def resolve_terminal(self, turn: GenerationTurn[str], terminal: Terminal) -> Terminal:
         if self.drop_continuation:
             return replace(terminal, value="host stopped", continuation=None)
         return terminal
@@ -124,8 +128,8 @@ async def test_terminal_commit_and_acknowledgment_precede_ordered_tools_and_succ
     assert fixture.timeline == [
         "arm:1",
         "provider:1",
-        "stream_closed:1",
         "commit:1",
+        "stream_closed:1",
         "observe:proposal:a",
         "observe:proposal:b",
         "observe:needs tools",
@@ -135,8 +139,8 @@ async def test_terminal_commit_and_acknowledgment_precede_ordered_tools_and_succ
         "successor:a,b",
         "arm:2",
         "provider:2",
-        "stream_closed:2",
         "commit:2",
+        "stream_closed:2",
         "observe:answer",
     ]
 
@@ -145,15 +149,13 @@ async def test_terminal_commit_and_acknowledgment_precede_ordered_tools_and_succ
 @pytest.mark.parametrize(
     "late", [GenerationObservation(2, "late"), GenerationTerminal(2, "second")]
 )
-async def test_any_event_after_terminal_prevents_commit_acknowledgment_and_tools(
+async def test_sealed_terminal_ends_observation_before_unconsumed_tail(
     late: Frame,
 ) -> None:
     fixture = Fixture({1: (*tool_turn("a"), late)})
-    with pytest.raises(GenerationDefect, match="after terminal"):
-        await fixture.run()
-    assert not any(
-        value.startswith(("commit", "observe", "tool", "open")) for value in fixture.timeline
-    )
+    fixture.frames[2] = (GenerationTerminal(0, "answer"),)
+    assert await fixture.run() == GenerationCompleted("answer", 2)
+    assert "observe:late" not in fixture.timeline
 
 
 @pytest.mark.asyncio
@@ -161,7 +163,7 @@ async def test_commit_failure_prevents_tool_publication_and_dispatch() -> None:
     fixture = Fixture({1: tool_turn("a")}, fail_commit=True)
     with pytest.raises(RuntimeError, match="durable commit"):
         await fixture.run()
-    assert fixture.timeline == ["arm:1", "provider:1", "stream_closed:1", "commit:1"]
+    assert fixture.timeline == ["arm:1", "provider:1", "commit:1", "stream_closed:1"]
 
 
 @pytest.mark.asyncio
@@ -247,7 +249,7 @@ async def test_nonmonotonic_events_never_commit_terminal(sequence: int) -> None:
 
 
 @pytest.mark.asyncio
-async def test_mismatched_continuation_arguments_fail_before_commit_or_dispatch() -> None:
+async def test_mismatched_continuation_preserves_native_truth_but_never_dispatches() -> None:
     continuation = GenerationContinuation(1, "state", (GenerationToolCall("a", "substituted"),))
     fixture = Fixture(
         {
@@ -259,7 +261,8 @@ async def test_mismatched_continuation_arguments_fail_before_commit_or_dispatch(
     )
     with pytest.raises(GenerationDefect, match="ordered tool proposals"):
         await fixture.run()
-    assert "commit:1" not in fixture.timeline
+    assert "commit:1" in fixture.timeline
+    assert not any(value.startswith(("observe", "tool")) for value in fixture.timeline)
 
 
 @pytest.mark.asyncio
@@ -282,11 +285,12 @@ async def test_proposals_without_continuation_are_not_dispatched() -> None:
     )
     with pytest.raises(GenerationDefect, match="omitted"):
         await fixture.run()
-    assert not any(value.startswith(("commit", "observe", "tool")) for value in fixture.timeline)
+    assert "commit:1" in fixture.timeline
+    assert not any(value.startswith(("observe", "tool")) for value in fixture.timeline)
 
 
 @pytest.mark.asyncio
-async def test_late_stream_failure_cannot_publish_or_commit_a_terminal() -> None:
+async def test_unconsumed_tail_cannot_erase_a_sealed_terminal() -> None:
     class LateFailure(Fixture):
         async def stream(self, turn, *, arm, cancellation):
             await arm()
@@ -294,9 +298,8 @@ async def test_late_stream_failure_cannot_publish_or_commit_a_terminal() -> None
             raise RuntimeError("late provider protocol defect")
 
     fixture = LateFailure({})
-    with pytest.raises(RuntimeError, match="late provider"):
-        await fixture.run()
-    assert fixture.timeline == ["arm:1"]
+    assert await fixture.run() == GenerationCompleted("answer", 1)
+    assert fixture.timeline == ["arm:1", "commit:1", "observe:answer"]
 
 
 @pytest.mark.asyncio
@@ -345,7 +348,7 @@ async def test_cancellation_during_admission_prevents_arming_or_dispatch() -> No
 @pytest.mark.asyncio
 async def test_host_continuation_substitution_prevents_observation_and_tools() -> None:
     class Substitution(Fixture):
-        async def complete(self, turn, terminal):
+        async def resolve_terminal(self, turn, terminal):
             assert terminal.continuation is not None
             return replace(
                 terminal, continuation=replace(terminal.continuation, payload="other decision")

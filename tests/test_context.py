@@ -39,13 +39,11 @@ from llm_agent_kernel.context import (
     ToolObservation,
     bootstrap_context,
     continuation_context,
-    run_context,
 )
 from llm_agent_kernel.definitions import (
     AgentDefinition,
     AgentRole,
     BatchAsOfMode,
-    ConversationalOutput,
     DefinitionId,
     HostInput,
     InputId,
@@ -109,8 +107,8 @@ def _definition(*, effect: ToolEffect = ToolEffect.Read, max_new_context_bytes: 
         definition_id=DefinitionId("assistant"),
         role=AgentRole("assistant", PromptSections((_section("role", "Be useful."),))),
         stable_context=PromptSections((_section("application", "Stable application."),)),
-        session_mode=SessionMode.continuing,
-        output_contract=ConversationalOutput(),
+        session_mode=SessionMode.isolated,
+        output_contract=StructuredOutput("context_result", Success),
         maximum_profile=maximum,
         provider=ProviderConfiguration(
             auth=CredentialRef("local_account", "owner"),
@@ -238,14 +236,14 @@ def test_batch_as_of_on_request_does_not_expose_source_timestamps() -> None:
     )
     as_of = datetime(2026, 9, 2, 12, 1, tzinfo=UTC)
 
-    hidden = run_context(
+    hidden = bootstrap_context(
         definition,
         (_input(),),
         as_of,
         plan,
         PromptSections(()),
     )
-    visible = run_context(
+    visible = bootstrap_context(
         definition,
         (_input(),),
         as_of,
@@ -278,23 +276,6 @@ def test_unauthorized_batch_as_of_projection_is_rejected_before_rendering() -> N
             PromptSections(()),
             input_projection=InputProjectionRequest(render_batch_as_of=True),
         )
-
-
-def test_healthy_run_context_sends_dynamic_material_without_repeating_stable_context() -> None:
-    definition, plan, _binding = _definition()
-
-    projection = run_context(
-        definition,
-        (_input(),),
-        datetime(2026, 9, 2, 12, 1, tzinfo=UTC),
-        plan,
-        PromptSections((_section("retrieved", "Fresh retrieval."),)),
-    )
-
-    assert "Fresh retrieval." in projection.rendered
-    assert "Be useful." not in projection.rendered
-    assert "Stable application." not in projection.rendered
-    assert 'kind="host_table"' in projection.rendered
 
 
 def test_tool_only_continuation_gets_no_repeated_input_or_ambient_clock() -> None:

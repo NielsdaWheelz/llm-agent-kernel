@@ -38,13 +38,9 @@ _PRIVATE_NAME_PARTS = frozenset(
 
 
 class EventKind(StrEnum):
-    claim = "claim"
-    admission = "admission"
     provider_turn = "provider_turn"
     validation = "validation"
     tool_dispatch = "tool_dispatch"
-    suspension = "suspension"
-    settlement = "settlement"
     usage = "usage"
     cancellation = "cancellation"
     outcome = "outcome"

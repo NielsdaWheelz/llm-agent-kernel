@@ -7,7 +7,6 @@ lowering, tool execution, domain storage, or the meaning of a native terminal.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
@@ -97,6 +96,7 @@ type GenerationFrame[Event, Terminal, State, Call] = (
 class GenerationCompleted[Terminal]:
     terminal: Terminal = field(repr=False)
     last_ordinal: int
+    cleanup_diagnostics: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +104,7 @@ class GenerationStopped[Terminal]:
     reason: Literal["cancelled", "turn_limit"]
     last_terminal: Terminal | None = field(repr=False)
     last_ordinal: int
+    cleanup_diagnostics: tuple[str, ...] = ()
 
 
 class GenerationDriver[Request, Event, Terminal, State, Call, Result](Protocol):
@@ -135,14 +136,26 @@ class GenerationLifecycle[Request, Terminal, State, Call](Protocol):
         """Durably record dispatch uncertainty under the current host claim."""
         ...
 
-    async def complete(
+    async def record_terminal(
+        self,
+        turn: GenerationTurn[Request],
+        terminal: GenerationTerminal[Terminal, State, Call],
+    ) -> None:
+        """Commit original sealed native truth before product work or cleanup.
+
+        An identical replay is idempotent; changed evidence is a defect. This
+        transaction owns no product decoder and cannot span external I/O.
+        """
+        ...
+
+    async def resolve_terminal(
         self,
         turn: GenerationTurn[Request],
         terminal: GenerationTerminal[Terminal, State, Call],
     ) -> GenerationTerminal[Terminal, State, Call]:
-        """Atomically store terminal and exact successor decision before returning.
+        """Resolve the already committed terminal through local product work.
 
-        The host may resolve its terminal and drop continuation, but may not
+        The host may project its terminal and drop continuation, but may not
         substitute continuation or terminal identity. No database transaction
         may remain open across provider or tool I/O.
         """
@@ -181,7 +194,7 @@ async def run_generation[Request, Event, Terminal, State, Call, Result](
     tools: GenerationTools[Call, Result],
     observer: GenerationObserver[Event, Terminal],
     cancellation: CancelSignal,
-    max_turns: int,
+    max_turns: int | None,
 ) -> GenerationCompleted[Terminal] | GenerationStopped[Terminal]:
     """Execute bounded native children without taking over their native protocol.
 
@@ -190,7 +203,7 @@ async def run_generation[Request, Event, Terminal, State, Call, Result](
     the application must persist and publish that separate orchestration outcome.
     Task cancellation and boundary failures propagate without automatic retries.
     """
-    if type(max_turns) is not int or max_turns < 1:
+    if max_turns is not None and (type(max_turns) is not int or max_turns < 1):
         raise ValueError("generation maximum turns must be positive")
     if not isinstance(start, GenerationTurn | GenerationContinuation):
         raise GenerationDefect("generation start has an unknown closed type")
@@ -198,36 +211,45 @@ async def run_generation[Request, Event, Terminal, State, Call, Result](
         raise GenerationDefect("a later generation turn must start from its committed continuation")
 
     last_terminal: Terminal | None = None
+    cleanup_diagnostics: tuple[str, ...] = ()
     last_ordinal = start.source_ordinal if isinstance(start, GenerationContinuation) else 0
     current = start
     while True:
         if cancellation.is_set():
-            return GenerationStopped("cancelled", last_terminal, last_ordinal)
+            return GenerationStopped("cancelled", last_terminal, last_ordinal, cleanup_diagnostics)
         if isinstance(current, GenerationContinuation):
-            if current.source_ordinal >= max_turns:
-                return GenerationStopped("turn_limit", last_terminal, last_ordinal)
+            if max_turns is not None and current.source_ordinal >= max_turns:
+                return GenerationStopped(
+                    "turn_limit", last_terminal, last_ordinal, cleanup_diagnostics
+                )
             results: list[GenerationToolResult[Result]] = []
             for call in current.calls:
                 if cancellation.is_set():
-                    return GenerationStopped("cancelled", last_terminal, last_ordinal)
+                    return GenerationStopped(
+                        "cancelled", last_terminal, last_ordinal, cleanup_diagnostics
+                    )
                 result = await tools.execute(current.source_ordinal, call)
                 if not isinstance(result, GenerationToolResult) or result.call_id != call.call_id:
                     raise GenerationDefect("generation tool result differs from its call identity")
                 results.append(result)
             if cancellation.is_set():
-                return GenerationStopped("cancelled", last_terminal, last_ordinal)
+                return GenerationStopped(
+                    "cancelled", last_terminal, last_ordinal, cleanup_diagnostics
+                )
             await lifecycle.open(current)
             if cancellation.is_set():
-                return GenerationStopped("cancelled", last_terminal, last_ordinal)
+                return GenerationStopped(
+                    "cancelled", last_terminal, last_ordinal, cleanup_diagnostics
+                )
             turn = driver.successor(current, tuple(results))
             if not isinstance(turn, GenerationTurn) or turn.ordinal != current.source_ordinal + 1:
                 raise GenerationDefect("generation successor is not the next ordered turn")
         else:
             turn = current
         if cancellation.is_set():
-            return GenerationStopped("cancelled", last_terminal, last_ordinal)
+            return GenerationStopped("cancelled", last_terminal, last_ordinal, cleanup_diagnostics)
         try:
-            terminal, proposals = await _consume_turn(
+            terminal, proposals, diagnostics = await _consume_turn(
                 turn=turn,
                 driver=driver,
                 lifecycle=lifecycle,
@@ -235,8 +257,9 @@ async def run_generation[Request, Event, Terminal, State, Call, Result](
                 cancellation=cancellation,
             )
         except _CancelledBeforeDispatch:
-            return GenerationStopped("cancelled", last_terminal, last_ordinal)
-        completed = await lifecycle.complete(turn, terminal)
+            return GenerationStopped("cancelled", last_terminal, last_ordinal, cleanup_diagnostics)
+        cleanup_diagnostics += diagnostics
+        completed = await lifecycle.resolve_terminal(turn, terminal)
         if not isinstance(completed, GenerationTerminal) or completed.sequence != terminal.sequence:
             raise GenerationDefect("generation lifecycle changed terminal identity")
         if completed.continuation is not None and completed.continuation != terminal.continuation:
@@ -247,7 +270,7 @@ async def run_generation[Request, Event, Terminal, State, Call, Result](
             await observer.observe(proposal.value)
         await observer.observe(completed.value)
         if completed.continuation is None:
-            return GenerationCompleted(completed.value, last_ordinal)
+            return GenerationCompleted(completed.value, last_ordinal, cleanup_diagnostics)
         current = completed.continuation
 
 
@@ -262,7 +285,11 @@ async def _consume_turn[Request, Event, Terminal, State, Call, Result](
     lifecycle: GenerationLifecycle[Request, Terminal, State, Call],
     observer: GenerationObserver[Event, Terminal],
     cancellation: CancelSignal,
-) -> tuple[GenerationTerminal[Terminal, State, Call], tuple[GenerationProposal[Call, Event], ...]]:
+) -> tuple[
+    GenerationTerminal[Terminal, State, Call],
+    tuple[GenerationProposal[Call, Event], ...],
+    tuple[str, ...],
+]:
     armed = False
     arm_started = False
 
@@ -277,15 +304,16 @@ async def _consume_turn[Request, Event, Terminal, State, Call, Result](
         armed = True
 
     terminal: GenerationTerminal[Terminal, State, Call] | None = None
+    recorded = False
+    diagnostics: tuple[str, ...] = ()
     proposals: list[GenerationProposal[Call, Event]] = []
     sequence = -1
     stream = driver.stream(turn, arm=arm, cancellation=cancellation)
-    async with aclosing(stream):
+    primary_error: BaseException | None = None
+    try:
         async for frame in stream:
             if not armed:
                 raise GenerationDefect("generation evidence arrived before durable dispatch arming")
-            if terminal is not None:
-                raise GenerationDefect("generation stream emitted an event after terminal")
             if not isinstance(
                 frame, GenerationObservation | GenerationProposal | GenerationTerminal
             ):
@@ -299,6 +327,26 @@ async def _consume_turn[Request, Event, Terminal, State, Call, Result](
                 proposals.append(frame)
             else:
                 terminal = frame
+                await lifecycle.record_terminal(turn, terminal)
+                recorded = True
+                break
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        try:
+            await stream.aclose()
+        except Exception as error:
+            if primary_error is not None:
+                primary_error.add_note(
+                    f"{type(error).__name__}: generation stream cleanup also failed"
+                )
+            elif not recorded:
+                raise
+            else:
+                diagnostics = (
+                    f"{type(error).__name__}: stream cleanup failed after native terminal",
+                )
     if terminal is None:
         raise GenerationDefect("generation stream ended without terminal truth")
     continuation = terminal.continuation
@@ -309,7 +357,7 @@ async def _consume_turn[Request, Event, Terminal, State, Call, Result](
         proposal.call for proposal in proposals
     ):
         raise GenerationDefect("generation continuation differs from its ordered tool proposals")
-    return terminal, tuple(proposals)
+    return terminal, tuple(proposals), diagnostics
 
 
 __all__ = [

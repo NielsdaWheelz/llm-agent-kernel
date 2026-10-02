@@ -5,7 +5,6 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import FrozenInstanceError, fields, replace
-from datetime import UTC, datetime
 from inspect import signature
 from types import SimpleNamespace
 from typing import Any
@@ -75,32 +74,18 @@ from llm_agent_kernel import (
     ToolBudgetFactoryPort,
     bootstrap_context,
     continuation_context,
-    run_context,
-)
-from llm_agent_kernel.coordination import (
-    AdmissionRequest,
-    AdmissionToken,
-    AppendInputs,
 )
 from llm_agent_kernel.definitions import (
     AgentDefinition,
     AgentRole,
-    Checkpoint,
-    ClaimId,
-    ConversationalOutput,
     DefinitionId,
-    DispatchLineage,
-    HostInput,
-    InputClaim,
-    InputId,
     KernelLimits,
     ProviderConfiguration,
     RunId,
     SessionMode,
     StructuredOutput,
-    ThreadId,
 )
-from llm_agent_kernel.kernel import run_one_shot, run_thread
+from llm_agent_kernel.kernel import run_one_shot
 
 
 class Input(BaseModel):
@@ -155,7 +140,8 @@ def test_dependency_provider_event_contracts_are_exact() -> None:
         "failure",
         "final_text",
         "session_ref",
-        "structured_output",
+        "evidence",
+        "raw_structured_output",
         "usage",
         "diagnostics",
     ]
@@ -275,25 +261,11 @@ def _definition(**provider_changes: object) -> AgentDefinition:
         definition_id=DefinitionId("assistant"),
         role=AgentRole("assistant", _sections("Help the user.")),
         stable_context=_sections("Stable application context."),
-        session_mode=SessionMode.continuing,
-        output_contract=ConversationalOutput(),
+        session_mode=SessionMode.isolated,
+        output_contract=StructuredOutput("test_result", Success),
         maximum_profile=profile,
         provider=ProviderConfiguration(**provider_values),
         session_compatibility_revision="contract-test-v1",
-    )
-
-
-def _claim():
-    catalog, profile, _ = _catalog_and_profile()
-    plan = ToolPlan(profile.id, HostTable()).freeze(catalog, profile)
-    host_input = HostInput(InputId("input-1"), _sections("hello"), datetime.now(UTC))
-    return InputClaim(
-        ClaimId("claim-1"),
-        (host_input,),
-        Checkpoint("checkpoint-1"),
-        datetime.now(UTC),
-        plan,
-        1,
     )
 
 
@@ -430,7 +402,7 @@ async def test_dependency_web_read_v2_extraction_locators_are_exact(
 
 def test_entry_points_require_the_exported_plan_aware_budget_factory() -> None:
     assert ToolBudgetFactoryPort.__name__ == "ToolBudgetFactoryPort"
-    for entry_point in (run_thread, run_one_shot):
+    for entry_point in (run_one_shot,):
         parameters = signature(entry_point).parameters
         assert "budget_factory" in parameters
         assert "budgets" not in parameters
@@ -469,10 +441,8 @@ def test_input_projection_public_api_is_exact() -> None:
     assert InputProjectionPolicy().resolve(None) == (True, True)
     assert InputProjectionRequest().render_batch_as_of is False
     for entry_point in (
-        run_thread,
         run_one_shot,
         bootstrap_context,
-        run_context,
         continuation_context,
     ):
         parameter = signature(entry_point).parameters["input_projection"]
@@ -543,7 +513,6 @@ def test_definition_fingerprint_rotates_for_every_configurable_session_scope() -
         replace(first, role=AgentRole(first.role.role_id, _sections("Other role."))),
         replace(first, session_compatibility_revision="contract-test-v2"),
         replace(first, stable_context=_sections("Other stable context.")),
-        replace(first, session_mode=SessionMode.isolated),
         replace(first, output_contract=StructuredOutput("answer", Result)),
         replace(first, maximum_profile=changed_profile),
         replace(
@@ -638,61 +607,3 @@ def test_structured_output_requires_a_closed_object() -> None:
 def test_kernel_limits_are_finite_and_bounded(change: dict[str, object]) -> None:
     with pytest.raises((TypeError, ValueError)):
         KernelLimits(**change)  # type: ignore[arg-type]
-
-
-def test_claim_and_append_batches_are_non_empty() -> None:
-    claim = _claim()
-    with pytest.raises(ValueError, match="non-empty"):
-        InputClaim(
-            claim.claim_id,
-            (),
-            claim.through_checkpoint,
-            claim.as_of,
-            claim.plan,
-            claim.attempt_number,
-        )
-    with pytest.raises(ValueError, match="must not be empty"):
-        AppendInputs((), Checkpoint("checkpoint-2"), datetime.now(UTC))
-
-
-def test_only_an_isolated_admission_may_share_a_parent_slot() -> None:
-    parent = AdmissionToken(RunId("root"), "window", "epoch", 8, 100, 100, True)
-    with pytest.raises(ValueError, match="thread admission cannot share"):
-        AdmissionRequest(
-            RunId("child"),
-            ThreadId("thread"),
-            1,
-            1,
-            1,
-            1,
-            parent,
-        )
-
-
-def test_thread_dispatch_lineage_is_complete_and_immutable() -> None:
-    lineage = DispatchLineage(
-        ClaimId("claim-1"),
-        Checkpoint("checkpoint-2"),
-        (InputId("input-1"), InputId("input-2")),
-        3,
-        "a" * 64,
-        "b" * 64,
-    )
-
-    assert lineage.input_ids == (InputId("input-1"), InputId("input-2"))
-    assert lineage.definition_fingerprint == "a" * 64
-    with pytest.raises(FrozenInstanceError):
-        lineage.model_step_ordinal = 4  # type: ignore[misc]
-
-
-@pytest.mark.parametrize("fingerprint", ["", "a" * 63, "g" * 64, "A" * 64, None])
-def test_thread_dispatch_requires_exact_definition_identity(fingerprint: object) -> None:
-    with pytest.raises(ValueError, match="definition fingerprint"):
-        DispatchLineage(
-            ClaimId("claim"),
-            Checkpoint("checkpoint"),
-            (InputId("input"),),
-            1,
-            fingerprint,  # type: ignore[arg-type]
-            "b" * 64,
-        )

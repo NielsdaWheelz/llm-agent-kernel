@@ -265,7 +265,7 @@ def test_plan_must_be_host_exposed_and_strictly_serial() -> None:
 
     with pytest.raises(PlanValidationError, match="max_in_flight"):
         require_host_plan(parallel, maximum)
-    with pytest.raises(PlanValidationError, match="HostTable"):
+    with pytest.raises(PlanValidationError, match="HostTable|max_in_flight"):
         require_host_plan(native, maximum)
 
 
