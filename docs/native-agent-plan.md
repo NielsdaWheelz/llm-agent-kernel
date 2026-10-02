@@ -1,9 +1,8 @@
 # native agent implementation plan
 
-status: design work; runtime implementation and all target acceptance are
-`NOT_RUN`. the [contract](native-agent-spec.md) owns behavior, types and schemas;
-this document owns delivery, file boundaries and proof. no code is changed by
-accepting this plan. the [metadata handoff](integrations/nexus-metadata.md) records
+status: implementation in progress; exact qualification status is recorded in
+[implementation evidence](native-agent-evidence.md). the [contract](native-agent-spec.md) owns behavior, types and schemas;
+this document owns delivery, file boundaries and proof. the accepted scope is implemented on isolated feature branches. the [metadata handoff](integrations/nexus-metadata.md) records
 the separately running consumer and exact capability requirement.
 
 ## working rules
@@ -251,5 +250,5 @@ external action merely to restore a former schema.
 
 finish by updating the owning specs/ADRs, deleting resolved issue records and
 removing task-owned temporary resources. retain open issues only for evidence not
-yet established. no deployments, paid calls or edits to the metadata worktree are
-authorized by this documentation task.
+yet established. implementation and paid qualification calls were subsequently authorized.
+no deployment or edit to the metadata worktree is included.

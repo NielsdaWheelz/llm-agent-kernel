@@ -1,7 +1,7 @@
 # native agent supervision
 
-status: accepted target, detailed design 2026-10-02; implementation and target
-qualification are NOT_RUN. [SPEC section 18](../SPEC.md#18-native-agent-target-requirements)
+status: accepted contract, 2026-10-02; implementation status and exact target
+qualification are recorded in [evidence](native-agent-evidence.md). [SPEC section 18](../SPEC.md#18-native-agent-target-requirements)
 and [adr 0010](decisions/0010-native-agent-supervision.md) adopt this contract.
 the [delivery plan](native-agent-plan.md) owns files, sequencing, tests and cutovers.
 the [review](native-agent-review.md) owns baseline evidence; the
@@ -68,10 +68,11 @@ values/ports. reuse existing identity, context, output, dispatch and tool types.
 class NativeDefinition:
     provider: ProviderConfiguration
     role: AgentRole
-    output: OutputContract
+    output: AgentOutputSpec
     maximum_profile: FrozenCapabilityProfile
     compatibility_revision: str
     control: NativeControl
+
 
 @dataclass(frozen=True)
 class NativeControl:
@@ -81,6 +82,7 @@ class NativeControl:
     pending_calls: int = 16
     pending_call_bytes: int = 1_048_576
 
+
 @dataclass(frozen=True)
 class OwnerPermit:
     scope_id: str
@@ -88,15 +90,23 @@ class OwnerPermit:
     operation_id: str
     parent_invocation_id: str | None
 
+
 class OwnerPort(Protocol):
     async def require_current(self, permit: OwnerPermit) -> None: ...
 
+
 async def run_native(
-    *, definition: NativeDefinition, request: NativeRequest,
-    provider: ProviderSessionPort, session: ProviderSessionLease,
-    owner: OwnerPort, journal: NativeJournal,
-    inputs: NativeInputPort, dispatch: ToolDispatchPort,
-    budgets: ToolBudgetFactoryPort, messages: NativeMessagePort,
+    *,
+    definition: NativeDefinition,
+    request: NativeRequest,
+    provider: ProviderSessionPort,
+    session: ProviderSessionLease,
+    owner: OwnerPort,
+    journal: NativeJournal,
+    inputs: NativeInputPort,
+    dispatch: ToolDispatchPort,
+    budgets: ToolBudgetFactoryPort,
+    messages: NativeMessagePort,
     cancellation: CancellationToken,
 ) -> AgentNotSubmitted | AgentTerminal: ...
 ~~~
@@ -629,7 +639,7 @@ effort plus successful web search/read is mandatory, separate from failure fixtu
 
 ## 9. delivery and acceptance
 
-each id has exactly one owner; all target criteria are NOT_RUN. details and files
+each id has exactly one owner; the evidence record owns current proof status. details and files
 are in the [delivery plan](native-agent-plan.md). frozen-lock installation and
 actual consumer topology are required for installed claims.
 
@@ -719,9 +729,9 @@ c5d242fa7907bff1b7a7e26e95febc548c0a6963; it is not deployed-build qualification
 - [turn/start can steer an active turn](https://github.com/openai/codex/blob/c5d242fa7907bff1b7a7e26e95febc548c0a6963/codex-rs/app-server/src/request_processors/turn_processor.rs#L651-L684).
 - [turn request fields, including strict output](https://github.com/openai/codex/blob/c5d242fa7907bff1b7a7e26e95febc548c0a6963/codex-rs/app-server-protocol/schema/typescript/v2/TurnStartParams.ts#L14-L60).
 
-content/consumer source evidence: jarvis definitions.py/terminal.py currently make
+content/consumer source evidence: jarvis definitions.py/terminal.py at the historical baseline made
 approval suspend the loop and lack explicit waiting; terminal composition can exceed
 discord's limit. read_positions.py/write_dispatch.py derive identities from a whole
 model decision. nexus agent_api.py couples historical undo ownership to shell
-credentials. these are migration requirements at the owning layer, not reasons
+credentials. these were migration requirements at the owning layer, not reasons
 to add another framework.

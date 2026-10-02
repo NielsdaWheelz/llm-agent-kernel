@@ -333,8 +333,8 @@ def test_dependency_web_read_revision_refreezes_exact_host_table_plan() -> None:
     )
     assert WEB_READ_SPEC.limits.max_attempts == 8
     assert WEB_READ_SPEC.limits.deadline_seconds == 20.0
-    assert available.implementation_revision == "llm-tools-web-read-v2"
-    assert unavailable.implementation_revision == "llm-tools-web-read-v2"
+    assert available.implementation_revision == "llm-tools-web-read-v3"
+    assert unavailable.implementation_revision == "llm-tools-web-read-v3"
     assert available.policy_epoch == PolicyEpoch("web-read-v1")
     assert available.policy_inputs == {
         "accepted_media": (
@@ -361,10 +361,10 @@ def test_dependency_web_read_revision_refreezes_exact_host_table_plan() -> None:
     published = render_prompt(publish_host_table(plan))
 
     assert maximum.profile_revision == (
-        "1c2957e53e23d277e8f58c9d7f3ceecf11dbe6b8a1a2f2be3c185fe91328f7e5"
+        "a61bd565a025cd8486da86dda7b5c3b5b3adf832f7b0aabaf6ab29f1076d5121"
     )
-    assert plan.plan_revision == "7f88eea84fa31631677b7499d468281f5e4e1dcdfa761f50e236246dfabeb749"
-    assert '"implementation_revision":"llm-tools-web-read-v2"' in published
+    assert plan.plan_revision == "50cdc80db794194219ea1460647d3bfd8be6cc08f39b67014bc548f46407e7c5"
+    assert '"implementation_revision":"llm-tools-web-read-v3"' in published
 
 
 @pytest.mark.asyncio

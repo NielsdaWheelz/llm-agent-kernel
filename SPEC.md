@@ -1,1376 +1,255 @@
 # llm-agent-kernel specification
 
-Normative terms **MUST**, **MUST NOT**, **SHOULD**, and **MAY** have their usual
-RFC 2119 meanings.
-
-Sections 1–15 specify the contained structured AgentRuntime protocol. Section
-16 extends the package with the accepted shared Nexus generation protocol and
-supersedes earlier package-wide restrictions on provider lanes and ordered
-multi-call proposals. The contained protocol's single-call grammar, native
-containment, and host action boundary remain mandatory. Section 17 requires
-original paid-decision journaling and supersedes earlier attempt-local recovery
-and BilledOnce-recomputation allowances.
-
-section 18 adopts the native supervision target and its linked detailed contract.
-[adr 0010](docs/decisions/0010-native-agent-supervision.md) records the decision.
-this is accepted design, not a claim of implemented or qualified capability.
-
-## 1. Goals
-
-V1 provides a reusable Python 3.12 kernel that:
-
-1. Runs a bounded model/tool loop over host-owned durable input.
-2. Uses the real subscription-backed Codex session API shipped by
-   `provider-runtime`.
-3. Validates one complete structured model step before displaying text or
-   dispatching a tool.
-4. Allows exactly one serial host tool call per model step.
-5. Lets newly arrived compatible human input steer a running loop.
-6. Makes provider sessions disposable and cold-bootstrapable from canonical
-   host context.
-7. Preserves host ownership of authority, persistence, approval, delivery,
-   scheduling, effect identity, and reconciliation.
-8. Bounds repeated work across runs as well as work inside one run.
-9. Owns no application database schema or workflow engine.
-
-V1 is a small control plane for trustworthy personal agents, not a general
-workflow system, tool platform, or persistent multi-agent graph.
-
-## 2. Dependencies and implementation gate
-
-The distribution is `llm-agent-kernel`; applications import
-`llm_agent_kernel`. It supports Python 3.12 and newer.
-
-Importing `llm_agent_kernel.generation` MUST NOT initialize `llm_tools` or the
-contained structured-agent runtime. The existing flat `llm_agent_kernel` API
-retains its concrete exported objects and static types. Accessing that flat API
-or requesting its full export inventory initializes the structured-agent stack;
-dependency import failures therefore surface on that first access.
-
-The reviewed dependency baseline is:
-
-- `provider-runtime` from the `llm-calling` repository:
-  `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`
-- `llm-tools`: `9e6d155f3b64f03495911435b7cae8b8d131f9a2`
-- An externally supervised Codex App Server, updated by the host to latest stable.
-
-The provider owns the documented Codex App Server protocol over WebSocket on
-the configured Unix socket. The public `backend="codex", transport="sdk"`
-literal names this route; it does not select a bundled SDK or private server.
-The host deployment owns server installation, supervision, account enrollment,
-environment and socket access. Neither kernel nor provider starts a server or
-owns its account home. The provider normalizes native cumulative accounting
-into invocation-local usage before the public agent-runtime boundary. It distinguishes
-native compaction's synthetic context estimate from actual cumulative usage;
-estimates are not charged. Compaction remains native-owned, without a new kernel
-accounting or lifecycle API. V1 selects only
-`provider_runtime.agent_runtime.AgentRuntime`; it does not use the stateless
-root `ProviderRuntime.generate` lane. Library dependencies remain exact Git
-pins. Native Codex is host-owned and has no version admission gate: the host
-resolves latest stable only during explicit install/update, not at invocation.
-Version-only apply preserves healthy servers; planned restart is explicit and
-may interrupt turns. Normal crash recovery may load the installed update.
-CLI/server versions may differ; compatibility is not presumed.
-
-The provider validates initialization protocol shape, not native version
-equality. In the disabled-builtins posture it classifies audited App Server messages and retained
-custom-call shape. Native authority activity becomes typed tool or permission
-events; malformed, reordered, or unknown protocol becomes fatal
-`ProtocolDefect`. Native Code Mode is contained and detected, not proven absent
-before its first observable event. Strict protocol drift intentionally breaks
-availability until audited. A version observation is diagnostic, not evidence
-that an unseen release preserves containment. The one-user host accepts this
-upstream-breakage/repair trade-off without a compatibility reader or fallback.
-A private read-only provider cwd prevents mutation
-within that scope but is not by itself a host-confidentiality boundary.
-
-The same provider baseline defines `AgentTerminal.final_text` as the
-provider-selected authoritative assistant response rather than the
-concatenation of `AgentText` observations. For Codex, the last completed
-`phase=final_answer` message wins. If none exists, the last completed message
-with unknown phase is the audited native terminal-selection rule.
-Commentary is ineligible for terminal selection and MUST NOT be interpreted as
-executable structured output. Provider-runtime owns this message selection;
-the kernel MUST NOT duplicate it.
-
-The reviewed `llm-tools` revision exposes and qualifies the public seams this
-kernel needs:
-
-1. Pure strict input validation that performs no position occupation, budget
-   reservation, recorder write, or dispatch.
-2. A public proof that one frozen tool plan is internally consistent with its
-   catalog view and tightens a maximum frozen capability profile, including
-   exposed bindings, grants, limits, contract revisions, implementation
-   revisions, and policy revisions. Freezing and publication MUST reject a
-   catalog view whose tool, implementation, or policy revision does not exactly
-   match the corresponding frozen grant.
-3. A public `HostTable` publication/rendering contract for the tools represented
-   to a model through structured host prompts rather than provider-native tools.
-4. An asynchronous durable execution/recorder path suitable for an async host,
-   without blocking the event loop on persistent recorder operations.
-
-The qualified revision preserves `ToolEffect`, `ReplayPolicy`,
-`FrozenToolPlan`, `InvocationPosition`, `EffectId`, recorder uncertainty,
-position conflict, and tool-budget behavior. Its conformance suite includes
-adversarial cross-catalog substitution and direct inconsistent-plan tests at
-construction, proof, publication, and execution. The immutable revision is
-fetchable from the configured remote; the package resolver MUST lock that exact
-commit rather than import from a sibling worktree.
-
-That revision also owns the corrected `web.search` whole-operation deadline.
-`bind_brave_web_search` accepts a positive finite
-`operation_deadline_seconds`, defaulting to and capped at 12 seconds inside the
-declared 15-second executor deadline. The inner deadline covers every provider
-attempt and retry delay and is frozen into binding policy identity. A custom
-`WebSearchProvider.search` implementation MUST accept the optional keyword-only
-`attempt_started` callback, invoke it synchronously once immediately before
-each external attempt, and propagate task cancellation unchanged. Expected
-inner expiry becomes the declared `UpstreamUnavailable` result with the actual
-started-attempt count; unexpected outer timeout and cancellation retain the
-existing executor replay and uncertainty semantics. The kernel neither starts
-nor separately accounts this tool deadline.
-
-The same revision corrects `web.read` extraction without changing its portable
-contract or policy. Both available and unavailable bindings MUST identify the
-implementation as `llm-tools-web-read-v2`. Plain-text evidence MUST identify
-`plain-text-v2`, which performs strict declared-charset decoding and whitespace
-collapse without interpreting entities or markup. HTML/XHTML evidence MUST
-identify `html-visible-text-v2`, which uses the parser's single entity-decoding
-pass and MUST NOT interpret the parser output a second time. JSON remains
-`json-canonical-v1`. `WEB_READ_SPEC`, the Web contracts and limits,
-`web-read-v1` policy epoch, policy inputs, and policy revision remain unchanged;
-`web.search` remains implementation `llm-tools-web-search-v2` with policy epoch
-`web-search-v2` and its existing contract, policy revision, and policy inputs.
-Any host catalog, frozen profile, frozen plan, or `HostTable` publication that
-contains `web.read` MUST be recomposed and re-frozen from the v2 binding. A v1
-frozen identity MUST fail closed against the v2 catalog rather than be reused.
-
-The kernel MUST NOT import a private dependency module to bypass a missing
-public seam. It MUST NOT duplicate provider SDK integration, tool execution,
-schema compilation, prompt-section rendering, or recorder semantics.
-
-## 3. Ownership
-
-### 3.1 Provider-runtime owns
-
-- Subscription-backed access through the host-enrolled Codex account.
-- Native session creation, resume, turns, interruption, references, and close.
-- Session-scoped `PermissionPolicy`, native options, model, reasoning, cwd, and
-  structured-output lowering.
-- Strict parsing of the provider's declared JSON-schema output.
-- Authoritative assistant-message selection for terminal text and structured
-  output; streaming text remains observational.
-- Normalized events, usage when available, quota exhaustion, and typed provider
-  failures.
-- Projection of provider-native cumulative accounting into progressive,
-  invocation-local usage without charging restored historical usage.
-- Protocol connection, native session policy, and subscription closure; closing
-  a client never terminates the shared server or unrelated threads.
-
-### 3.2 llm-tools owns
-
-- Tool declarations, bindings, catalogs, frozen profiles and plans, including
-  plan/catalog consistency and tightening proofs.
-- `ToolEffect` (`Pure`, `Read`, `Write`) and orthogonal `ReplayPolicy`
-  (`BilledOnce`, `ReDispatchable`).
-- Tool schemas and pure strict argument validation.
-- Tool-call, attempt, input/output-byte, concurrency, and elapsed execution
-  budgets through `llm_tools.RunLimits`.
-- Invocation-position occupation, recorder protocol, replay memoization,
-  uncertainty poisoning, execution, result envelopes, and prompt sections.
-
-`llm-tools` requires a stable effect ID and durable recorder for `Write`; it does
-not mint application effect IDs, reconcile an external effect, resolve an
-uncertain position, or decide product authority.
-
-### 3.3 The kernel owns
-
-- Immutable agent definitions and deterministic fingerprints.
-- The bounded kernel-owned base instruction and its immutable identity.
-- Plan-aware construction and exact-limit verification of the dependency-owned
-  tool budget.
-- Provider containment requirements and the proof that a run plan tightens the
-  definition's maximum profile.
-- The closed logical model-step grammar, its Codex-compatible provider-wire
-  envelope, structured-result schema compilation, and semantic output-contract
-  validation.
-- Provider-neutral bootstrap and continuation context choreography.
-- The bounded serial model/tool loop, polling choreography, cancellation, and
-  kernel-level limits.
-- Provider-session and host input/checkpoint ports.
-- Run outcomes, accumulated provider usage, and conformance tests.
-- Opt-in dispatch of one host-selected initial `Read` for isolated one-shot
-  context, without synthesizing a model step or bypassing the host dispatcher.
-
-### 3.4 The host application owns
-
-- Canonical input, conversation history, conclusions, and delivery.
-- Input selection, prioritization, compatibility, and the frozen plan chosen for
-  each claimed batch.
-- Run admission and durable no-progress attempt accounting.
-- Product context and retrieval.
-- Tool composition, credentials, policy, approval, action state, effect-ID
-  minting, durable recorder implementation, and reconciliation.
-- Schedules, background work, privacy, retention, and user experience.
-
-The kernel owns no table, migration, queue, outbox, connector, memory store,
-approval matrix, or effect ledger. This is not a claim that a consumer needs no
-durable state. A continuing consumer with writes normally needs at least:
-
-1. Canonical input/conclusion/checkpoint and delivery state.
-2. Disposable provider-session reference state.
-3. A durable `llm-tools` recorder/effect record for writes.
-
-## 4. Core values
-
-### 4.1 AgentDefinition
-
-An `AgentDefinition` is immutable configuration containing:
-
-- Stable definition ID and role instructions.
-- Stable provider-neutral prompt sections.
-- A definition-bound model-visible input projection policy.
-- `SessionMode`: `continuing` or `isolated`.
-- `OutputContract`: `conversational` or one closed, provider-representable
-  structured result type.
-- A maximum frozen `llm-tools` capability profile.
-- Exact session-scoped provider configuration.
-- A required, non-empty, owner-controlled `session_compatibility_revision`.
-- `KernelLimits`.
-
-The provider configuration for the v1 Codex route includes backend, transport,
-credential profile identity, model, reasoning, application system/developer material,
-output schema, cwd scope, additional directories, MCP configuration,
-`PermissionPolicy`, and `CodexNativeOptions`.
-
-The kernel prepends one exact base instruction to the provider system channel
-for every new, resumed, reconstructed, continuing, and isolated session. It
-identifies a contained structured agent rather than a coding agent; makes only
-the authoritative final schema-conforming kernel step executable; restricts
-host-tool requests to the kernel `call_tool` step against the complete published
-`HostTable`; forbids provider-native shell, Code Mode, files, Web, MCP, apps,
-collaboration, permissions, and other native tools; makes `AgentText` and
-commentary observational; and requires tool observations to arrive through
-kernel-owned context without fabrication. Application role/context and
-application system/developer material remain separate specialization points and
-cannot remove the kernel-owned instruction. The prompt guides behavior; it is
-not an authority boundary.
-
-The input projection policy fixes whether per-input `source_timestamp`
-attributes are rendered and selects one batch-`as_of` mode: `always`, `never`,
-or `on_request`. The default renders both attributes exactly as before. An
-invocation may explicitly request batch `as_of`; that request is effective only
-for `on_request`, redundant for `always`, and is rejected as a widening request
-for `never`. Per-input timestamp visibility cannot be widened per invocation.
-
-The deterministic definition fingerprint covers every value that can change a
-native session's meaning or containment, including the kernel base
-instruction's immutable revision and SHA-256 digest, the complete input
-projection policy, and exact `session_compatibility_revision`. The owner MUST
-rotate that revision when an application, kernel, or provider-runtime semantic
-change makes saved sessions incompatible even if no other serialized definition
-field changed. It excludes credential secret bytes, current input, the
-invocation's projection request or initial Read, other dynamic context, the
-per-run plan, and host time. Any change to a covered value rotates the session
-and forces bootstrap. Initial Reads are isolated-only and therefore never
-resume or store a native session reference.
-
-### 4.2 RunPlan
-
-Each invocation receives one frozen `llm-tools` plan with `HostTable` exposure.
-Before provider or tool I/O, the kernel uses the qualified public dependency
-predicate to prove both that the plan is internally consistent with the exact
-catalog view it will publish and that the entire plan tightens the definition's
-maximum profile. Comparing the embedded profiles alone is insufficient. The
-published effect, schemas, replay policy, implementation revision, contract
-revision, and policy revision MUST be the values covered by that proof. Any
-mismatch fails before rendering or provider/tool I/O. The plan MUST set
-`max_in_flight = 1`.
-
-Every binding MUST declare a non-empty owner-controlled
-`implementation_revision` covering its handler and transitive execution
-behavior. A handler or behavior-affecting dependency change requires a revision
-bump unless that change is already represented by revisioned `policy_inputs`.
-The revision is identity and recovery evidence, not a claim that code was
-automatically hashed or independently attested.
-
-The plan is fixed for the invocation. A model cannot discover, add, widen, or
-reclassify tools. Tool descriptions in model context describe the plan; they do
-not grant authority. A proposed tool absent from the plan is protocol-invalid
-and dispatches nothing.
-
-The caller supplies a `ToolBudgetFactoryPort`, not a `BudgetState` constructed
-from out-of-band plan knowledge. After `claim` returns and the kernel validates
-the exact selected plan, the kernel calls `create(plan)` once for a run that can
-proceed. The returned `BudgetState.limits` MUST equal the claimed plan's
-`profile.run_limits`. A mismatch parks thread input or rejects an ordinary
-isolated run before context rendering, admission, provider I/O, or tool I/O. An
-isolated run with an initial Read first completes child admission and
-cancellation checks, then creates and verifies that same one budget before the
-initial dispatch, observation rendering, or provider I/O. The factory does not
-transfer ownership of tool accounting to the kernel: the returned state and
-`llm-tools` executor retain that responsibility.
-
-### 4.3 ApplicationThread and InputClaim
-
-An application thread is a host-owned durable workstream identified by an
-opaque `thread_id`. It is not a provider session.
-
-The host claims one non-empty, bounded batch and returns an `InputClaim` with:
-
-- An opaque `claim_id` stable for this acquisition, not necessarily for retries.
-- One or more ordered host inputs, each with an opaque stable `input_id`.
-- An opaque consumed checkpoint.
-- Source timestamps and one host `as_of` value.
-- The frozen run plan selected by host policy.
-- A durable no-progress attempt number for the oldest logical input.
-
-The host chooses batching, priority, and compatibility. The kernel neither
-defines a `run_class` nor infers authority from input text. The plan is still
-independently proven inside the definition maximum before I/O.
-Source timestamps and `as_of` remain required operational inputs even when the
-definition policy omits them from model-visible context.
-
-### 4.4 Run and model turn
-
-A run is one bounded invocation over one claim. It may perform several provider
-turns and serial tool calls but does not silently start a fresh-budget successor
-over the same failed input.
-
-A provider turn is one complete consumption of an `AgentRuntime.stream_turn`
-event stream. A model step is the one validated structured value returned by
-its successful terminal event. The convenience `AgentRuntime.run_turn` method
-MUST NOT be used: it consumes and discards the intermediate events that the
-kernel must inspect to enforce containment.
-
-`AgentText` events are observations and need not concatenate to
-`AgentTerminal.final_text`. They are inspected only as part of the complete
-stream and are never supplied to logical-step validation. The kernel consumes
-only the successful terminal's structured value for execution.
-
-An isolated one-shot has explicit host input, no application claim/checkpoint or
-saved session reference, a fresh native session, a structured output contract,
-and no `Write` tool. It MAY carry one invocation-local `InitialReadCall` naming
-a canonical `ToolId` plus JSON-compatible arguments. The call is host-selected
-input to orchestration, not a model step or an authority grant. Its result is
-durable only through its selected decision policy and host-owned result commit.
-
-## 5. Exact provider surface and containment
-
-### 5.1 Selected lane
-
-V1 uses only:
-
-```text
-provider_runtime.agent_runtime.AgentRuntime
-  open_session(AgentSessionRequest)
-  stream_turn(AgentSession, TurnRequest)
-  close_session(AgentSession)
-```
-
-These are public dependency APIs. The adapter MUST consume every event yielded
-by `stream_turn`; it MUST NOT call the convenience `run_turn` projection in
-production or infer event history from its terminal. The adapter returns a
-terminal to the kernel only after observing a well-formed stream through that
-terminal.
-
-Every `AgentSessionRequest.system` begins with the exact kernel base instruction.
-The provider lowers non-empty system material to Codex App Server
-`baseInstructions`, replacing the built-in coding-agent prompt on new, resumed,
-and reconstructed sessions. Any application system material follows as a
-separate value; consumers MUST NOT copy, replace, or parameterize the kernel
-instruction.
-
-The adapter MUST represent the kernel provider-wire envelope through
-`JsonSchemaAgentOutput`. The root is one closed object, not a discriminated
-union. Every property of every object is required, and inactive/optional values
-are explicit nulls. Jarvis tools are not provider-native tools and are not MCP
-tools. `mcp_servers` MUST be empty.
-
-The Codex request MUST use:
-
-- `backend = "codex"`, `transport = "sdk"`, and the configured shared Unix socket.
-- Local-account credential reference.
-- An empty absolute cwd with read-only filesystem policy: private `0500`, or
-  explicit group-shared `0750` beneath the host-provisioned setgid parent with
-  inherited group ownership verified.
-- No additional directories.
-- Network disabled.
-- Approval mode `deny`.
-- Empty copied environment.
-- The exact Codex `allowed_tools` sentinel required by the pinned runtime, while
-  separately setting `CodexNativeOptions(builtin_tools="disabled")`.
-- Native Web search disabled.
-
-The sentinel is the pinned provider-runtime request contract; it is not authority.
-Safety is the conjunction of native-feature disablement, empty read-only cwd,
-disabled network/environment, denial of provider approval, and host refusal to
-accept native tool activity.
-
-Any `AgentToolUse` or `AgentPermissionRequest` event fails the provider turn,
-discards its session, dispatches no host tool, and commits no model-authored
-conclusion. `AgentText` chunks are never delivered as conversational output;
-only a validated terminal structured step may be displayed or executed.
-
-Any provider `ProtocolDefect` is likewise fatal: the live session is discarded
-and no terminal for that turn may be accepted, synthesized, or replayed. The
-kernel does not parse provider-native method names; retained custom `exec`
-calls and future authority shapes remain provider-runtime's classification
-responsibility. Inert `AgentNative` observations remain non-executable and do
-not by themselves poison an otherwise clean terminal.
-
-`AgentTerminal.final_text` is the provider-selected authoritative assistant
-response. `AgentText` observations can contain commentary, drafts, or final
-answer chunks and need not concatenate to that terminal value. The Codex
-adapter in provider-runtime selects the last completed `phase=final_answer`
-message, or otherwise the last completed phase-unknown message as the pinned
-SDK compatibility fallback. Commentary is never eligible. The kernel MUST NOT
-concatenate observations or implement another message-selection algorithm.
-
-### 5.2 ProviderSessionPort
-
-The provider adapter exposes the native resource lifecycle rather than
-pretending it is a stateless call:
-
-```text
-acquire_continuing(definition, saved_ref | none) -> live session lease
-open_isolated(definition) -> live isolated session lease
-run_observed_turn(lease, typed content, cancellation) -> AgentTerminal
-release(lease) -> return continuing session to host cache
-discard(lease) -> close and invalidate session
-close(lease) -> close isolated or retired session
-```
-
-`run_observed_turn` is a kernel port operation, not a wrapper around
-`AgentRuntime.run_turn`: its implementation drives `AgentRuntime.stream_turn`,
-suppresses `AgentText` from logical-step execution, accumulates usage, and
-inspects every event. It returns the provider-selected terminal unchanged; only
-that terminal's structured value enters logical validation. Each
-`AgentUsage` is a progressive invocation-to-date snapshot, so snapshots within
-one turn are non-additive. The adapter retains the latest snapshot rather than
-summing snapshots, prefers `AgentTerminal.usage` when present, and adds exactly
-one invocation-local usage value to the lease per started provider turn. The
-lease total therefore sums distinct kernel turns, including consecutive turns,
-without charging usage restored from a resumed native session. Provider-runtime
-owns native cumulative-to-invocation normalization; the kernel MUST NOT
-reimplement that provider-specific delta algorithm. On a native tool-use or
-permission-request event it taints and discards the session and returns no
-terminal or model-authored output to the loop.
-
-`AgentTerminal.usage` is invocation-local for success, failure, cancellation,
-and quota terminals. `Absent` means the provider supplied no safely attributable
-usage. Any missing turn makes the lease token total incomplete rather than
-fabricating zero or a cumulative delta, although its started turn remains
-counted.
-
-The host MAY retain a continuing live session between runs for latency and
-provider caching. A lease permits one active turn. Shutdown closes every live
-session. Isolated sessions are always closed in a `finally` path.
-
-`AgentQuotaExhausted` maps to the distinct `quota_exhausted` run outcome and is
-never retried or replaced with another provider. Expected provider failures are
-mapped explicitly; runtime invariant violations remain defects.
-
-### 5.3 SessionRefPort
-
-Continuing session references are disposable but generation-checked:
-
-```text
-load(thread_id, definition_fingerprint)
-  -> none | stored(ref, generation)
-compare_and_set(thread_id, definition_fingerprint,
-                expected_generation | none, new_ref)
-  -> stored(new_generation) | stale
-discard(thread_id, definition_fingerprint, expected_generation | none)
-  -> discarded | stale
-```
-
-The first store uses `expected_generation = none`. Every successful store
-returns the generation required for the next store. A stale result is a
-`configuration_error`/ownership defect: no tool dispatch or conclusion from
-that terminal may proceed.
-
-After every successful provider turn, the kernel stores the returned
-`AgentSessionRef` before acting on its model step. If the later tool or canonical
-settlement boundary is interrupted, host input remains unconsumed and recovery
-discards the speculative reference before replay. This ordering prevents a
-committed conclusion from being absent from the next resumed session.
-
-A missing, invalid, incompatible, or unresumable reference causes one cold
-bootstrap, never canonical data loss. The adapter owns live open/resume/close;
-the session-reference store owns only serialized refs and generations.
-
-## 6. Structured model protocol
-
-### 6.1 Grammar
-
-The complete model response is exactly one closed variant:
-
-```text
-say
-  text
-
-call_tool
-  canonical tool_id
-  arguments
-
-finish
-  optional internal reason
-  result only as required by the definition output contract
-```
-
-Unknown fields, mixed variants, trailing prose, empty `say`, and model-authored
-call IDs, authority labels, previews, credentials, effect IDs, approval
-instructions, or delivery instructions are forbidden.
-
-Conversational definitions allow `say` and `finish` without a result.
-Structured definitions forbid `say` and require `finish.result` to validate
-against their closed result type.
-
-The logical variants above are distinct from the provider wire. Codex receives
-one closed envelope object with four required properties: `type`, `say`,
-`call_tool`, and `finish`. Exactly one payload selected by `type` is non-null;
-the other payloads are null. A conversational `finish.reason` is a required
-nullable value. A structured `finish` additionally carries the compiled result
-object, and the `say` payload is constrained to null.
-
-The provider-wire `call_tool.arguments` value is a string containing one strict
-JSON object. This avoids an arbitrary map schema, because Codex Structured
-Outputs does not permit schema-valued `additionalProperties`. Before logical
-tool validation, the kernel rejects duplicate keys, non-finite constants,
-trailing data, and non-object argument values, then supplies the decoded object
-to the unchanged pure `llm-tools` validator. The model still supplies no call
-or effect identity.
-
-At `StructuredOutput` construction, the kernel compiles Pydantic's result
-schema into the supported strict subset: every object stays closed, every
-property becomes required, optional values remain explicit (normally nullable),
-definitions are preserved, and non-validating defaults/generator annotations
-are removed. Map-shaped objects, unsupported semantic keywords, invalid local
-definitions, and supported-subset size/depth violations fail deterministically
-before an `AgentDefinition` can open or run a provider session. The original
-result type remains the authority for independent semantic revalidation.
-
-### 6.2 Whole-step validation
-
-Before display or dispatch, the kernel MUST:
-
-1. Require `AgentTerminal(status="succeeded")` with structured output.
-2. Revalidate and decode the complete closed provider-wire envelope, including
-   its exactly one selected payload.
-3. Revalidate the decoded value through the kernel-owned closed logical step
-   model, even though `provider-runtime` already enforced the wire schema.
-4. Apply the frozen output contract.
-5. For `call_tool`, resolve the exact binding from the frozen HostTable plan.
-6. Validate its decoded arguments through the qualified pure public `llm-tools`
-   validation seam.
-7. Confirm remaining kernel budget. The `llm-tools` executor independently owns
-   and enforces the frozen plan's remaining tool budget at dispatch.
-
-Failure of any check produces no visible model text, no position occupation,
-and no tool call. A bounded protocol correction may be supplied to the next
-provider turn. Exceeding the repair allowance ends the run; it is not rearmed
-with fresh repair budget.
-
-Whole-step atomicity covers validation. It does not pretend external effects
-form a transaction.
-
-### 6.3 Step behavior
-
-- `say` proposes conversational text for host settlement and delivery.
-- `finish` proposes a silent conversational conclusion or a structured one-shot
-  result.
-- `call_tool` proposes exactly one serial host call. Its observation becomes
-  input to a later provider turn; the model may then produce a truthful `say`.
-
-V1 deliberately has no nonterminal narration step. Long tool loops expose
-host-owned typing/activity state but no model-authored progress prose. Adding a
-durable progress channel is a later product decision.
-
-## 7. Tool boundary
-
-### 7.1 Serial execution and positions
-
-Parallel and multi-call dispatch do not exist in v1. This removes partial
-outcome vectors, not-initiated suffixes, and multiple unresolved effects.
-
-`ToolDispatchPort` receives the validated binding, validated input, the budget
-constructed from the exact validated plan, cancellation token, and immutable
-dispatch lineage. A thread
-`DispatchLineage` contains:
-
-- The current attempt's `claim_id` (which need not survive recovery).
-- The current opaque `through_checkpoint`.
-- The ordered `input_id` values admitted through that checkpoint.
-- The model-step ordinal within the original admitted work.
-- The exact definition fingerprint and accepted stable `model_decision_id`.
-
-An isolated model-proposed call carries its attempt run ID, model-step ordinal,
-accepted stable model-decision ID, and exact `position`. Both model-derived
-lineages expose `InvocationPosition("model-decision:" + model_decision_id)`.
-An initial Read carries its attempt run ID and the caller's stable operation ID;
-its position hashes that operation in a disjoint initial-read domain. The host
-MUST use these exact positions for recoverable `Pure`/`Read` work. A `BilledOnce`
-read requires a durable llm-tools recorder; its original result is replayed and
-an uncertain occupied position requires explicit recovery.
-
-For a `Write`, host code first creates or resolves its existing durable action
-record after current policy/approval. That action ID remains both
-`InvocationPosition` and `EffectId`. The new model decision journal never
-creates, approves, replaces, or weakens an action. Explicitly transient isolated
-inference may use a nondurable Read recorder, with the corresponding repeated
-cost accepted by that caller. No durable caller may silently take that path.
-
-Invocation positions MUST be unique for distinct calls and stable whenever a
-call may be resumed or replayed. A same-position/different-input conflict is a
-host defect and never a reason to dispatch.
-
-### 7.2 Dispatch result
-
-The dispatcher returns one of:
-
-```text
-completed(llm_tools ToolResult)
-suspended(host_ref, waiting_for = user | system)
-```
-
-Expected tool successes and declared/boundary failures use the closed
-`llm-tools` result envelope. Executor configuration, position conflict, broken
-binding, recorder, or adapter failures raise a typed defect; they are never
-misrepresented to the model as an ordinary tool failure.
-
-`suspended(..., user)` means the host durably accepted work that requires a
-human decision. `suspended(..., system)` means the host durably accepted work
-whose reconciliation or completion continues without human action. Neither is
-called `uncertain`. Terminal uncertainty is a later host-owned resolution after
-the binding's reconciliation procedure is exhausted.
-
-A suspension settles the current input, releases every live resource, and
-returns. A later host input contains the opaque reference, tool ID, original
-validated arguments, resolution state, and safe result/evidence. The kernel
-does not define an approval-specific input type or action status vocabulary.
-
-### 7.3 Observation bounds
-
-Tool bindings MUST produce bounded results under their declared
-`llm_tools.RunLimits`. Connector families SHOULD return bounded previews,
-pagination or stable source references, and typed `TooLarge`/boundary guidance
-rather than oversized payloads.
-
-The kernel maintains one cumulative bound over the UTF-8 bytes of model-visible
-material it newly renders and submits during the current invocation. This
-includes its bootstrap or run delta, appended-input deltas, tool observations,
-protocol corrections, and any cold-bootstrap replay rendered in that run.
-The kernel base instruction, provider application system/developer material,
-JSON-schema transport overhead, history already retained by a native session,
-and provider compaction are outside this counter and MUST NOT be described as
-covered by it. When older recomputable read
-observations must be omitted, the kernel inserts an explicit omission marker and
-preserves stable source references supplied by the host. It MUST NOT silently
-truncate an action outcome, approval payload, or uncertainty evidence.
-
-A generic durable observed-value store is not a v1 kernel requirement. It may be
-added by a host when source-specific reread/pagination is insufficient.
-
-The completed result of an isolated initial Read is projected as a typed tool
-observation with `origin="initial_read"` before the first provider turn. It is
-required initial context and is not silently omitted as a recomputable prior
-observation. Declared and boundary failures remain ordinary typed `llm-tools`
-results. Configuration defects, position conflicts, recovery requirements,
-oversized required context, suspension, and cancellation retain their distinct
-fail-closed one-shot outcomes.
-
-## 8. Context and steering
-
-### 8.1 Provider-neutral context
-
-`ContextSourcePort` supplies typed sections for:
-
-- Stable role instructions and application context.
-- Bounded canonical completed history.
-- Current claimed host inputs with identities, text, and operational source
-  timestamps.
-- Retrieved context selected by the host.
-- The exact frozen HostTable plan and tool documentation.
-- Host timezone or other stable locale context when relevant.
-- One operational `as_of` value for each newly admitted host-input batch.
-
-`InputProjectionPolicy` is public immutable definition state. Its default
-renders each input's ID and source timestamp plus the batch `as_of`, preserving
-the pre-policy prompt byte-for-byte. A definition can permanently suppress
-per-input source timestamps. `BatchAsOfMode` selects `always`, `never`, or
-`on_request`; `InputProjectionRequest(render_batch_as_of=True)` is the only
-invocation-local widening request and is valid only where the definition allows
-it. The request is validated before claim/rendering/admission/provider/tool I/O
-and is applied consistently to initial input, mid-loop appends, and any cold
-reconstruction. There is no post-render mutation seam. Input IDs and content
-remain visible, and the operational timestamp values remain available to host
-coordination regardless of rendering.
-
-When an isolated invocation selects an initial Read, its completed observation
-is added through this same context projection before any provider session is
-opened or turned.
-
-`llm-tools` renders typed prompt sections. XML-like presentation is structure and
-provenance, never a security boundary. Human input, retrieved memory, tool
-observations, connector content, and public Web content remain untrusted data.
-In-plan automatic tools can still be induced by malicious data; approval and
-containment limit authority, not prompt interpretation.
-
-### 8.2 Continuation and bootstrap
-
-A healthy continuing session receives only material not already sent to it:
-newly claimed or polled host input, tool observations, protocol corrections, and
-refreshed dynamic context. Each host input appears once in that session.
-
-A cold bootstrap includes stable instructions, bounded canonical completed
-history, retrieved context, current unresolved host input, the current plan, and
-explicit omission markers. It need not reconstruct provider reasoning or
-turn-local read observations byte-for-byte. Reads may be repeated. Durable
-effect arguments and outcomes must come from host action state, never solely
-from the discarded provider transcript.
-
-A kernel base-instruction identity change rotates every definition fingerprint
-without a host compatibility-revision bump. Old references remain in their
-former fingerprint namespace and MUST NOT resume under the new model-visible
-protocol; the first run cold-bootstraps from canonical host context.
-
-### 8.3 Mid-loop polling
-
-Before every provider turn, before tool dispatch, after tool completion, and
-immediately before settlement, the kernel calls:
-
-```text
-poll(claim, through_checkpoint)
-  -> none
-   | append(compatible_inputs, new_checkpoint, new_as_of)
-   | preempt(reason)
-```
-
-`append` inputs MUST be non-empty, ordered, and compatible with the already
-frozen plan according to host policy. They extend the claim/checkpoint and are
-sent to the provider exactly once. A new `as_of` accompanies the appended batch;
-its model visibility follows the invocation's validated projection. Ordinary
-tool continuations do not receive a repeated clock.
-
-`preempt` stops before another provider turn or tool dispatch. The host decides
-which input types preempt and how the interrupted input is concluded. The
-cancellation token may be triggered immediately by ingress while an external
-call is in flight; cancellation cannot undo an effect already committed.
-
-Inputs incompatible with the current plan remain unclaimed for a later run.
-The host may prioritize interactive input over scheduled/background work.
-
-## 9. Checkpoint, settlement, and recovery
-
-### 9.1 InputCheckpointPort
-
-```text
-claim(thread_id, owner_token)
-  -> no_work | busy | deferred(until) | claim(InputClaim)
-poll(claim, through_checkpoint) -> poll result
-settle(claim, through_checkpoint, host_conclusion)
-  -> idle | more_input
-release(claim, reason) -> released | already_released
-park(claim, reason) -> parked | already_parked
-```
-
-`claim` MUST never return an empty batch. `no_work` calls no provider. The host
-MUST persist input before signalling work and MUST make startup/recovery scan the
-same canonical unconsumed input.
-
-`settle` atomically and idempotently persists the host-owned conclusion,
-advances consumption through the checkpoint, and determines whether other input
-remains. It releases the claim. If it returns `more_input`, the host signals the
-next run after commit; correctness rests on canonical unconsumed input plus
-startup/recovery scanning, not an impossible atomic transaction spanning a
-database and an out-of-process trigger.
-
-V1 commits a valid conversational conclusion for its claimed input even if an
-ordinary follow-up arrived during finalization, then processes that follow-up in
-the next run. It does not discard a paid answer and ask the model to rewrite it.
-Exact host stop/pause controls may preempt before settlement. This UX trade-off
-is deliberate.
-
-`release` is cleanup for shutdown, invariant defects, or an interrupted host
-boundary. It never arms a successor by itself. The input remains visibly
-unconsumed for explicit recovery.
-
-`park` atomically releases claim ownership into a durable operator-only state
-and trips the applicable circuit breaker. It is the configuration-defect exit;
-normal startup scanning cannot reclaim parked input until operator correction.
-
-### 9.2 No-progress stops
-
-The following deterministic stops MUST settle a host-authored stopped
-conclusion and consume the current claimed input:
-
-- Exhausted protocol-repair allowance.
-- Kernel model-step or cooperative elapsed-limit exhaustion.
-- Provider quota exhaustion.
-- Explicit owner cancellation/stop when host policy says the input is complete.
-- An accepted failed provider terminal with a determinate failure reason.
-
-They MUST NOT automatically rearm the same logical input. Configuration defects
-park the input, trip the host circuit breaker, and require operator correction;
-they do not become model-visible tool failures.
-
-A process interruption may leave the claim unconsumed. The host supplies a
-durable attempt number on the next claim. Once the configured no-progress
-attempt ceiling is exceeded, admission persists a stopped/parked conclusion
-without calling the provider, except that the decision journal is consulted
-first: an armed unknown decision parks unconsumed and a completed decision
-retains its original replay authority.
-
-### 9.3 Run admission
-
-Per-run limits do not bound a system that can start unlimited runs. Every thread
-run therefore requires a host-issued `AdmissionToken` proving that a rolling
-admission policy was checked before provider I/O. An isolated one-shot MUST also
-be covered by host admission: it either receives its own token or a child token
-whose turn/token allowance was already reserved by a serial parent invocation.
-It has no admission retry state; denial returns to its caller without provider
-I/O.
-
-The host policy MUST bound, per deployment or thread and rolling window:
-
-- Started provider turns.
-- Available input/output token usage.
-- Consecutive no-progress attempts for one logical input.
-- Concurrent cognitive work.
-
-It MAY additionally bound estimated monetary cost when the provider surface
-exposes a priceable call. The subscription-backed AgentRuntime lane does not
-produce root-lane `CallMeta` and is not treated as per-token billable; it uses
-turn/token ceilings and `AgentQuotaExhausted` instead.
-
-Before provider I/O, the host MUST durably reserve against the rolling policy:
-
-- One live cognitive-work slot for the exclusive root work epoch. A serial child
-  one-shot MAY share that slot only while its parent cannot perform provider or
-  tool I/O and only when its capacity was included in the root reservation.
-- The run's maximum remaining provider turns.
-- The route's configured input/output-token allowance when that usage dimension
-  is available.
-
-Because `AgentRuntime` reports tokens only after a turn and exposes no hard
-per-turn token cap, the host MAY issue a token reserving more than the requested
-allowance. A production host MUST configure that conservative excess from the
-route's qualified finite context/output bounds so one terminal report cannot
-exceed its reservation. The kernel still stops when reported cumulative usage
-crosses `KernelLimits`; the excess is admission capacity, not extra run budget.
-
-The resulting `AdmissionToken` identifies the run, rolling window, reserved
-capacity, and reservation state. A clean exit settles actual available usage
-and refunds unused capacity in `finally`, including ordinary failure and
-cancellation. Invocation-local values are summed across kernel turns exactly
-once. If any started turn has `Absent` usage, the corresponding run token
-dimensions remain unavailable and clean settlement conservatively retains the
-full token reservation. Process death is charged conservatively: the full
-turn/token reservation remains consumed until its rolling window expires. During startup
-under the host's exclusive deployment/ownership lock, an orphaned in-flight
-reservation is marked interrupted and its live concurrency slot is released;
-its turn/token charge is not refunded. A missing or corrupt admission journal
-fails closed until explicit host repair.
-
-A denied admission calls no provider. Host policy either returns
-`deferred(until)` while leaving canonical input unconsumed, or persists a
-visible stopped conclusion. The host, not the kernel, owns deferred-work
-signalling, notification, and recovery scanning.
-
-## 10. Kernel limits and cancellation
-
-`KernelLimits` is distinct from `llm_tools.RunLimits`. It contains finite
-defaults for:
-
-- Provider turns per run.
-- Protocol-repair turns per run.
-- Cooperative elapsed duration at safe boundaries and the hard deadline passed
-  to each provider turn.
-- Provider input/output usage when the selected route reports it.
-- Cumulative bytes of kernel-rendered model-visible material newly submitted in
-  the current invocation.
-
-Tool calls, attempts, tool input/output bytes, tool concurrency, and tool
-deadlines remain exclusively in the frozen plan's `llm_tools.RunLimits`. The
-kernel MUST NOT maintain a second tool budget or charge a replay twice.
-
-`KernelLimits.max_cooperative_seconds` is not a hard total wall-clock guarantee.
-The clock starts at invocation entry; the kernel observes it at safe boundaries
-and passes the remaining duration to the provider turn. A host claim, context
-source, poll, session-reference operation, admission operation, dispatch,
-settlement, release, park, usage settlement, or cleanup may return after that
-duration. At the next safe boundary the kernel prevents further provider/tool
-work when possible, but it does not interrupt a host operation or pretend that
-cleanup completed on time. Tool execution is independently governed by the
-validated plan's `RunLimits.max_elapsed_seconds`. The kernel MUST NOT place a
-blunt outer timeout around a `Write`, because abandoning it outside the
-dependency recorder boundary would undermine uncertainty and reconciliation
-safety.
-
-Cancellation is cooperative and checked at every provider, polling, dispatch,
-and settlement boundary. It is passed into provider and tool adapters. A
-cancellation result does not erase a committed external effect and never causes
-an unconditional retry.
-
-## 11. Run algorithms
-
-### 11.1 Thread run
-
-The public behavior is equivalent to:
-
-```text
-validate the invocation input projection against the definition policy
-claim one bounded non-empty host batch or return no_work/busy/deferred
-verify frozen plan/catalog tightening
-construct a fresh tool budget from that plan and verify exact RunLimits
-durably reserve admission and verify its token before provider I/O
-load/acquire compatible continuing provider session, or cold bootstrap
-
-loop within KernelLimits:
-  poll and append compatible host input, or handle preemption
-  build only new continuation material, or one cold bootstrap
-  replay the latest accepted paid decision, or durably arm its frozen request
-  before consuming one complete AgentRuntime stream and inspecting every event
-  reject native tool/permission events without projecting a terminal
-  durably commit the exact normalized terminal before dependent effects
-  map typed terminal failure, or CAS the returned live session ref (never a replayed ref)
-  validate one complete structured step
-
-  if call_tool:
-    poll/preempt before dispatch
-    dispatch exactly one validated call serially through host + llm-tools
-    if completed:
-      retain the bounded observation and continue
-    if suspended:
-      settle the host-referenced suspension and return suspended
-
-  if say or finish:
-    poll once more for stop/preemption
-    settle the host-owned conclusion and return completed
-
-on deterministic no-progress stop:
-  settle a host-authored stopped conclusion; do not rearm this input
-
-on interruption after model dispatch was armed:
-  retain paid uncertainty and discard native continuation; never auto-redispatch
-on configuration defect:
-  park unconsumed input; require explicit correction
-
-always settle/refund admission on clean exit; release the live provider lease
-on startup, release only orphaned concurrency slots;
-  retain their rolling capacity charge
-```
-
-No database transaction remains open across provider or external tool I/O.
-
-### 11.2 One-shot run
-
-An isolated one-shot:
-
-- Requires `SessionMode.isolated`, a structured output contract, and an explicit
-  `DurableIsolatedDecisions` or `TransientModelDecisions` choice.
-- Validates its invocation input projection against the definition policy
-  before plan rendering, admission, provider I/O, or tool I/O.
-- Requires a HostTable plan containing no `ToolEffect.Write` binding.
-- Validates that plan and, with no initial Read, constructs a fresh budget
-  through `ToolBudgetFactoryPort` and requires exact plan `RunLimits` before
-  rendering, admission, provider I/O, or tool I/O.
-- Requires a host-issued admission reservation; denial returns to the caller
-  without retry or provider I/O.
-- MAY receive zero or one `InitialReadCall`. When present, it validates the exact
-  selected plan first, then proves the named binding is granted and exactly
-  `ToolEffect.Read` and purely validates its arguments before rendering,
-  admission, provider I/O, or tool I/O. Missing, ungranted, stale, `Pure`,
-  `Write`, or malformed selections fail at this boundary.
-- For that opt-in path, completes child admission/token and cancellation checks,
-  creates and verifies one fresh plan-aware budget, dispatches the initial Read
-  through the normal host port with `InitialReadDispatchLineage`, and projects
-  only a completed typed result. That exact budget is reused by every later
-  model-proposed call. The dependency-owned executor alone accounts calls,
-  attempts, bytes, external attempts, and tool elapsed time.
-- Opens the provider session only after the initial observation is logically
-  available and has passed required context-size projection. A typed
-  `BudgetExceeded` or declared failure may be shown to the model; it grants no
-  external work. A suspension or configuration/recovery defect fails closed.
-- Uses a fresh native session and no `InputCheckpointPort`, admission retry
-  state, or `SessionRefPort`.
-- Uses the same structured step validation, serial tool loop, budgets, and
-  cancellation.
-- Closes the native session in `finally`.
-- Returns only a schema-valid `finish.result` or a typed stop outcome.
-
-The facility is a single deterministic Read for constructing first-turn model
-context. It is not a hook, retry mechanism, list of calls, dependency graph,
-workflow engine, authority mechanism, or permission to execute commentary.
-`AgentText` remains observational and non-executable.
-
-Only explicitly transient `Read + BilledOnce` work accepts repeated cost after
-a crash. Recoverable work uses stable positions and durable llm-tools records.
-Isolated provider state is never saved as a reusable native reference or treated
-as canonical.
-
-## 12. Outcomes
-
-Thread outcomes are:
-
-- `completed`: current input was durably concluded and consumed.
-- `suspended(host_ref, waiting_for)`: host work is durable and a later host
-  input will resume product work.
-- `no_work`, `busy`, or `deferred(until)`: no provider call began.
-- `preempted`: host policy stopped the run for higher-priority input.
-- `cancelled`: cancellation stopped the run under its declared settlement rule.
-- `budget_exhausted`: a kernel limit stopped and concluded the input.
-- `quota_exhausted`: subscription quota stopped and concluded the input.
-- `protocol_error`: repair allowance stopped and concluded the input.
-- `provider_error`: an accepted normalized terminal records provider failure.
-- `model_decision_uncertain`: an armed paid dispatch has no accepted terminal;
-  thread input remains parked and unconsumed.
-- `configuration_error`: a dependency/port/containment invariant failed and the
-  input was parked for operator correction.
-
-Every result includes run ID, provider turns, available normalized token usage,
-duration, and whether canonical input was consumed. No outcome implicitly means
-"retry me".
-
-One-shot outcomes replace thread states with `completed(structured_result)` or
-the applicable typed stop.
-
-## 13. Observability and privacy
-
-Every run has a stable run ID. An optional event sink receives bounded metadata
-for claim, admission, provider turn, validation, tool dispatch, suspension,
-settlement, usage, cancellation, and terminal outcome. Sink failure is nonfatal
-and never acknowledges canonical work.
-
-Default events and logs contain stable IDs, kinds, timings, counts, revisions,
-and usage—not prompts, human text, retrieved memory, tool arguments/results,
-session refs, credentials, or provider-native payloads. An application may opt
-into a separately configured redacted diagnostic transcript; the kernel defines
-the configuration and sink boundary but does not require persistence.
-
-Provider-side native session transcripts are unredacted third-party data at
-rest under the provider/runtime retention model. Discarding a local session ref
-does not promise provider deletion. Consumers MUST state that privacy trade-off.
-
-## 14. Required conformance
-
-The release suite covers both single-run interior behavior and composed seams:
-
-1. Exact `AgentRuntime` request mapping and open/stream/close lifecycle against
-   the pinned route; production never calls the event-discarding `run_turn`
-   convenience projection. A consumer regression proves commentary
-   `AgentText` cannot reach logical validation or dispatch and that only the
-   terminal structured value can execute.
-2. Native built-ins disabled, empty read-only cwd, disabled network/environment,
-   approval deny, no MCP, and fail-stop on any native tool/permission event.
-3. Codex-compatible provider-wire JSON-schema enforcement plus independent
-   envelope decoding, logical-step validation, and output-contract validation.
-   Tests audit conversational and structured schemas for an object root, closed
-   objects, all-properties-required, explicit nullability, JSON-string tool
-   arguments, nested/optional/empty results, unsupported-contract preflight,
-   malformed branch combinations, and deterministic fingerprints.
-4. Pure argument validation performs no recorder/budget/dispatch operation.
-5. Frozen plan/catalog consistency, full-plan tightening, and exact `HostTable`
-   exposure are proven before rendering or I/O, including adversarial
-   cross-catalog handler-implementation substitution tests.
-6. Exactly one serial tool call per model step; no parallel or multi-call path.
-7. `Write` execution has stable action-owned position/effect ID, immutable
-   claim/checkpoint/input/step lineage, and a durable recorder; conflicts and
-   uncertain positions never redispatch blindly.
-8. `Pure`/`Read` one-shot behavior and explicitly transient BilledOnce recomputation
-   cost are explicit and tested.
-9. Mid-loop human input is polled and appears once before the next model turn;
-   stop/preemption prevents later dispatch.
-10. Empty claims call no provider; oversized batches are bounded by the host.
-11. Valid final text is persisted before delivery; restart delivery is tested by
-    the consumer's outbox contract.
-12. Session-reference CAS precedes dispatch/settlement; every crash boundary
-    either resumes an aligned session or discards it before replay.
-13. Suspension preserves the host ref, original tool/arguments, waiting actor,
-    and later safe resolution without relying on provider history.
-14. Protocol, budget, quota, and explicit-stop outcomes consume the poison input
-    and cause zero automatic successor runs for it.
-15. Crash recovery cannot exceed the durable no-progress attempt ceiling.
-16. Thread runs and isolated one-shots are covered by durable maximum turn/token
-    reservations before provider I/O. Each exclusive root work epoch reserves
-    one concurrency slot; a strictly serial child may share it only when its
-    capacity was reserved by the parent. Clean exits refund unused capacity;
-    crash recovery releases only the orphaned live slot and conservatively
-    retains the rolling capacity charge.
-17. Provider quota, expected failure, invariant defect, executor result, and
-    recorder recovery remain distinct.
-18. Observation and cumulative-context bounds yield typed failures or explicit
-    omission markers, never silent truncation or a successful false result. The
-    counter covers exactly the kernel-rendered material newly submitted in that
-    invocation and excludes provider configuration/schema overhead, retained
-    native history, and provider compaction.
-19. A cold bootstrap works after deleting all provider-session state; durable
-    effect context comes from the host, while safe reads may repeat.
-20. One-shot sessions always close and never touch checkpoint or saved-ref ports.
-21. Multi-run integration fixtures cover poison input, cancellation, mid-loop
-    steering, suspension/resolution, startup recovery, and rolling admission.
-22. Ordinary tests use deterministic fakes; paid live qualification is opt-in
-    and records no private payloads.
-23. A plan-aware factory runs only after exact plan validation; its returned
-    `BudgetState` must carry exactly the plan's `RunLimits` before rendering,
-    admission, provider I/O, or tool I/O, for both thread and one-shot runs.
-24. The cooperative elapsed limit deadlines provider turns and prevents new
-    work at safe boundaries without wrapping host cleanup or a `Write`; tool
-    execution remains under its independently frozen `llm-tools` deadline.
-25. A non-empty owner-controlled session-compatibility revision participates in
-    the definition fingerprint, and mutating it rotates saved-session identity.
-26. A definition-bound input projection preserves legacy rendering by default,
-    can suppress per-input timestamps, controls batch `as_of` as always, never,
-    or explicitly requested, rejects widening requests before any external
-    boundary, and participates completely in deterministic fingerprinting for
-    thread and isolated empty-plan runs.
-27. With no initial Read, no host-selected Read or initial-Read position is
-    introduced. Both paths obey the explicit paid-decision contract in section 17. With one, plan/binding/input validation precedes admission and
-    I/O; admission and cancellation precede one exact shared tool budget and
-    dispatch; initial/model positions are deterministic and disjoint; the typed
-    completed observation precedes provider I/O; failures, bounds, commentary,
-    accounting, containment, and finally-close behavior remain fail-closed.
-28. Empty application system configuration still replaces the Codex coding-agent
-    prompt with the kernel base instruction. Its immutable identity rotates
-    fingerprints and saved-session namespaces automatically; every session path
-    receives it, application material cannot remove it, retained custom-exec and
-    later-terminal incidents fail with zero host action, `ProtocolDefect` is
-    fatal, and inert provider observations preserve normal terminal behavior.
-
-## 15. Explicitly deferred
-
-- Stateless root `ProviderRuntime.generate` support.
-- Provider-native or MCP application tools.
-- Parallel or multi-call model steps.
-- Nonterminal model-authored progress delivery.
-- Generic durable observed-value storage.
-- Tool discovery in the kernel.
-- Lua, QuickJS, WASM, CodeAct, or other model-authored program execution.
-- General delegation, persistent peer agents, task trees, join, and cancellation
-  propagation.
-- Kernel-owned SQL, workflow, queue, scheduler, lease, connector, memory, or UI.
-- Initial-call lists, hooks, retries, dependency graphs, and general pre-model
-  workflows beyond the single isolated Read defined above.
-
-Deferred features require measured need, an ADR, and preservation of the
-provider containment, plan-tightening, admission, and effect boundaries above.
-
-## 16. Shared generation protocol
-
-[ADR 0008](docs/decisions/0008-shared-generation-orchestration.md) admits Nexus as
-a second consumer. `llm_agent_kernel.generation.run_generation` MUST own its
-portable native-child and ordered-tool loop. A consumer MUST NOT retain a second
-loop under an adapter. Frozen application selections, provider request/event
-projection, native transport, tool execution, durable transactions, authority,
-and delivery retain their established owners.
-
-### 16.1 Values and boundaries
-
-`GenerationTurn` carries a positive absolute ordinal and a typed frozen native
-request. A fresh invocation starts at ordinal one. A recovered invocation MUST
-start with `GenerationContinuation`, which carries its source ordinal, typed
-host continuation payload, and a nonempty ordered tuple of calls with unique
-provider correlation IDs. These IDs correlate results; they MUST NOT become
-effect identities or grant authority.
-
-`GenerationDriver.stream` MUST await the supplied arming callback exactly once
-after native admission and before native model dispatch. The host lifecycle
-MUST durably record uncertainty under its current claim before that callback
-returns. A pre-admission refusal MUST NOT arm a child. The driver validates
-native request/event identity, handles in-flight cancellation, and closes
-transport resources when its async generator is closed.
-
-The closed stream values are `GenerationObservation`, `GenerationProposal`,
-and `GenerationTerminal`. Their nonnegative sequences MUST strictly increase;
-gaps from native projection are permitted. Observations are non-authoritative
-progress. Proposals are buffered. The complete stream MUST end after exactly
-one terminal; any later event or exception prevents terminal commitment and
-dependent dispatch. A continuation MUST name the current ordinal and contain
-exactly the observed ordered calls, including their payloads.
-
-### 16.2 Durable decisions and acknowledgment
-
-`GenerationLifecycle.complete` MUST atomically commit the accepted child
-terminal and exact successor decision before returning. It MAY resolve the
-host terminal and drop continuation; it MUST NOT substitute terminal identity
-or continuation. The kernel MUST await this result before publishing buffered
-proposals or terminal evidence, and MUST await each observer acknowledgment
-before executing dependent tools. Acknowledgment failure propagates without
-dispatching those tools.
-
-A starting continuation MUST have been reopened and validated against durable
-host state. Tools MUST execute through existing authority and recorder paths
-using stable positions. The kernel MUST execute calls serially, verify each
-returned correlation ID, and never automatically retry a failed boundary.
-Uncertain external effects remain subject to host reconciliation.
-
-Before preparing a successor, `GenerationLifecycle.open` MUST verify that the
-accepted continuation's identity and canonical bytes exactly match its durable
-record and current claim. It MUST raise on disagreement. The driver then
-purely prepares the next absolute ordinal from that exact payload and ordered
-tool results. No host transaction may remain open across provider/tool I/O.
-
-### 16.3 Cancellation and limits
-
-`max_turns` MUST be a positive integer and bounds absolute child ordinals,
-including resumed work. It does not replace llm-tools tool/attempt/byte or
-deadline accounting. If no successor turn is available, the kernel MUST stop
-before initiating tools whose result cannot be continued.
-
-Cooperative cancellation MUST be checked before a provider turn, dispatch
-arming, each tool, continuation reopening, and successor preparation. Native
-transport owns in-flight cancellation. Python task cancellation MUST propagate
-and close the stream; it MUST NOT be converted to fabricated provider evidence.
-
-`GenerationCompleted` means an accepted final native child exists. Its native
-terminal may be successful, failed, incomplete, or cancelled. `GenerationStopped`
-is a separate orchestration outcome with reason `cancelled` or `turn_limit`,
-last accepted terminal when available, and last accepted/source ordinal. The
-host MUST persist and publish its stopped parent outcome separately, preserve
-child truth, and retire any pending successor atomically with that stop. A
-resume has no retained terminal value unless supplied by durable host evidence;
-`last_terminal=None` MUST NOT be presented as native success.
-
-### 16.4 Qualification
-
-Ordinary tests MUST use network-disabled deterministic providers and explicit
-process-local lifecycle fakes. Consumers MUST qualify native admission timing,
-ordered event acknowledgment, real recorder replay, task cancellation, durable
-continuation identity, effect uncertainty, and stop publication against their
-own stores. These checks MUST retain the contained AgentRuntime conformance
-suite. Paid/live provider qualification remains a separate explicit gate.
-
-## 17. Durable paid decisions
-
-ADR [0009](docs/decisions/0009-durable-paid-decisions.md) supersedes earlier
-attempt-local inference and BilledOnce-recomputation allowances for recoverable
-runs. It does not change the contained model grammar or host action barrier.
-
-### 17.1 Explicit recovery contract
-
-`run_thread` requires `ModelDecisionJournal`. `run_one_shot` requires a closed
-choice: `DurableIsolatedDecisions(IsolatedDecisionScope(operation_id), journal)`
-or explicit `TransientModelDecisions()`. A durable isolated operation ID names
-actual host work and MUST survive crashes, retries, and new attempt UUIDs.
-
-Thread `ModelDecisionScope` names the thread and original first input. Its
-ordinal counts paid decisions in that original work, including protocol repairs.
-`ModelDecisionRequest` hashes scope and ordinal into `decision_id`, and hashes
-all original authority, input/checkpoint/as-of, logical counters, canonical
-context, and exact submitted context into a separate `request_fingerprint`.
-Definition identity includes the authenticated frozen catalog selection:
-`model_key`, reasoning key, `agent_definition_revision`, and row fingerprint.
-Consumers discover that catalog before constructing `ProviderConfiguration`;
-the kernel supplies no model/reasoning/catalog defaults.
-
-`latest` returns only `ModelDecisionArmed`, `ModelDecisionCompleted`, or no
-record. `arm` durably accepts one original request under current host ownership.
-`complete` durably accepts the exact normalized terminal from the fully drained
-provider stream, before tool dispatch, conclusion settlement, or successful
-reference CAS. It cannot substitute either request or terminal.
-
-### 17.2 Recovery and uncertainty
-
-Host claim selection consults the journal before retry/poison handling, freezes
-and restores original ordered inputs/checkpoint/as-of, and gives existing
-committed action recovery priority. An armed decision parks unconsumed input
-with `model_decision_uncertain`. A completed decision replays without provider
-I/O or charging its prior usage again. Authority or claim drift fails closed.
-
-Replay uses no obsolete native session reference. Any subsequent provider turn
-cold-boots from the stored canonical text, accepted model evidence, and current
-tool observations. Canonical snapshots and newly submitted context are each
-bounded by `max_new_context_bytes`; exhaustion never clips evidence. Logical
-turn and repair bounds survive recovery. Current-invocation metrics count only
-new paid dispatches; host rolling admission retains crash capacity charges.
-
-Once the provider method is invoked, an exception without an accepted terminal
-retains uncertainty, even when named `TurnNotStarted`, `SessionMismatch`, or
-`SessionUnavailable`. None proves the backend was not invoked. The only
-`release_undispatched` path is a kernel-observed stop after arm and before
-provider invocation. Cancellation and cleanup never rearm uncertain work.
-
-The journal adapter atomically persists any existing bounded host role evidence
-required to validate a replayed result. It restores that evidence before replay;
-the kernel does not own its schema and canonical prompt text grants no authority.
-BilledOnce tools use original lineage positions and a durable llm-tools recorder.
-Writes still require the original host action/effect record and policy barrier.
-The journal owns no scheduler, effect, action approval, or reconciliation policy.
+this is the current reusable contract. [native supervision](docs/native-agent-spec.md)
+is normative detail; [adr 0010](docs/decisions/0010-native-agent-supervision.md)
+supersedes the former conversational step loop, session cache and capacity
+admission. [evidence](docs/native-agent-evidence.md) distinguishes implemented
+behavior, controlled proof and installed live qualification.
+
+## 1. goals
+
+one shared supervisor for jarvis and nexus; truthful provider evidence, durable
+acceptance before actions, responsive control and useful work after cold restart.
+keep application authority and canonical state in the application. codapt supplies
+native supervision semantics; byte parity, workspace tools and its machine/billing
+infrastructure are excluded.
+
+## 2. dependencies and implementation gate
+
+python 3.12+. `pyproject.toml` and `uv.lock` name exact immutable provider-runtime
+and llm-tools revisions. install the frozen lock. no sibling-source import is an
+installed qualification. the qualified native binary is stock codex 0.160.0;
+consumer manifests pin that version.
+
+| dependency | exact candidate revision |
+| --- | --- |
+| llm-tools | `cad13af1289c247897236959bfff0d6791956d4b` |
+| provider-runtime | `b2ce2bc6ad01f39838ca44b865daa0d47e9f9254` | any unsupported exact capability fails
+before arm/submission; never substitute another model, effort, tool or route.
+
+provider-runtime owns SDK integration, structured-output lowering, native callback
+transport, native identities, authoritative submission/finality and per-turn
+control. llm-tools owns prompt rendering, declarations, frozen profiles/plans,
+pure validation, execution, budgets, durable position/replay contracts and results.
+the kernel must use these public mechanisms rather than copy their internals.
+
+## 3. ownership
+
+| owner | responsibility |
+| --- | --- |
+| provider-runtime | prepare exact wire request; classify send facts; correlate native events/callbacks/control; preserve original terminal |
+| llm-tools | schemas/plans and one executor/recorder/accounting contract |
+| kernel | validate effective authority; supervise callback/input/control ordering; enforce host journal boundaries |
+| application | requests/context, owner permits, transactions, action identity/consent/reconciliation, publication/outbox |
+| native host | account state, persistent stock server, private socket and private read-only cwd |
+
+the kernel owns no application table, migration, queue, scheduler, credential
+store, memory service, delivery transport, approval policy or action ledger.
+
+## 4. core values
+
+`NativeDefinition` binds exact `ProviderConfiguration`, `AgentRole`, provider
+output contract, maximum frozen profile, compatibility revision and finite
+`NativeControl`. its fingerprint includes complete containment, exact schemas,
+base instruction identity, tool authority and control bounds.
+
+`NativeRequest` binds stable attempt, scope, operation, ordered canonical input
+ids, canonical/submitted prompt sections, frozen plan, recovery policy, absolute
+optional deadline and thread checkpoint. its fingerprint excludes renewable owner
+token; ownership renewal cannot change immutable work identity. `OwnerPermit`
+proves current application ownership and explicit parent invocation for an
+isolated gate. native call ids identify proposals; they never authorize effects.
+
+`NativeInvocationProposal` freezes original arguments, call/tool identity,
+input/checkpoint lineage and all plan/binding revisions. `InvocationRecord`
+identifies host acceptance and immutable `NativeReply`. `DispatchCompleted`
+contains the original llm-tools result and host receipt reference;
+`DispatchSuspended` is an existing durable host wait, not execution success.
+
+## 5. exact provider surface and containment
+
+`AgentRuntime` prepares a turn before the journal arms it. immutable
+`AgentAttempt` includes exact request digest. `AgentTurnRef` identifies the
+accepted native session/turn. unsupported schema/model/callback composition is a
+preflight refusal, not a route fallback.
+
+native codex built-ins, web, MCP, inherited environment, network and unsolicited
+permissions are disabled. cwd is private, empty and read-only. host callbacks
+are the only application tools. a native tool/permission event is a containment
+defect: fence callbacks and discard only that session. the account host retains
+credentials; worker state is empty and accountless. native host network for model
+authentication is distinct from model/tool network authority.
+
+## 6. structured model protocol
+
+native main uses the provider's native reasoning loop, declared callbacks and
+exact text or strict JSON terminal contract. completed public commentary is
+observational and may precede terminal. it cannot settle a request or action.
+
+isolated `run_one_shot` retains one closed `call_tool` or `finish` value and
+serial read-only host tools for real gate/context/memory roles. `say`,
+`run_thread`, conversational session/cache/CAS and capacity reservations are
+removed. validate the complete step and pure arguments before dispatch.
+
+## 7. tool boundary
+
+prove exact plan/catalog consistency and tightening of definition maximum before
+rendering or I/O. publish and execute the same declarations and frozen revisions.
+one callback dispatch at a time; finite overlap buffers queue arrival order.
+unknown tools never execute; known invalid arguments retain original evidence and
+a bounded typed rejection, with zero handler entry.
+
+the host journal accepts immutable invocation before dispatch. writes require
+host-created effect identity; `InvocationPosition` equals `EffectId`. reads and
+isolated gates retain their own original invocation identities. commit the
+original executor result, then immutable callback reply, before sending that
+reply. duplicate identical callbacks replay; changed bytes/revisions fail closed.
+an entered unknown action never becomes fresh merely because a model changes
+call id. domain reconciliation remains application-owned.
+
+## 8. context and steering
+
+canonical host context cold-bootstraps useful work; native history is disposable.
+new input is polled while reasoning and callbacks wait. `NativeDelivery` retains
+prepared/sent/queued/recorded/rejected facts. queued acknowledgment does not prove
+recorded input or model attention. later steer cannot reattribute an accepted
+invocation to newer inputs. ambiguous delivery never silently resends an action.
+
+`NativeMessagePort` commits completed commentary and delivery outbox atomically
+and idempotently. partial network deltas are not completed public messages. host
+request settlement keeps earlier unfinished work when another topic arrives.
+
+## 9. checkpoint, settlement, and recovery
+
+native arm precedes provider submission. retained evidence has three distinct
+forms: authoritative non-submission, exact sealed native terminal, and unresolved
+submission. a timeout, `TurnNotStarted`, RPC error, missing id or absent usage is
+not negative submission proof.
+
+native terminal/usage/raw payload commit before cleanup or application decoding,
+resolution and publication. local stop/fence/cancel acknowledgment is separate
+from native finality. an original safe failure or valid terminal survives later
+cleanup/product failure. native `turn/completed` evidence may preserve a failed
+or interrupted turn with unfinished callbacks; successful completion requires a
+valid resolved native lifecycle.
+
+### 9.3 run admission
+
+`OwnerPort.require_current` fences provider/effect entry and settlement authority.
+there are no capacity reservations or fabricated token charges. an explicitly
+serial isolated gate uses the current owner's permit and parent invocation; its
+wait cannot block transport/control reading. no unused input is automatically
+rearmed by cleanup.
+
+## 10. limits and cancellation
+
+no task-wide native usage/call/elapsed quota is required. jarvis main has no
+arbitrary elapsed cutoff. nexus owns its job deadlines. tool deadlines, individual
+input/output bounds, in-flight serialization and transport buffers remain finite.
+`llm_tools.RunLimits` may omit each cumulative quota; use the shared budget algebra
+and never double-account reservation, settlement or replay. provider context/output
+policy is admission/reservation, not an invented native inner-loop token ceiling.
+
+stop promptly revokes callback authority, records control independently and
+interrupts only the affected turn. stopping cancels never-entered approval/action
+work in the host. entered effects still settle truthfully or require reconciliation.
+a stalled callback or withheld start acknowledgment cannot starve control.
+
+## 11. run algorithms
+
+`run_native`: validate -> require owner -> recover own sealed truth if present ->
+prepare exact provider request -> durably arm -> submit -> supervise input,
+commentary and serial callbacks -> commit original terminal -> cleanup. each
+callback is validation -> host acceptance -> dispatch -> durable result -> durable
+reply -> wire reply. the transport reader remains independent of effect execution.
+
+`run_one_shot`: validate frozen read-only plan -> require owner -> recover or arm
+exact model decision -> stream provider turn -> commit original evidence -> decode
+whole step -> dispatch at accepted isolated position -> continue or finish.
+recoverable paid inference explicitly selects `DurableIsolatedDecisions`;
+disposable inference explicitly selects `TransientModelDecisions`.
+
+## 12. outcomes
+
+native execution returns provider `AgentTerminal` with mandatory
+`NativeTerminalEvidence` or `LocalStopEvidence`. only exact own native seal can
+produce `NativeRecovery`; local stop never supplies recovery authority.
+`AgentNotSubmitted` is a separate authoritative provider submission fact.
+`NativeUncertain` preserves the armed unresolved attempt. it is never automatic
+redispatch permission. isolated outcomes remain `OneShotCompleted` or
+`OneShotStopped`, with original accepted decision/usage retained.
+
+## 13. observability and privacy
+
+use existing redacted kernel events/diagnostics. do not persist private raw
+transcripts or credentials for qualification. public fixtures may retain exact
+receipts. raw provider evidence belongs to the host's durable journal; product
+text is its separately derived projection. XML-like prompt structure establishes
+provenance, not a security boundary.
+
+## 14. required conformance
+
+[native acceptance](docs/native-agent-spec.md#9-delivery-and-acceptance) assigns
+N001–N020 exactly once. required verification includes controlled transport faults,
+actual recorder/store transactions, owner/process loss, real selected model plus
+research tools and strict JSON, containment and installed immutable artifacts.
+[the delivery plan](docs/native-agent-plan.md) specifies red/green/refactor and
+owner-requested deletion of new temporary feature tests after final proof.
+existing applicable conformance stays. static checks do not prove live behavior.
+
+## 15. explicitly deferred
+
+program execution, parallel tools, delegation graph, application workflow engines,
+memory redesign, native shell/files/web/network, compatibility lanes and new
+multi-user infrastructure. do not add abstractions for hypothetical consumers.
+
+## 16. shared generation protocol
+
+`llm_agent_kernel.generation.run_generation` serves the retained raw API generation
+lane. `GenerationTurn` carries exact generation/model-turn identity;
+`GenerationProposal` may contain ordered API-native multi-call proposals whose
+results execute serially through the application's canonical tools.
+
+### 16.2 durable decisions and acknowledgment
+
+`GenerationLifecyclePort` arms each child and commits its original terminal before
+`resolve_terminal` performs product validation. the lifecycle owns authoritative
+continuation evidence; a product rejection cannot erase a successful provider
+terminal or authorize another paid call. API continuation may reopen only its
+exact sealed original successor identity and persisted continuation.
+
+### 16.3 cancellation and limits
+
+`GenerationControlPort` polls at safe boundaries; no generic timeout destroys
+host cleanup/settlement. `max_turns` is optional, with configured per-turn and
+host/tool bounds preserved. native callback execution calls `run_native` directly;
+do not nest journals or a second generation loop around its native inner loop.
+
+## 17. durable paid decisions
+
+host-backed `ModelDecisionJournal` stores exact request, arm, authoritative
+non-submission or original terminal before interpreting a model choice. recover
+paid decisions from their original record, never by regenerating a similar choice.
+
+### 17.1 explicit recovery contract
+
+`DurableIsolatedDecisions` supplies journal and `IsolatedDecisionScope`;
+`TransientModelDecisions` marks disposable work explicitly. supplied resume state
+must match exact definition, run/step, plan and request identity. accepted action
+records, original arguments/revisions and effect identity remain host authority.
+
+### 17.2 recovery and uncertainty
+
+own native seal permits local product replay with zero provider/catalog calls.
+exact original-attempt non-submission proof permits local failure settlement.
+missing proof, local stop, parent outcome or exception naming stays uncertain.
+jarvis may restart reasoning in a fresh thread only after fencing the old attempt;
+original action barriers survive. nexus never redispatches an uncertain generation.
 
 ## 18. native agent target requirements
 
-status: accepted target contract; implementation and native qualification pending.
-these requirements apply to the planned native callback protocol for jarvis and
-nexus. sections 1–17 describe the existing protocols until their explicit cutovers.
-the [native supervision contract](docs/native-agent-spec.md) is normative for this
-extension, including its delivery dependencies and N001–N020 acceptance criteria.
-
-the accepted codapt-derived kernel contract is the source of truth for shared
-agent behavior. llm-tools, provider-runtime and consumer contracts MUST adapt to
-it where necessary; current APIs and pins do not constrain the target design.
-codapt2 supplies the reference behavior, subject to the explicit choices here.
-dependency changes retain clear ownership and require qualified immutable pins
-at integration; design authority does not move their implementations into the kernel.
-
-- model usage limits are not required. the native protocol MUST NOT require token,
-  spend, cumulative model-turn or task-wide tool-call budgets, reservations for those budgets,
-  or a hard/soft budget selection. usage reporting may remain observational;
-  absent usage MUST NOT itself block work. this supersedes section 9.3's usage
-  reservation requirement for native orchestration and the affected isolated
-  gate/context/memory roles. those roles retain independently selected per-operation
-  request bounds; parent/gate rolling capacity reservations are removed together.
-- neither application requires model-native shell, file or network tools. the
-  target MUST expose application tools through declared contained callbacks and
-  MUST NOT broaden native authority to make an integration work. provider network
-  transport and explicit host tools such as research/storage are separate owners.
-- nexus's existing shell/http route is a migration source, not a permanent second
-  tool interface in the target. qualify callbacks and retire the replaced route;
-  an unsupported callback capability is not permission for a hidden shell fallback.
-- the native recovery policy MUST be explicit and frozen with the request.
-  jarvis selects automatic reasoning recovery from canonical context and recorded
-  tool results after old callback authority is
-  fenced. retain the old attempt's uncertainty; a new attempt does not prove the
-  old one was never submitted or has stopped. recover existing actions first;
-  an uncertain external effect still requires host reconciliation. section 17.2's
-  ban on redispatch does not prohibit this new reasoning attempt in the target.
-  nexus metadata selects `reconcile_only`: an uncertain journal step MUST block
-  redispatch. automatic jarvis recovery cannot override that consumer contract.
-- current ownership, validated invocation, durable action/result, stop and bounded
-  transport-buffer requirements remain necessary. removing usage budgets does not
-  remove the effect boundary or permit concurrent owners of the same work.
-- jarvis main MUST NOT stop merely because a fixed elapsed-time window expired.
-  it continues until completion, a real blocker, required input or owner
-  stop. transport/tool operation timeouts remain distinct from task lifetime;
-  nexus retains its separately selected job deadlines.
-- a pending approval MUST block only that action and work dependent on its outcome.
-  jarvis continues independent work and waits when nothing useful remains.
-  persist the original action and return its pending status to the callback;
-  do not hold the callback or suspend the whole task solely to await approval.
-  later approval/resolution refers to that exact action and becomes ordinary host
-  input. it MUST NOT cause the model to propose the effect again. pending actions
-  MUST NOT be presented as completed, and owner stop still prevents automatic
-  restart. the host retains approval and action-execution policy.
-- owner stop MUST cancel still-pending approvals for the stopped work. approval
-  and stop MUST be serialized against the same durable work/action authority:
-  after stop wins, a stale approval cannot dispatch. already-dispatched actions
-  retain settlement/reconciliation obligations. resumption requires fresh approval
-  of the exact action where policy requires approval; it cannot reactivate a
-  cancelled approval or duplicate an already-dispatched effect.
-- jarvis MUST support brief public progress messages and useful partial answers
-  during ongoing work. deliver substantive findings, changes of direction and
-  blockers without waiting for the final native terminal. such messages are
-  observational: they MUST NOT authorize tools, settle actions, publish a strict
-  structured result or establish task completion. application status comes from
-  recorded outcomes; prompts require truthful descriptions of pending work.
-- ordinary new requests in an active jarvis conversation MUST reach the agent
-  promptly so it can answer or reprioritize. retain unfinished work unless the
-  owner cancels it; do not queue a request merely because its topic differs.
-  steering MUST preserve durable input identity and MUST NOT change the frozen
-  tool authority or output contract. incompatible configuration changes require
-  a correctly admitted subsequent turn. this is input supervision, not a kernel
-  task scheduler or a new persistent work registry.
-
-the [delivery plan](docs/native-agent-plan.md) assigns implementation and proof.
-the [metadata handoff](docs/integrations/nexus-metadata.md) owns the exact concurrent
-consumer requirement and readiness report. no current runtime change is implied.
+[the accepted detailed contract](docs/native-agent-spec.md) governs jarvis/nexus
+composition, schemas, content requirements and N001–N020. implementation status and
+exact qualified artifacts live in [evidence](docs/native-agent-evidence.md), with
+[metadata handoff](docs/integrations/nexus-metadata.md). historical ADRs describe
+former decisions; they cannot reactivate deleted runtime paths.

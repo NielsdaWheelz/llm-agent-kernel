@@ -136,7 +136,7 @@ from qualified finite context/output bounds. those bounds cannot be assumed to
 cover an opaque native loop. jarvis's paid write gate also opens a second native
 turn while the parent awaits a callback, changing the serial child-slot premise.
 
-evidence: [run admission](../SPEC.md#93-run-admission), baseline lines 848–862;
+evidence: [run admission](../SPEC.md#93-run-admission), historical v1 baseline lines 848–862 (superseded by native owner-only admission);
 [jarvis admission.py:487](../../jarvis/src/jarvis/admission.py#L487);
 `definitions.py:151–174`; `write_dispatch.py:202–210`.
 resolution: qualify a finite exposure bound or explicitly amend native-lane

@@ -1,115 +1,35 @@
-# Repository instructions
+# repository instructions
 
-This repository specifies and contains `llm-agent-kernel`, imported as
-`llm_agent_kernel`.
+this repository contains `llm-agent-kernel`, imported as `llm_agent_kernel`.
 
-## Current phase
-
-- V1 runtime implementation and packaging are present. Keep changes within the
-  reusable kernel boundary and prove them through the conformance suite.
-- The accepted Nexus generation extension in SPEC section 16 and ADR 0008
-  permits additional native provider lanes and ordered multi-call proposals.
-  Earlier v1-only restrictions below apply to the contained AgentRuntime
-  protocol, not to that explicitly qualified generation protocol.
-- SPEC section 17 and ADR 0009 require host-backed paid decision journals for
-  recoverable work and explicit transient selection for disposable inference.
-- `SPEC.md` is normative. Architecture, acceptance, slices, and ADRs must agree
-  with it.
-- SPEC section 18 and ADR 0010 adopt the native target in
-  `docs/native-agent-spec.md`; `docs/native-agent-plan.md` assigns its delivery.
-  Its explicit amendments govern the new protocol and hard cutovers, including
-  prepared provider turns, optional cumulative quotas and owner-only admission.
-  existing v1 restrictions below describe the current contained protocol; they
-  do not veto the accepted target. implementation remains pending.
-- The public `llm-tools` seams in SPEC section 2 are qualified and locked at the
-  exact immutable revision recorded there and in `pyproject.toml`/`uv.lock`.
-
-## Permanent boundaries
-
-- Target Python 3.12 or newer.
-- Use only `provider_runtime.agent_runtime.AgentRuntime` for v1 provider work.
-- Use `llm-tools` for prompt sections, tool declarations, frozen profiles and
-  plans, pure schema validation, execution, tool budgets, positions, replay,
-  recorders, and results.
-- Own provider-neutral orchestration: definitions, containment fingerprints,
-  context projections, strict steps, serial loops, polling, admission,
-  cancellation, ports, outcomes, and conformance tests.
-- Own no application table, migration, workflow engine, queue, scheduler,
-  connector, credential store, memory system, approval policy, delivery path,
-  action ledger, effect identity, or reconciliation procedure.
-- Do not duplicate provider SDK integration or any `llm-tools` registry,
-  executor, budget, recorder, discovery implementation, or renderer.
-- V1 has no program runtime, parallel/multi-call step, model-authored progress
-  channel, provider-native application tool, MCP application tool, or delegation
-  graph.
-
-## Invariants
-
-- Exact model grammar: one closed `say`, `call_tool`, or `finish` value.
-- Validate the whole step and pure tool input before output or dispatch.
-- Exactly one serial tool call per model step; model supplies no call/effect ID.
-- Thread dispatch carries immutable claim, checkpoint, ordered input, and
-  model-step lineage plus accepted decision ID; isolated dispatch carries run,
-  step, and accepted decision identity. The
-  kernel neither interprets nor persists either form.
-- Native Codex built-ins and Web are disabled; cwd is private, empty, and
-  read-only; network, copied environment, MCP, and approvals are disabled.
-- Every contained Codex session receives the exact kernel-owned structured-agent
-  base instruction before application system material. Its immutable revision
-  and digest participate in the definition fingerprint; consumers do not copy
-  the text or manually rotate compatibility for a kernel instruction change.
-- Consume `AgentRuntime.stream_turn` directly; never use the event-discarding
-  `run_turn` projection. Fail-stop and discard the session on any
-  provider-native tool or permission event.
-- The complete native session policy is part of the definition fingerprint.
-- Every definition has a non-empty owner-controlled session-compatibility
-  revision in that fingerprint so semantic changes can deliberately rotate
-  saved sessions.
-- Effective authority is the intersection of provider containment and the
-  host-selected frozen plan. Before rendering or I/O, prove the exact
-  plan/catalog view is internally consistent and tightens the definition
-  maximum; comparing profiles alone is insufficient.
-- Every tool binding has a non-empty owner-controlled implementation revision
-  covering its handler and transitive execution behavior. Bump it when that
-  behavior changes unless revisioned policy inputs already capture the change.
-- `KernelLimits` and `llm_tools.RunLimits` are distinct. Never double-account a
-  tool call, attempt, byte, deadline, or replay.
-- Construct the tool `BudgetState` from the claimed, validated plan and require
-  its limits to equal that plan before provider or tool I/O.
-- The kernel elapsed limit is cooperative at safe boundaries and is a hard
-  provider-turn deadline, not a hard timeout over host ports, tools, settlement,
-  or cleanup. Tool deadlines remain frozen `llm-tools` limits.
-- Context bytes count only material the kernel newly renders and submits during
-  the current invocation, not provider configuration, schema overhead, retained
-  native history, or provider compaction.
-- `Write` requires a host-created durable action/effect record whose stable ID
-  is both `InvocationPosition` and `EffectId`.
-- Suspension is a durable host boundary. The later resolution supplies original
-  validated arguments and evidence; provider history is not canonical.
-- Poll compatible input before provider turns, dispatch, after completion, and
-  before settlement. Incompatible input remains unclaimed.
-- No claim may be empty. No cleanup path automatically rearms unconsumed input.
-- Deterministic no-progress stops consume poison input. Crashes are bounded by
-  durable attempt counting and host-issued rolling admission before provider
-  I/O.
-- Admission reserves maximum turn/token capacity and one live slot per root work
-  epoch before provider I/O. A strictly serial child one-shot may share that
-  slot only when the parent reservation includes its capacity. Clean exits
-  refund unused capacity; crash recovery releases only the orphaned slot and
-  retains its rolling capacity charge.
-- Store a successful returned session reference by generation CAS before acting
-  on the model step. A stale CAS permits no dispatch or settlement.
-- Provider sessions are disposable; canonical host context must cold-bootstrap
-  useful work.
-- XML-like formatting is provenance and structure, never a security boundary.
-
-## Change rules
-
-- Prefer the smallest reusable contract proven by a real consumer.
-- New persistent-state requirements, provider/tool ownership, workflow
-  semantics, program execution, or delegation require an ADR.
-- Do not hide operational stores behind “no schema” or “adapter” language.
-- A second consumer is required before generalizing a Jarvis-only concern.
-- Keep acceptance IDs unique and assigned to exactly one slice.
-- Verify relative links, anchors, dependency claims, and terminology after every
-  material documentation edit.
+- python 3.12+. `SPEC.md` and `docs/native-agent-spec.md` are normative; adr 0010
+  supersedes the deleted conversational loop, session cache and capacity admission.
+- provider-runtime owns SDK/native transport, exact request/capability validation,
+  authoritative send/finality evidence and per-handle control. do not duplicate it.
+- llm-tools owns rendering, declarations/plans, pure validation, executor, budget
+  algebra, durable recorder/positions/replay and results. use its public contracts.
+- kernel owns portable native ordering and genuine isolated/raw-generation roles.
+  no application store, migration, workflow/queue, credential, memory, consent,
+  effect ledger, publication, delivery or reconciliation procedure belongs here.
+- exact unsupported requests fail before arm/send; no fallback or compatibility.
+- effective authority is provider containment intersected with the host frozen
+  plan; prove plan/catalog consistency and tightening before rendering or I/O.
+- native shell/files/web/network/MCP/unsolicited permissions and inherited
+  authority are disabled. cwd is private, empty and read-only.
+- accept immutable invocation before effect; commit result and immutable reply
+  before wire send. one dispatch lane, independent live transport/control.
+- preserve original native seal/raw/usage before product validation or cleanup.
+  exception names, timeout, local stop and parent outcome never prove submission.
+- owner permits authorize entry; recorded action/result facts survive revocation.
+  restart reasoning only after fencing old callbacks; retain effect barriers.
+- no task-wide quota or arbitrary main cutoff. finite operation/buffer bounds
+  remain. share llm-tools arithmetic; never double-charge settlement or replay.
+- fingerprints cover full containment, base instruction and frozen binding/plan
+  revisions. implementation revisions cover transitive execution behavior.
+- prefer the smallest complete reusable contract proven by actual consumers.
+  new persistent requirements or ownership changes need an ADR. no future framework.
+- keep acceptance ids unique; verify documentation links/pins/terminology after
+  material changes. record unresolved issues in `docs/issues/<short-name>.md`.
+- use concise explicit control flow and meaningful proportionate verification.
+  delete new temporary feature tests only after required final proof, as accepted
+  in `docs/native-agent-plan.md`; retain applicable existing conformance.

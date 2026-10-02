@@ -1,6 +1,6 @@
 # adr 0010: supervise native agents without importing application policy
 
-- status: accepted target design; implementation and qualification pending
+- status: accepted and implemented; exact qualification status in ../native-agent-evidence.md
 - date: 2026-10-02
 - scope: provider submission/finality, native callbacks and consumer adoption
 - amends for the native extension: adrs 0003, 0005, 0006, 0008 and 0009; preserves existing

@@ -1,7 +1,8 @@
 # nexus metadata integration handoff
 
-status: **NOT_READY** for implementation integration; specification work only,
-2026-10-02. no new qualified kernel/provider/tools pins or integration branch exist.
+status: **NOT_READY** for implementation integration; implementation authorized
+and underway, 2026-10-02. isolated `feature/native-agent-supervision` worktrees
+exist; no qualified kernel/provider/tools pin set or adapter commit is ready.
 this is the coordination record for the metadata owner; do not infer readiness
 from the accepted design or from controlled failure tests.
 
@@ -54,14 +55,14 @@ the [native contract](../native-agent-spec.md#9-delivery-and-acceptance) assigns
 
 | artifact/proof | current status |
 | --- | --- |
-| kernel checkout | `main`, `c5236809e3d8765b28e169792f50d24713c8a31a`; uncommitted design docs |
+| kernel checkout | `feature/native-agent-supervision`, `/Users/nnandal/Documents/code/llm-agent-kernel-native`; implementation underway |
 | current declared provider pin | `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`; baseline, not the repair |
 | current declared tools pin | `9e6d155f3b64f03495911435b7cae8b8d131f9a2`; baseline, not callback qualification |
-| ready integration branch / new immutable pins | unavailable |
-| exact selected model/effort + strict-json + successful web search/read | `NOT_RUN` |
-| four-tool declaration, dispatch, result and scope proof | `NOT_RUN` |
-| controlled preflight/native-failure/cleanup/uncertainty fixtures | `NOT_RUN` for the target |
-| durable terminal -> forced product failure -> local recovery | `NOT_RUN` for the target |
+| ready integration branch / new immutable pins | unavailable; candidate branches are unqualified |
+| exact selected model/effort + strict-json + successful web search/read | actual personal `gpt-6-luna`/`xhigh` and strict json + declared echo callback green on 0.160.0; actual research pending separately |
+| four-tool declaration, dispatch, result and scope proof | frozen declaration is present; live research underway, unqualified |
+| controlled preflight/native-failure/cleanup/uncertainty fixtures | provider native 10/10 and kernel native 5/5 candidate green; real nexus postgres unresolved/local-stop/parent-terminal anomaly block redispatch |
+| durable terminal -> forced product failure -> local recovery | candidate postgres green: exact own seal retained, cold local recovery and Completed replay with provider/catalog trap |
 
 before marking ready, replace the unavailable row with fetchable commits for each
 dependency and the nexus adapter branch; record clean installed lock resolution,
@@ -72,3 +73,21 @@ never a substitute for that successful live journey.
 
 the metadata owner chooses its domain fixtures and expected metadata. the kernel
 owner supplies adapter/capability evidence and does not edit the metadata worktree.
+
+implementation progress is recorded in [evidence](../native-agent-evidence.md).
+an inactive Uncertain journal remains blocked even if a parent terminal exists.
+native terminal recovery must use the kernel-owned authoritative native receipt
+and perform no provider call; metadata's Completed publication memo is separate.
+
+the shared execution seam is `execute_generation`: it reads the stable journal
+before catalog/provider work. on an Uncertain native generation it accepts only
+that exact model attempt's independently committed provider seal (or authoritative
+non-submission proof), then resolves product state locally. an early domain guard
+must eventually defer to that qualified seam; parent outcomes remain irrelevant.
+this describes candidate implementation, not permission to weaken metadata's guard
+before installed integrated proof.
+
+the adapter migration is `0254_native_agent.py`, standalone parent `0252`.
+metadata's uncommitted `0253_metadata_operations.py` has the same parent. final
+integration requires a single agreed chain; metadata's owner retains its migration
+ownership. neither branch may publish a two-head deployment.
