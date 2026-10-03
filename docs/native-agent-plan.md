@@ -1,8 +1,9 @@
 # native agent implementation plan
 
-status: implementation in progress; exact qualification status is recorded in
+status: accepted scope implemented and qualified; exact artifacts and proof are in
 [implementation evidence](native-agent-evidence.md). the [contract](native-agent-spec.md) owns behavior, types and schemas;
-this document owns delivery, file boundaries and proof. the accepted scope is implemented on isolated feature branches. the [metadata handoff](integrations/nexus-metadata.md) records
+this document owns delivery, file boundaries and proof. all n1–n5 slices are
+implemented on isolated feature branches. the [metadata handoff](integrations/nexus-metadata.md) records
 the separately running consumer and exact capability requirement.
 
 ## working rules

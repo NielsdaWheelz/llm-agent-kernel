@@ -382,7 +382,12 @@ class NativeJournal(Protocol):
     async def fence(self, attempt_id, reason) -> None: ...
 ~~~
 
-these calls use the current host permit and return only after durable commit.
+these calls preserve the original host permit/attempt identity and return only
+after durable commit. arm, new prepared input and invocation admission require
+live authority. original binding, existing delivery observations, entered results
+and provider outcomes remain retainable after fencing; none renews authority.
+an observed delivery must correlate to its original prepared identity. stale public
+progress publishes nothing; active progress still receives full phase/schema validation.
 arm is create-once for a fresh id; changed duplicate identity is a defect.
 bind is once for the exact attempt/native tuple. record_invocation checks current
 ownership/attempt/plan and assigns a host invocation id plus serial ordinal.
@@ -734,19 +739,18 @@ memory or delegation upgrade is prerequisite. no cross-repo mega-release.
 | phase-aware strict jarvis message | stock schema applies to commentary too; one additional Progress case keeps prose and final authority separate |
 | delete new feature tests after proof | follows owner instruction; forfeits their ongoing regression protection and requires fresh focused proof for later changes |
 
-technical choices above are selected, not deferred to a junior. remaining gates are
-implementation and evidence: actual native capability/containment, immutable
-dependency artifacts, real-store race/crash behavior and product quality.
-a finding that requires changing agreed behavior returns to the owner with evidence,
+technical choices above are selected, not deferred to a junior. native capability,
+containment, immutable artifacts, real-store races/crashes and product quality are
+qualified for the accepted scope in the current evidence record. later findings
+that require changing agreed behavior return to the owner with evidence,
 consequences and a recommendation; unsupported capability never selects a fallback.
 
 shared contract and nexus boundary repairs are implemented. exact current
 artifact/acceptance status is in [evidence](native-agent-evidence.md) and the
-[independent nexus handoff](integrations/nexus-metadata.md). resolved issue records
-are removed. the remaining [jarvis content qualification](issues/native-content-publication.md)
-belongs to its phase-aware application schema; it does not gate nexus adoption.
-its [late stop observation race](issues/native-stop-observation-race.md) is also
-consumer-owned; observed provider facts grant no live execution authority.
+[independent nexus handoff](integrations/nexus-metadata.md). the phase-aware jarvis
+content and late stop-observation race pass final installed proof. resolved issue
+records are removed. each application's domain schema remains independently owned;
+observed provider facts grant no live execution authority.
 the [historical uncertainty release gate](issues/historical-uncertainty-release.md)
 is separate: new native seals cannot certify old unsealed work. production needs
 the application's audited disposition, verified archive and stale-replay/undo proof.

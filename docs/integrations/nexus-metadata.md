@@ -4,18 +4,32 @@ status: **READY** for nexus adapter/pin adoption, 2026-10-02. final frozen
 noneditable research, local recovery, process-death barriers and the combined
 migration fixture pass. new feature tests are deleted from these four repositories.
 jarvis's application schema is independent. metadata's installed domain acceptance
-remains owner-run; production release is separately **BLOCKED** by historical
+remains independently owned; production release is separately **BLOCKED** by historical
 uncertainty. this is artifact qualification, not deployment.
 
 ## ownership
 
-metadata owns `/Users/nnandal/Documents/code/nexus-web-metadata`,
-`feature/metadata-enrichment`, implementation
+metadata owns `/Users/nnandal/Documents/code/nexus-web-metadata` and
+`feature/metadata-enrichment`. its original implementation was
 `603c0e0c1d9b00a2f992d468f2204a2be503c36c`, docs head `392cb85fd`.
 its 20 composed api/postgres/queue/worker checks, 11 domain checks, rss/source
 fencing, minio epub repair, browser journeys and static checks are independent
 metadata proof. no native/model/research qualification is attributed to them.
 this worktree is untouched.
+
+owner update, 2026-10-02: adoption at
+`5d50fda0522c1af9d768a49fcec2606ea52be702` uses these exact shared pins and
+the committed da68 lock. the owner reports its 20 actual composed checks, six
+SIGKILL/reclaim cases and baseline-owner success/whole-chain rollback GREEN.
+these are attributed consumer receipts, not a new independent rerun here.
+the first genuine book attempt lacked the local stack's existing embedding key;
+job `086c70f7-24f4-43c0-b0b4-85454ba3f5a7`, generation
+`4b42cef1-a713-5776-8d5f-cbc89275f627` remains uncertain with original callback
+and no seal. no redispatch. the owner is repairing consumer binding readiness and
+typed configuration failure through existing `Availability`/`OperatorActionRequired`;
+handlers, tool definitions and shared pins stay unchanged. original-seal recovery
+must still bypass current prerequisites. a fresh three-unit genuine positive cohort
+remains pending; the failed attempt is retained separately.
 
 kernel integration owns provider/kernel/tools contracts, nexus adapters, native
 0254 and immutable dependency pins. metadata consumes admission, execution and
@@ -57,7 +71,7 @@ all five isolated worktrees use `feature/native-agent-supervision`.
 | citations/progress | actual postgres original-result/model-projection separation, numbered resource citations, atomic progress/SSE replay and stopped-owner refusal green; controlled native identity |
 | migration | installed canonical candidate `f13bb04bf9e801a1d75c6d79141132220c4405d1` passes the unchanged baseline-owner verifier: authenticated continuation/history/undo retained; blocked0255 rolls back the whole transaction |
 | exact process deaths | SIGKILL at arm, accepted callback, actual note handler before atomic commit, and committed result before reply; original attempt/journal/effect facts retained, zero redispatch |
-| final checks | provider960 remaining tests/2skip/40liveexcluded, kernel172/2livedeselected, tools203/2deselected; types/lint/build/public dependency audit pass; nexus final `./scripts/test` passes |
+| final checks | provider 960 remaining tests/2 skip/40 live excluded, kernel 172/2 live deselected, tools 203/2 deselected; types/lint/build/public dependency audit pass; nexus final `./scripts/test` passes |
 
 stock feature flags proved insufficient: model metadata can force vendor
 CodeMode/clock and async user-input tools. the supported host-start catalogue
@@ -67,17 +81,17 @@ inert; native authority/permissions continue to fail-stop. jarvis now requires a
 separate contained endpoint; nexus retains its dedicated host.
 
 final installed research generation `95d85ea3-c6eb-4acc-a7bc-35a5a37905b5`
-uses the exact pins above, stock0.160.0, Pydantic2.12.5, urllib3 2.8.0,
-AnyIO4.15.1 and PyJWT2.15.1. committed nexus lock sha256:
+uses the exact pins above, stock 0.160.0, pydantic 2.12.5, urllib3 2.8.0,
+anyio 4.15.1 and pyjwt 2.15.1. committed nexus lock sha256:
 `da68f22297fd37830d3b8f939fd124869adfa864afd3ab7a1d7c30fd0f3be4c1`.
-all four module origins are noneditable installed site-packages. all461 nexus,
-46 provider,17 kernel and18 tools py/json source files match installed bytes.
+all four module origins are noneditable installed site-packages. all 461 nexus,
+46 provider, 17 kernel and 18 tools py/json source files match installed bytes.
 original stock `turn_context`, not selected_spec inference, records luna/xhigh:
 thread `01a0ffc4-ec9f-7192-acd7-1c12d8e6bc76`,
 turn `01a0ffc4-ed0c-73c1-9fa1-e645a7ac5069`.
-actual four-tool results establish Pride and Prejudice/Jane Austen/1813;
-`web.read` successfully reads the returned Gutenberg source URL. strict JSON and
-original24,315 input/549 output tokens are retained.
+actual four-tool results establish pride and prejudice/jane austen/1813;
+`web.read` successfully reads the returned gutenberg source URL. strict JSON and
+original 24,315 input/549 output tokens are retained.
 
 bounded receipt paths, available for integration review:
 
@@ -96,8 +110,17 @@ bounded receipt paths, available for integration review:
 - `/private/tmp/native-provider-live-d23kkjjt/isolation.json`: owned private
   account/socket, stock version, complete contained catalogue and qualified host.
 
-the prior d108 research generation8c5f4732 remains historical; its original stock
-rollout for thread01a0ff87 is retained and was delivered separately. no new model
+the owner may use the retained qualified macOS host for its finite three-job cohort:
+pid 51322, socket
+`/private/tmp/codex-daemon-501/native-provider-b2c4ea7ac087475a9b69099801d4fb67.sock`.
+its account and all original stock rollouts remain intact until the owner reports
+host use finished. the private Brave credential source is
+`/Users/nnandal/Documents/code/nexus-web/.env`, `BRAVE_SEARCH_API_KEY`; no secret
+value belongs in this handoff or receipts. availability was confirmed without a
+new provider call. this retained qualification host is not a deployment claim.
+
+the prior d108 research generation 8c5f4732 remains historical; its original stock
+rollout for thread 01a0ff87 is retained and was delivered separately. no new model
 call was made merely to locate it.
 
 ## consumer integration
@@ -140,10 +163,10 @@ parent is separate from the settled shell parent. its authenticated continuation
 opens after cutover; original effects/authorships persist and remaining-note undo
 executes once. no native seals are invented.
 
-the installed migration-only candidate adds metadata's exact committed0253 body
-as canonical0255/down0254. the unchanged owner verifier passes both original
-portable archives in separate kernel-owned databases.0254 accepts the terminal
-shell parent;0255 rejects its inactive Uncertain journal; one actual upgrade
+the installed migration-only candidate adds metadata's exact committed 0253 body
+as canonical 0255/down 0254. the unchanged owner verifier passes both original
+portable archives in separate kernel-owned databases. 0254 accepts the terminal
+shell parent; 0255 rejects its inactive Uncertain journal; one actual upgrade
 transaction restores credentials, principals, history, version and captured schema.
 this proves migration/history/undo, not a full metadata domain/UI merge.
 
@@ -158,8 +181,9 @@ owner databases and the metadata worktree remain untouched.
 
 all pins are pushed and fetchable on `feature/native-agent-supervision`. adoption
 uses the consumer's committed frozen lock, never editable source overlays. metadata's
-actual enrich_metadata/codex/metadata recovery,20-case composed driver and three-unit
-bibliographic acceptance remain owner-run after installation.
+actual enrich_metadata/codex/metadata recovery and 20-case composed driver are
+owner-reported GREEN after adoption; the fresh three-unit bibliographic acceptance
+remains owner-run after its readiness repair.
 
 ## separate production release gate
 
