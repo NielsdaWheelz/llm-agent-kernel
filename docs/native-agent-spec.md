@@ -745,6 +745,9 @@ artifact/acceptance status is in [evidence](native-agent-evidence.md) and the
 [independent nexus handoff](integrations/nexus-metadata.md). resolved issue records
 are removed. the remaining [jarvis content qualification](issues/native-content-publication.md)
 belongs to its phase-aware application schema; it does not gate nexus adoption.
+the [historical uncertainty release gate](issues/historical-uncertainty-release.md)
+is separate: new native seals cannot certify old unsealed work. production needs
+the application's audited disposition, verified archive and stale-replay/undo proof.
 
 ## 11. extraction provenance
 
