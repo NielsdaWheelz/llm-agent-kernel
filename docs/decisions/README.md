@@ -12,4 +12,4 @@
 | [0008](0008-shared-generation-orchestration.md) | Share ordered generation choreography with Nexus | Accepted |
 | [0009](0009-durable-paid-decisions.md) | Retain original paid decisions and uncertainty | Accepted |
 | [0010](0010-native-agent-supervision.md) | supervise native agents with explicit submission and invocation evidence | accepted; implemented, see current evidence |
-| [0011](0011-contained-native-host.md) | require a restricted stock host and separate jarvis endpoint | accepted; installed qualification in progress |
+| [0011](0011-contained-native-host.md) | require a restricted stock host and separate jarvis endpoint | accepted; host qualified, deployment not run |

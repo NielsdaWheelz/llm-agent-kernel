@@ -1,5 +1,9 @@
 # native agent adversarial review
 
+this is the historical design review. current implementation and installed
+acceptance are recorded in [evidence](native-agent-evidence.md); its results below
+do not claim the later implemented tree is still untested.
+
 follow-up owner decisions supersede this initial review's optional budget and
 shell-retention recommendations: no model usage limits; no native shell/files/
 network in either app; automatic reasoning recovery with action barriers; no

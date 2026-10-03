@@ -1,6 +1,8 @@
 # adr 0011: make the native tool ceiling a host prerequisite
 
-status: accepted, 2026-10-02; installed qualification in progress.
+status: accepted and host qualification passed, 2026-10-02. exact scope and
+receipts are in [implementation evidence](../native-agent-evidence.md).
+deployed systemd activation remains NOT_RUN; artifact adoption is separate.
 
 stock 0.160.0 model metadata overrides feature-off defaults: native CodeMode,
 clock and async user-input can execute despite those flags. ordinary v2 events
