@@ -20,6 +20,8 @@ from llm_tools import (
     render_prompt,
 )
 from provider_runtime.agent_runtime import (
+    CODEX_CONTAINMENT_CATALOG_REVISION,
+    CODEX_CONTAINMENT_VERSION,
     CodexNativeOptions,
     CredentialRef,
     FrozenJsonDict,
@@ -663,6 +665,8 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
             "native": {
                 "builtin_tools": provider.native.builtin_tools,
                 "web_search": provider.native.web_search,
+                "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
+                "containment_version": CODEX_CONTAINMENT_VERSION,
             },
             "policy": {
                 "approval": provider.policy.approval,

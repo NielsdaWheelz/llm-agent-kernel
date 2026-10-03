@@ -17,6 +17,8 @@ from llm_tools import (
     render_prompt,
 )
 from provider_runtime.agent_runtime import (
+    CODEX_CONTAINMENT_CATALOG_REVISION,
+    CODEX_CONTAINMENT_VERSION,
     AgentAttempt,
     AgentControlReceipt,
     AgentInputRecorded,
@@ -134,6 +136,8 @@ class NativeDefinition:
                 "native": {
                     "builtin_tools": provider.native.builtin_tools,
                     "web_search": provider.native.web_search,
+                    "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
+                    "containment_version": CODEX_CONTAINMENT_VERSION,
                 },
                 "cwd_scope": provider.cwd_scope,
                 "additional_dirs": [],

@@ -46,6 +46,8 @@ from llm_tools import (
 )
 from llm_tools.testing import InMemoryPositionRecorder, RecordingTelemetry
 from provider_runtime.agent_runtime import (
+    CODEX_CONTAINMENT_CATALOG_FILENAME,
+    CODEX_CONTAINMENT_VERSION,
     AgentControlReceipt,
     AgentRuntime,
     AgentRuntimeConfig,
@@ -169,9 +171,14 @@ class Peer:
             if method == "initialized":
                 continue
             if method == "initialize":
-                result = {"userAgent": "controlled-test-peer"}
+                result = {"userAgent": f"controlled-test-peer/{CODEX_CONTAINMENT_VERSION}"}
             elif method == "account/read":
                 result = {"account": {"type": "chatgpt"}}
+            elif method == "config/read":
+                result = {
+                    "config": {"model_catalog_json": f"/host/{CODEX_CONTAINMENT_CATALOG_FILENAME}"},
+                    "origins": {"model_catalog_json": {"name": {"type": "sessionFlags"}}},
+                }
             elif method == "model/list":
                 result = {
                     "data": [
