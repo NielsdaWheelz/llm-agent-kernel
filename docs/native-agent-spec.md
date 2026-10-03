@@ -740,22 +740,11 @@ dependency artifacts, real-store race/crash behavior and product quality.
 a finding that requires changing agreed behavior returns to the owner with evidence,
 consequences and a recommendation; unsupported capability never selects a fallback.
 
-the existing issue files track unimplemented acceptance:
-[submission](issues/native-submission-evidence.md),
-[terminal provenance](issues/native-terminal-provenance.md),
-[terminal preservation](issues/native-terminal-preservation.md),
-[callback durability](issues/native-callback-durability.md),
-[callback qualification](issues/native-callback-qualification.md),
-[control](issues/native-control-recovery.md),
-[nested gate](issues/native-gate-control.md),
-[tool quotas](issues/native-tool-usage-policy.md),
-[live delivery](issues/native-live-delivery.md),
-[content publication](issues/native-content-publication.md),
-[effect history](issues/native-effect-history.md),
-[socket topology](issues/native-socket-topology.md),
-[session cleanup](issues/native-session-cleanup.md) and
-[environment drift](issues/review-environment-pin-drift.md).
-the selected designs resolve their design questions, not their unrun acceptance.
+shared contract and nexus boundary repairs are implemented. exact current
+artifact/acceptance status is in [evidence](native-agent-evidence.md) and the
+[independent nexus handoff](integrations/nexus-metadata.md). resolved issue records
+are removed. the remaining [jarvis content qualification](issues/native-content-publication.md)
+belongs to its phase-aware application schema; it does not gate nexus adoption.
 
 ## 11. extraction provenance
 

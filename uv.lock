@@ -622,7 +622,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=2adb9790fc7a54de5342effaca9391c2f3d24ff9" },
-    { name = "provider-runtime", git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=98913f35ab4c9bef2af85d90fd6e4bed747bd64c" },
+    { name = "provider-runtime", git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=e1498d8382f192ae664ae9790b682a8e8a8b0d38" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
 
@@ -876,7 +876,7 @@ wheels = [
 [[package]]
 name = "provider-runtime"
 version = "0.1.0"
-source = { git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=98913f35ab4c9bef2af85d90fd6e4bed747bd64c#98913f35ab4c9bef2af85d90fd6e4bed747bd64c" }
+source = { git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=e1498d8382f192ae664ae9790b682a8e8a8b0d38#e1498d8382f192ae664ae9790b682a8e8a8b0d38" }
 dependencies = [
     { name = "anthropic" },
     { name = "google-genai" },

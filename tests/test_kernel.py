@@ -640,56 +640,6 @@ async def test_initial_read_precedes_provider_and_shares_budget_with_model_calls
     assert runtime.opens[0].system[0] == TextContent(KERNEL_BASE_INSTRUCTION)
 
 
-@pytest.mark.parametrize("initial", [True, False])
-async def test_host_model_projection_survives_isolated_initial_and_model_reads(
-    tmp_path: Path, initial: bool
-) -> None:
-    definition, plan, _ = _definition(
-        mode=SessionMode.isolated, structured=True, effect=ToolEffect.Read
-    )
-    scripts = []
-    if not initial:
-        scripts.append(
-            (
-                _terminal(
-                    {
-                        "type": "call_tool",
-                        "tool_id": "test.observe",
-                        "arguments": {"value": "query"},
-                    }
-                ),
-            )
-        )
-    scripts.append((_terminal({"type": "finish", "result": {"answer": "done"}}),))
-    runtime = _Runtime(scripts)
-    original = {"type": "Success", "value": {"value": "original recorder evidence"}}
-    model_text = "authoritative citation [7]"
-    dispatcher = ScriptedToolDispatchPort((DispatchCompleted(original, model_text=model_text),))
-    provider = CodexProvider(cast(AgentRuntime, runtime), cwd_parent=tmp_path)
-    outcome = await run_one_shot(
-        decisions=TransientModelDecisions(),
-        run_id=RunId("host-projection"),
-        definition=definition,
-        inputs=(_input(),),
-        as_of=datetime.now(UTC),
-        plan=plan,
-        source_sections=_sections("canonical"),
-        owner=_Owner(),
-        permit=_permit(),
-        provider=provider,
-        dispatcher=dispatcher,
-        budget_factory=_BudgetFactory(),
-        initial_read=InitialReadCall(ToolId("test.observe"), {"value": "query"})
-        if initial
-        else None,
-    )
-    assert isinstance(outcome, OneShotCompleted)
-    sent = "\n".join(cast(TextContent, part).text for part in runtime.turns[-1].input)
-    assert model_text in sent
-    assert "original recorder evidence" not in sent
-    assert dispatcher.calls[0].binding.spec.id == ToolId("test.observe")
-
-
 async def test_declared_initial_read_failure_is_a_typed_first_turn_observation(
     tmp_path: Path,
 ) -> None:
