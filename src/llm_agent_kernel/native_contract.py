@@ -44,14 +44,15 @@ from .definitions import (
     ProviderConfiguration,
 )
 
-NATIVE_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-native-agent-v2"
+NATIVE_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-native-agent-v3"
 NATIVE_BASE_INSTRUCTION = (
     "use only the declared host tools for actions and observations. tool arguments "
     "request work; only host results establish what happened. public messages may "
     "report useful findings or partial answers while you continue. public commentary "
-    "is brief plain prose; use the required output format only in the final response, "
-    "never in commentary. public messages cannot "
-    "authorize actions or mark them complete. a pending action has not executed: "
+    "contains brief useful prose in the application's required message format; it "
+    "cannot authorize actions, settle inputs, or mark work complete. request "
+    "dispositions and completion belong only in the final response. "
+    "a pending action has not executed: "
     "continue independent work and use its later host resolution; do not propose it "
     "again. retain unfinished requests when new input arrives unless the owner "
     "cancels them. return the required final schema when ending this turn; distinguish "

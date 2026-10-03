@@ -598,7 +598,7 @@ owner supplies the typed facts. no content-generation service is introduced.
 | protocol/model | kernel-owned instruction below; app owns role/tone/domain policy | instruction revision rotates fingerprint; retrieved instructions grant no authority |
 | tool/model | one existing ToolSpec: operation, prerequisites, units/timezone, identifier source, coverage and exact/fuzzy distinction | model-visible/executed schema agree; no guessed effect id or callback-only coercion |
 | results/model | existing Success/Failure plus host pending/recovery receipt; include actual evidence/coverage and safe next step | no “sent” for pending; no “retry” for uncertain effect; immutable reply precedes transmission |
-| progress/owner | completed public commentary; useful finding, direction change, partial answer or blocker, normally one or two sentences | no heartbeat prose/percentages/private reasoning; delivered once before final without settling work |
+| progress/owner | completed public commentary in the declared message format, rendered as prose; useful finding, direction change, partial answer or blocker, normally one or two sentences | no heartbeat prose/percentages/private reasoning; delivered once before final without settling work |
 | final/owner | answer first; limitation once; explicit useful waiting/input need; disposition separate from prose | validate entire rendered discord message <=2,000 characters, including labels/questions; no silent truncation |
 | stop/recovery/owner | host facts: what stopped, cancelled approvals, already-dispatched unresolved effect and next real step | “nothing was sent” requires proof; ordinary recovery is quiet unless understanding changes |
 | metadata/research | metadata owner supplies current schema/prompt/fixtures; preserve precision, null semantics, admitted source receipts and existing citation owner | no invented citation/author/date fields; real search/read and schema-valid domain output together |
@@ -611,14 +611,25 @@ scheduled wake, stop or material failure. public message
 storage/delivery uses the existing outbox and product limits, not EventSink.
 action statuses come from receipts, not confident model text.
 
+stock 0.160.0 applies its strict-json schema to commentary as well as final output.
+jarvis declares one closed native message schema: `response` is either the existing
+final response union or `Progress{type: progress, text: nonempty <=2,000 characters}`;
+`input_outcomes` stays required. commentary requires Progress and empty dispositions;
+the journal validates the whole message, persists original wire identity/digest and
+publishes only its prose. other commentary cases are protocol defects. final output
+uses the existing final-only JarvisTerminal contract; Progress cannot become a final
+settlement. no plaintext fallback or extraction of old final-shaped commentary.
+nexus keeps its own output schemas and citation/publication owners.
+
 native base instruction, owned/revisioned centrally:
 
 > use only the declared host tools for actions and observations. tool arguments
 > request work; only host results establish what happened. public messages may
 > report useful findings or partial answers while you continue. public commentary
-> is brief plain prose; use the required output format only in the final response,
-> never in commentary. public messages cannot authorize actions or mark them
-> complete. a pending action has not executed:
+> contains brief useful prose in the application's required message format; it
+> cannot authorize actions, settle inputs, or mark work complete. request
+> dispositions and completion belong only in the final response.
+> a pending action has not executed:
 > continue independent work and use its later host resolution; do not propose it
 > again. retain unfinished requests when new input arrives unless the owner
 > cancels them. return the required final schema when ending this turn; distinguish
@@ -720,6 +731,7 @@ memory or delegation upgrade is prerequisite. no cross-repo mega-release.
 | nexus direct worker/socket topology | removes remote shell and callback relay; trusted socket holders have account-runtime authority and one service crash affects several jobs |
 | separate contained host, pinned vendor catalogue | keeps other coding clients unchanged; adds one jarvis service and explicit model-inventory requalification |
 | hard cutover | one implementation to understand; requires stopped migration, reconciled legacy effects and fresh approvals rather than execution compatibility |
+| phase-aware strict jarvis message | stock schema applies to commentary too; one additional Progress case keeps prose and final authority separate |
 | delete new feature tests after proof | follows owner instruction; forfeits their ongoing regression protection and requires fresh focused proof for later changes |
 
 technical choices above are selected, not deferred to a junior. remaining gates are

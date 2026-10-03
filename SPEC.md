@@ -88,9 +88,10 @@ authentication is distinct from model/tool network authority.
 ## 6. structured model protocol
 
 native main uses the provider's native reasoning loop, declared callbacks and
-exact text or strict JSON terminal contract. completed public commentary is plain
-prose, observational and may precede terminal. the final output format belongs
-only in the final response. commentary cannot settle a request or action.
+exact text or strict JSON output contract. completed public commentary may precede
+terminal. applications decode their declared message schema into brief owner-facing
+prose; final dispositions belong only to a final response. commentary cannot settle
+a request or action.
 
 isolated `run_one_shot` retains one closed `call_tool` or `finish` value and
 serial read-only host tools for real gate/context/memory roles. `say`,
