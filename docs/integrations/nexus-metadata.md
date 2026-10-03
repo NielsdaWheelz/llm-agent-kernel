@@ -17,19 +17,44 @@ fencing, minio epub repair, browser journeys and static checks are independent
 metadata proof. no native/model/research qualification is attributed to them.
 this worktree is untouched.
 
-owner update, 2026-10-02: adoption at
+initial native adoption at
 `5d50fda0522c1af9d768a49fcec2606ea52be702` uses these exact shared pins and
 the committed da68 lock. the owner reports its 20 actual composed checks, six
 SIGKILL/reclaim cases and baseline-owner success/whole-chain rollback GREEN.
-these are attributed consumer receipts, not a new independent rerun here.
-the first genuine book attempt lacked the local stack's existing embedding key;
-job `086c70f7-24f4-43c0-b0b4-85454ba3f5a7`, generation
-`4b42cef1-a713-5776-8d5f-cbc89275f627` remains uncertain with original callback
-and no seal. no redispatch. the owner is repairing consumer binding readiness and
-typed configuration failure through existing `Availability`/`OperatorActionRequired`;
-handlers, tool definitions and shared pins stay unchanged. original-seal recovery
-must still bypass current prerequisites. a fresh three-unit genuine positive cohort
-remains pending; the failed attempt is retained separately.
+these remain separately attributed adoption/migration receipts.
+
+final finite domain acceptance at consumer
+`bcdaf51ded7114ea4857b681fee66aeff9c53de4`: 21 composed checks, eight actual
+SIGKILL/cold-reclaim cases and three genuine personal luna/xhigh eight-field
+metadata jobs are GREEN. every positive job used all four actual tools. controlled
+recovery includes local cancellation and exact original `AgentNotSubmitted`;
+sealed recovery bypasses currently unavailable search bindings. shared pins and
+adapter bc9584 are unchanged. the independent review receipt is
+`/private/tmp/nexus-metadata-acceptance-ezuwcb8_/metadata-genuine-cohort-reviewed.receipt.json`,
+sha256 `ec0fc7622cc958683dfcd861f6f0cf7aff6f77a49c80bf82305607a8ccf19c89`.
+kernel integration independently verified its hash, copied stock bytes, exact
+native identities/seals, eight-field output and matching original callbacks.
+no new model/database execution was performed by this review.
+
+the two earlier jobs `086c70f7-24f4-43c0-b0b4-85454ba3f5a7` and
+`d8ffbb88-63ee-4ae4-b794-e35ed26114e9` remain `Uncertain` and unpublished with
+their original databases, rollout copies and private backups preserved. the first
+lacked the embedding prerequisite; the second received an actual invalid-key 401.
+the later successes confer no recovery authority on either attempt. the existing
+private backend credential source qualified the fresh cohort; no credential file
+was edited. local embedding configuration repair remains consumer-owned.
+
+this proves the finite synthetic domain cohort, not universal bibliographic
+accuracy, primary-only sourcing or a hard cumulative 64,000 native token ceiling.
+secondary-source/publisher attribution limits are retained in the review receipt.
+final docs-only closure `8258b4908ec673fe9386a4eb288558e898337aa7` leaves
+qualified product bcdaf51 unchanged. the owner's sole post-deletion
+`./scripts/test` passed exit 0 at canonical 0255; disposable test sources, fixtures
+and synthetic databases are deleted. [consumer verification](../../../nexus-web-metadata/docs/metadata-enrichment-verification.md)
+is committed. private `artifacts.json` in the receipt directory records cleanup/
+static proof and original stock/native evidence. both genuine uncertain databases
+and backups remain preserved, with their owned postgres stopped. this is finite
+local closure; literal metadata plan section 9 and production rollout remain blocked.
 
 kernel integration owns provider/kernel/tools contracts, nexus adapters, native
 0254 and immutable dependency pins. metadata consumes admission, execution and
@@ -108,16 +133,29 @@ bounded receipt paths, available for integration review:
   final installed seal/encoder-failure/SIGKILL/same-job cold reclaim; zero
   catalogue/provider calls, original usage and uncertainty barriers retained.
 - `/private/tmp/native-provider-live-d23kkjjt/isolation.json`: owned private
-  account/socket, stock version, complete contained catalogue and qualified host.
+  account/socket, stock version, complete contained catalogue and original qualified
+  host identity; historical after the authorized release below.
+- `/private/tmp/native-metadata-cutover-gu65429d/host-release.receipt.json`:
+  original-to-retained paths and hashes for all 49 stock rollouts, verified host exit
+  and absent owned socket/account/cognition/worker state. receipt sha256
+  `f51a067477701f16044f7bab3dadd283b6197805741a3d0297ac96eea544ce23`.
 
-the owner may use the retained qualified macOS host for its finite three-job cohort:
-pid 51322, socket
-`/private/tmp/codex-daemon-501/native-provider-b2c4ea7ac087475a9b69099801d4fb67.sock`.
-its account and all original stock rollouts remain intact until the owner reports
-host use finished. the private Brave credential source is
-`/Users/nnandal/Documents/code/nexus-web/.env`, `BRAVE_SEARCH_API_KEY`; no secret
-value belongs in this handoff or receipts. availability was confirmed without a
-new provider call. this retained qualification host is not a deployment claim.
+the metadata owner explicitly finished finite host use and authorized its release.
+pid 51322 exited on SIGTERM without force; its owned socket alias/physical target,
+private account, cognition subtree and worker state are absent. the shared socket
+parent, other coding hosts, Linux/DB resources, metadata worktree and owner evidence
+copies were not removed. all 49 original stock session JSONL files were copied,
+hashed and verified first under
+`/private/tmp/native-metadata-cutover-gu65429d/stock-rollouts/`; none changed during
+shutdown. original receipts keep their original paths; the release manifest maps
+them to the retained bytes. this endpoint is retired, not available or deployed.
+
+qualified private credential sources, never their values: Brave from
+`/Users/nnandal/Documents/code/nexus-web/.env`, `BRAVE_SEARCH_API_KEY`; embeddings
+from `/Users/nnandal/Documents/code/nexus-web/deploy/env/env-prod-backend`,
+`OPENAI_API_KEY`. the generic research harness and fresh metadata cohort privately
+injected the latter; the root `.env` embedding value was rejected. no credential
+source file was edited here.
 
 the prior d108 research generation 8c5f4732 remains historical; its original stock
 rollout for thread 01a0ff87 is retained and was delivered separately. no new model
@@ -135,7 +173,8 @@ retain current source/credit/access/claim fences on publication.
 an early Uncertain guard. it proves the exact native attempt/spec has its original
 seal or authoritative non-submission evidence. it authorizes only local
 `execute_generation` inspection/settlement, no dispatch or publication. metadata
-keeps its current early guard until installed qualified integration.
+retains its early guard unless this exact local-recovery evidence is present;
+qualified consumer adoption now exercises that seam.
 
 recovery reads original attempt facts before current catalogue/provider/tools or
 definition construction. encoder failure after seal, source/credit/access changes
@@ -145,11 +184,10 @@ blocked. Completed pending-publication memo replay remains a separate metadata p
 
 ## single migration chain
 
-agreed chain: **0252 -> native0254 -> metadata0255**. standalone metadata0253 is
-committed and undeployed; only disposable databases used it. after delivery the
-metadata owner renames/reparents it, rebuilds those databases and retains old
-receipts as historical. no stamp, alias, two-head deployment or metadata edits by
-kernel ownership.
+adopted chain: **0252 -> native0254 -> metadata0255**. standalone metadata0253
+was committed and undeployed; only disposable databases used it. the metadata owner
+renamed/reparented it and rebuilt those databases; old receipts remain historical.
+no stamp, alias, two-head deployment or metadata edits by kernel ownership.
 
 0254 removes the prohibited conditional callback-arguments CHECK. raw invalid
 arguments/rejected replies remain; existing authority and executor boundaries
@@ -181,9 +219,9 @@ owner databases and the metadata worktree remain untouched.
 
 all pins are pushed and fetchable on `feature/native-agent-supervision`. adoption
 uses the consumer's committed frozen lock, never editable source overlays. metadata's
-actual enrich_metadata/codex/metadata recovery and 20-case composed driver are
-owner-reported GREEN after adoption; the fresh three-unit bibliographic acceptance
-remains owner-run after its readiness repair.
+actual enrich_metadata/codex/metadata recovery, 21-case composed driver and three-unit
+genuine bibliographic acceptance are GREEN with their own receipts above. generic
+generation 95d85ea3 and initial 5d50 migration/adoption proof remain separate.
 
 ## separate production release gate
 
@@ -195,7 +233,8 @@ are NOT_RUN. no current legacy reset/release owner contact was found. the existi
 0252→0254→0255 proof does not qualify the earlier destructive0246 transition.
 kernel integration provides this verdict; nexus's reset/ledger and release owners
 must provide the actual archival transition and release receipts. no production
-writes or metadata edits were performed.
+writes or metadata edits were performed. stored-item repair and final release/
+restore remain separately blocked under their application owners.
 
 see [implementation evidence](../native-agent-evidence.md) and
 [acceptance ownership](../native-agent-spec.md#9-delivery-and-acceptance).

@@ -170,12 +170,23 @@ bytes equal the qualified 3f53 tree after deletion. deletion requires final
 static/type/build checks and exact runtime/dependency byte comparison; changed
 artifacts require affected final-artifact live proof. retaining proof notes
 instead of those tests sacrifices their continuing regression protection.
-metadata reports 20 actual composed checks, six SIGKILL/reclaim cases and combined
-migration GREEN on its adopted 5d50fda. its first genuine book remains uncertain
-after a missing local embedding prerequisite; no redispatch. the consumer owner
-is repairing typed readiness before a fresh three-unit positive cohort. these
-remain separately attributed domain checks in the
+metadata consumer bcdaf51 reports 21 actual composed checks, eight SIGKILL/cold-reclaim
+cases and three genuine personal luna/xhigh eight-field domain jobs GREEN. initial
+5d50 adoption/combined migration and generic 95d85ea3 capability remain separately
+attributed. independent review verifies the owner receipt hash, original copied
+stock traces, exact seals, strict output and successful actual four-tool results.
+the two earlier jobs remain uncertain/unpublished with their original evidence;
+later success grants neither recovery authority nor retroactive completion.
+source-precision and soft-token-policy limits remain explicit. these domain checks
+and final owner static/cleanup proof are recorded in the
 [handoff](integrations/nexus-metadata.md). no metadata worktree edits or deployment
-are authorized here. the qualified contained host/socket/account and original stock
-rollouts are retained for the metadata owner's finite three jobs, by explicit request;
-their job/domain acceptance is separate from this generic capability qualification.
+are authorized here. metadata docs-only 8258b490 preserves qualified bcdaf51;
+its post-deletion static pass/canonical 0255 and disposable-fixture cleanup are
+owner-reported GREEN. both original uncertain databases/backups remain preserved.
+after the owner's explicit finite-use-finished acknowledgement,
+the qualified macOS host exited on SIGTERM and only its recorded socket/account/
+cognition/worker state were released. all 49 original stock rollouts remain hashed
+and private at `/private/tmp/native-metadata-cutover-gu65429d/stock-rollouts/`, with
+path/hash mapping and scope in `host-release.receipt.json`. metadata evidence copies,
+databases, unrelated hosts and global socket parent remain untouched. no provider
+calls or production writes accompanied release; historical production remains BLOCKED.

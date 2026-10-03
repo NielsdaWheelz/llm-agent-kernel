@@ -13,8 +13,12 @@ requires uncertainty disposition before release. the historical receipts report:
 | --- | --- |
 | [2026-09-27 media census](../../../nexus-web-metadata/docs/tickets/model-cutover-dead-media-generations.md), source `7dc68929b4d5ddfd77eb1a50228d477fa0148b5d`, revision `0241` | 41 outcome-null media generations with dispatched, unsealed turns; 41 dead metadata jobs retaining admissions |
 | [2026-09-27 chat census](../../../nexus-web-metadata/docs/tickets/model-history-cutover-blocked-by-uncertain-work.md), same source/revision | running chat `ac2b162e-0bb1-4b66-90f5-a9aaec0b3f22`, dead job; two dispatched, unsealed chat generations, including one under a terminal run |
-| [2026-10-01 lewis inspection](../../../nexus-web-metadata/docs/tickets/metadata-live-research-smoke-unverified.md) | eight dead jobs: five uncertain dispatches and three catalog-refresh failures; no recorded publication/web call |
+| 2026-10-01 lewis inspection, retired smoke ticket at nexus revision `c2e0c154` | eight dead jobs: five uncertain dispatches and three catalog-refresh failures; no recorded publication/web call |
 
+the resolved research ticket was removed after finite local qualification. its
+original body remains in nexus git at
+`c2e0c1546a4cb839da33bc2eb496afb0443cf796:docs/tickets/metadata-live-research-smoke-unverified.md`;
+that local immutable object was verified, without assuming it is published remotely.
 these are historical counts, not today's census; overlap is unknown. missing tool
 rows, dead jobs, a parent outcome and stopped processes prove no native terminal
 or non-submission. new provider seals cannot certify old unsealed attempts.
