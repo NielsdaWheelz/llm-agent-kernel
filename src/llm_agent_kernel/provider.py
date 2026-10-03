@@ -199,7 +199,7 @@ class CodexProvider:
     ) -> AgentTurn:
         self._require_lease(lease)
         request = TurnRequest(input=content, timeout_seconds=timeout_seconds)
-        turn = self._runtime.prepare_turn(
+        turn = self._runtime.prepare_observed_turn(
             lease.session,
             request,
             attempt_id=attempt_id,

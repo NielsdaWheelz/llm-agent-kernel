@@ -1,8 +1,9 @@
 # nexus metadata integration handoff
 
-status: **NOT_READY** for installed integration, 2026-10-02. implementation and
-source-overlay research are green; contained host qualification and final frozen
-artifacts remain open. this record is not a deployment receipt.
+status: **NOT_READY** for final pin adoption, 2026-10-02. frozen noneditable
+installed research, local recovery and the combined migration fixture pass.
+final provider finite-state repair, jarvis progress content and requested
+feature-test deletion remain. this is qualification, not deployment.
 
 ## ownership
 
@@ -44,23 +45,29 @@ all five isolated worktrees use `feature/native-agent-supervision`.
 
 | artifact/proof | status |
 | --- | --- |
-| kernel candidate | `04381b8`; model-text and containment identity contracts; fetchable, not final qualified pin |
+| kernel candidate | `ece3cda0c9898d2041cb74041b711d83b6361c74`; original-seal recovery precedes current plan validation; fetchable candidate |
 | provider candidate | `23bd67420c9aaac78f5a6689d795b1eb02a1d5e9`; startup catalogue/version preflight and raw visibility; fetchable candidate |
 | tools candidate | `cad13af1289c247897236959bfff0d6791956d4b`; reader v3; fetchable, not final qualified pin |
-| nexus adapter | `/Users/nnandal/Documents/code/nexus-web-native`; aggregate commit/pins pending |
-| exact four-tool research | genuine source-overlay luna/xhigh strict-json success with useful actual results from all four tools; final frozen installed repeat pending |
+| nexus adapter | `c087faba0529095a076e83b559774a510b513dab`, `/Users/nnandal/Documents/code/nexus-web-native`; final pins pending |
+| exact four-tool research | genuine frozen noneditable installed luna/xhigh strict-json success, useful actual results from all four tools and read source URLs; no source overlay |
 | local terminal recovery | real postgres and process kill/reclaim green; original terminal/usage retained with zero provider/catalog calls; current-tools trap green |
 | uncertain barriers | unresolved, local-stop and parent-terminal-only cases stay blocked; original authoritative non-submission settles failure locally without a fabricated native seal |
 | citations/progress | actual postgres original-result/model-projection separation, numbered resource citations, atomic progress/SSE replay and stopped-owner refusal green; controlled native identity |
-| migration | 0254 principal backfill/synthetic raw-byte retention/credential deletion/historical undo green; combined0255 rejection rolls back whole transaction; valid historical continuation fixture pending metadata owner |
-| installed readiness | open; source overlays and controlled peers cannot qualify it |
+| migration | installed canonical candidate `f13bb04bf9e801a1d75c6d79141132220c4405d1` passes the unchanged baseline-owner verifier: authenticated continuation/history/undo retained; blocked0255 rolls back the whole transaction |
+| final readiness | provider completed-state repair, jarvis progress content and feature-test deletion remain; candidate proof does not qualify later changed artifacts |
 
 stock feature flags proved insufficient: model metadata can force vendor
 CodeMode/clock and async user-input tools. the supported host-start catalogue
-restriction passes actual direct-callback/clock/inherited-authority probes; final
-installed consumer qualification remains open. no hidden builtin activity is relabeled
+restriction passes actual direct-callback/clock/inherited-authority probes and
+cross-uid/two-native-job isolation. no hidden builtin activity is relabeled
 inert; native authority/permissions continue to fail-stop. jarvis now requires a
 separate contained endpoint; nexus retains its dedicated host.
+
+installed research generation `73e1c192-e2a8-4171-b47d-8b15fbdcbedb` uses the
+exact candidate pins above, stock0.160.0 and frozen `urllib3==2.8.0`.
+`/tmp/nexus-native-research.json` records original selected/native model and effort,
+all four useful tool receipts, read source URLs and strict output. all four module
+origins are installed site-packages; the consumer is noneditable.
 
 ## consumer integration
 
@@ -96,13 +103,27 @@ validate executable work. it preserves original principals, historical effects
 and raw continuation bytes without invented native seals, then intentionally
 drops shell credentials.
 
-the current continuation fixture has synthetic envelope/nonce/ciphertext. it proves
-byte retention, not a valid historical continuation. metadata is preparing a
-finite baseline-owner fixture and separate open provider-api parent for that gate.
+the finite baseline-owner fixture uses actual baseline chat admission, ledger,
+continuation codec/cipher, tool-write and authorship owners. the open ProviderApi
+parent is separate from the settled shell parent. its authenticated continuation
+opens after cutover; original effects/authorships persist and remaining-note undo
+executes once. no native seals are invented.
 
-actual transaction proof:0254 accepts the historical fixture; copied/reparented
-0255 rejects inactive Uncertain beside a terminal parent; one Alembic upgrade
-transaction restores original credentials/principals/history/schema/version.
+the installed migration-only candidate adds metadata's exact committed0253 body
+as canonical0255/down0254. the unchanged owner verifier passes both original
+portable archives in separate kernel-owned databases.0254 accepts the terminal
+shell parent;0255 rejects its inactive Uncertain journal; one actual upgrade
+transaction restores credentials, principals, history, version and captured schema.
+this proves migration/history/undo, not a full metadata domain/UI merge.
+
+snapshots cover captured public-schema definitions and all baseline table columns;
+comments are outside them. executed-v4 harness sha:
+`1a0185b5301d8d90131909a1c7856f0d145f13dd5135f7f958e28a4175c4a384`;
+comment-only corrected harness sha:
+`280a9bfe5d756f86c412ac73667e6e233e07613f6895f9c58cdfc021818cc956`.
+no reseed or check expansion occurred. receipts:
+`/private/tmp/native-combined-migration.PNQFIS/{success,blocked}.receipt.json`.
+owner databases and the metadata worktree remain untouched.
 
 final delivery must replace candidate pins with full fetchable hashes and record
 frozen installation, stock binary, contained host configuration, exact model/effort,

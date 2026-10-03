@@ -165,7 +165,7 @@ class _RecordingRuntime:
             return AgentSession(request.open.ref)
         return AgentSession(_ref(f"session-{len(self.requests)}", request.auth.profile_key))
 
-    def prepare_turn(self, session, request, *, attempt_id, input_id, controls):
+    def prepare_observed_turn(self, session, request, *, attempt_id, input_id, controls):
         return _PreparedTurn(self, session, request, AgentAttempt(attempt_id, "d" * 64))
 
     async def stream_turn(

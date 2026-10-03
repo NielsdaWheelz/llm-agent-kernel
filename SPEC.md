@@ -23,8 +23,10 @@ consumer manifests pin that version.
 
 | dependency | exact candidate revision |
 | --- | --- |
-| llm-tools | `cad13af1289c247897236959bfff0d6791956d4b` |
-| provider-runtime | `23bd67420c9aaac78f5a6689d795b1eb02a1d5e9` | any unsupported exact capability fails
+| llm-tools | `2adb9790fc7a54de5342effaca9391c2f3d24ff9` |
+| provider-runtime | `98913f35ab4c9bef2af85d90fd6e4bed747bd64c` |
+
+any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.
 
 provider-runtime owns SDK integration, structured-output lowering, native callback
@@ -69,7 +71,9 @@ optional host receipt reference. the kernel submits that text unchanged;
 
 ## 5. exact provider surface and containment
 
-`AgentRuntime` prepares a turn before the journal arms it. immutable
+`AgentRuntime.prepare_turn` prepares native work; `prepare_observed_turn`
+prepares bounded isolated observation and rejects declared callbacks. both share
+provider evidence and prepare before the journal arms them. immutable
 `AgentAttempt` includes exact request digest. `AgentTurnRef` identifies the
 accepted native session/turn. unsupported schema/model/callback composition is a
 preflight refusal, not a route fallback.
@@ -84,8 +88,9 @@ authentication is distinct from model/tool network authority.
 ## 6. structured model protocol
 
 native main uses the provider's native reasoning loop, declared callbacks and
-exact text or strict JSON terminal contract. completed public commentary is
-observational and may precede terminal. it cannot settle a request or action.
+exact text or strict JSON terminal contract. completed public commentary is plain
+prose, observational and may precede terminal. the final output format belongs
+only in the final response. commentary cannot settle a request or action.
 
 isolated `run_one_shot` retains one closed `call_tool` or `finish` value and
 serial read-only host tools for real gate/context/memory roles. `say`,

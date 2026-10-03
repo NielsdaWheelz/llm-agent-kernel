@@ -306,7 +306,7 @@ class _Runtime:
         self.closed: list[AgentSession] = []
         self.run_turn_calls = 0
 
-    def prepare_turn(self, session, request, *, attempt_id, input_id, controls):
+    def prepare_observed_turn(self, session, request, *, attempt_id, input_id, controls):
         digest = hashlib.sha256(
             json.dumps([part.text for part in request.input]).encode()
         ).hexdigest()

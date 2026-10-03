@@ -132,9 +132,9 @@ class _ObservingAgentRuntime(AgentRuntime):
         super().__init__(config)
         self.observed_requests: list[TurnRequest] = []
 
-    def prepare_turn(self, session, request, *, attempt_id, input_id, controls):
+    def prepare_observed_turn(self, session, request, *, attempt_id, input_id, controls):
         self.observed_requests.append(request)
-        return super().prepare_turn(
+        return super().prepare_observed_turn(
             session,
             request,
             attempt_id=attempt_id,
