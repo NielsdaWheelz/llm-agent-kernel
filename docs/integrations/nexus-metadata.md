@@ -229,12 +229,18 @@ the [historical uncertainty disposition](../issues/historical-uncertainty-releas
 is **OPEN / RELEASE BLOCKED**. old production unsealed work gains no authority
 from this runtime. the required fresh census, executable exact-id application
 disposition, verified pre-disposition restore and old effect/undo/stale-replay proofs
-are NOT_RUN. no current legacy reset/release owner contact was found. the existing
-0252→0254→0255 proof does not qualify the earlier destructive0246 transition.
-kernel integration provides this verdict; nexus's reset/ledger and release owners
-must provide the actual archival transition and release receipts. no production
-writes or metadata edits were performed. stored-item repair and final release/
-restore remain separately blocked under their application owners.
+still await owner qualification. on 2026-10-03 metadata root,
+`t-81545cb9ac775ed8` on macbook, accepted application reset/release preparation in
+`feature/metadata-enrichment`, including the release snapshot forwarding repair
+and finite archival transition. the kernel/native team has no active overlapping
+application work. the existing 0252→0254→0255 proof does not qualify the earlier
+destructive0246 transition. kernel integration provides this verdict; metadata
+root supplies the application transition and release proofs. no kernel/provider/
+tools/native adapter or pin changes are requested. production disposition, drain
+and deployment remain separately authorized final actions after concrete review.
+no production writes or metadata edits were performed by the kernel owner.
+stored-item repair and final release/restore remain separately blocked; the
+qualification host remains retired and original uncertain-job evidence preserved.
 
 see [implementation evidence](../native-agent-evidence.md) and
 [acceptance ownership](../native-agent-spec.md#9-delivery-and-acceptance).

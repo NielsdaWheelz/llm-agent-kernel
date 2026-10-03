@@ -4,6 +4,12 @@ status: OPEN production release gate; independent of nexus artifact readiness.
 review: 2026-10-02, read-only source/document inspection. fresh production census,
 disposition and release are NOT_RUN. no runtime changes or production writes.
 
+ownership update, 2026-10-03: metadata root, `t-81545cb9ac775ed8` on macbook,
+has accepted nexus application reset/release preparation in
+`feature/metadata-enrichment`. the missing owner is resolved; the executable
+disposition and restored-copy release proofs still await that owner's receipts.
+production disposition, drain and deployment require separate final authorization.
+
 ## evidence and kernel disposition
 
 the metadata [cutover plan, section 9](../../../nexus-web-metadata/docs/metadata-enrichment-plan.md#9-hard-cutover-and-verification)
@@ -100,11 +106,14 @@ backend invocation alone does not qualify the full release.
 ## owners and closure
 
 kernel integration owns this evidence verdict and handoff; it owns no application
-archive/reset transaction. the model plan assigns nexus's consumer/backend reset
-designer the ledger/history/migration work; the release owner owns quiescence,
-backup and deployment. metadata/media owns retained metadata jobs, publication
-and later retries. no current legacy reset/release owner contact or session is
-identified in the inspected documents; obtain that handoff rather than guessing.
+archive/reset transaction. metadata root now owns nexus's application reset/ledger
+and release preparation, including the snapshot forwarding repair, finite
+archival transition and census/backup/restore/effect/undo/stale-replay proofs.
+metadata/media retains ownership of metadata jobs, publication and later retries.
+the kernel/native team has no active overlapping application work; its adapter,
+provider/kernel/tools artifacts and immutable pins remain unchanged. the retired
+qualification host remains retired. preparation needs no fresh model calls and
+must preserve the original stopped uncertain-job databases and evidence.
 
 release may proceed only with a fresh target census, executed owner disposition,
 verified pre-disposition restore, exact-chain/effect/undo/stale-replay proofs and
