@@ -110,18 +110,15 @@ async def run_native(
     cancellation: CancellationToken,
 ) -> AgentNotSubmitted | AgentTerminal:
     """Supervise one native attempt; host policy owns task continuation/recovery."""
-    require_native_plan(request.plan, definition.maximum_profile)
     await owner.require_current(request.permit)
     recovered = await journal.recover(request.attempt_id)
-    fingerprint = definition.session_fingerprint(request.plan)
     if recovered is not None:
-        if (
-            recovered.request.fingerprint != request.fingerprint
-            or recovered.definition_fingerprint != fingerprint
-        ):
-            raise NativeDefect("native recovery changed its frozen request or definition")
+        if recovered.request.fingerprint != request.fingerprint:
+            raise NativeDefect("native recovery changed its frozen request")
         await owner.require_current(request.permit)
         return recovered.terminal
+    require_native_plan(request.plan, definition.maximum_profile)
+    fingerprint = definition.session_fingerprint(request.plan)
     if session is None:
         raise NativeDefect("a new native attempt requires an explicitly acquired live session")
     if (
