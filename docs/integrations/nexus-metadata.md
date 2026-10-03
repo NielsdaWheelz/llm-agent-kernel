@@ -1,93 +1,113 @@
 # nexus metadata integration handoff
 
-status: **NOT_READY** for implementation integration; implementation authorized
-and underway, 2026-10-02. isolated `feature/native-agent-supervision` worktrees
-exist; no qualified kernel/provider/tools pin set or adapter commit is ready.
-this is the coordination record for the metadata owner; do not infer readiness
-from the accepted design or from controlled failure tests.
+status: **NOT_READY** for installed integration, 2026-10-02. implementation and
+source-overlay research are green; contained host qualification and final frozen
+artifacts remain open. this record is not a deployment receipt.
 
 ## ownership
 
-- metadata: `/Users/nnandal/Documents/code/nexus-web-metadata`,
-  `feature/metadata-enrichment`, base `a494f743`. owns metadata policy, schema,
-  prompts, journal step selection and domain acceptance. this worktree is untouched.
-- kernel stream: shared kernel, provider-runtime, llm-tools, nexus generation
-  adapters, required integration migrations and dependency pins. metadata must
-  not implement a local dispatch fix or another agent loop.
-- integration stays through nexus `generation_service` and the existing durable
-  generation/journal boundaries. no metadata import of provider internals.
+metadata owns `/Users/nnandal/Documents/code/nexus-web-metadata`,
+`feature/metadata-enrichment`, implementation
+`603c0e0c1d9b00a2f992d468f2204a2be503c36c`, docs head `392cb85fd`.
+its 20 composed api/postgres/queue/worker checks, 11 domain checks, rss/source
+fencing, minio epub repair, browser journeys and static checks are independent
+metadata proof. no native/model/research qualification is attributed to them.
+this worktree is untouched.
 
-## required capability
+kernel integration owns provider/kernel/tools contracts, nexus adapters, native
+0254 and immutable dependency pins. metadata consumes admission, execution and
+terminal projection; it implements no native loop or dispatch recovery.
 
-| field | exact requirement |
+## exact capability
+
+| field | requirement |
 | --- | --- |
-| route/account | codex personal; no api-route or account substitution |
-| model/effort | `gpt-6-luna`, `xhigh`; retain actual resolved/wire identity as evidence |
-| output | metadata's closed native structured-json schema; strict json decoding, no extracting json from prose or weakening the schema |
-| runtime | 300-second generation bound; session-open/cleanup are separately reported |
-| content | 32 kib = 32,768 bytes of content; preserve existing instructions/content distinction |
-| context/output policy | 64,000 context tokens; 8,000 output tokens; preserve both in the frozen request |
-| tools | actual `nexus.document.search`, `nexus.resource.read`, `web.search`, `web.read` under the admitted resource scope |
-| identity | stable metadata journal step and generation identity; callback identity is subordinate, never a new logical job |
-| recovery | commit native terminal before metadata decode/validation/publication; recover that work locally without another provider call |
-| uncertainty | unresolved submission blocks redispatch of this metadata step; no timeout/exception/native-id absence proves non-submission |
+| route/account | codex personal; no substitution |
+| model/effort | actual `gpt-6-luna` / `xhigh`, preserved selected/wire identity |
+| output | closed native strict-json schema; no prose extraction or schema weakening |
+| runtime | 300-second generation deadline; open/cleanup reported separately |
+| content | 32,768 content bytes; existing instruction/content distinction |
+| context/output | frozen 64,000 context tokens / 8,000 reserved output tokens |
+| tools | actual `nexus.document.search`, `nexus.resource.read`, `web.search`, `web.read` within admitted scope |
+| identity | same job, stable journal step/generation and original model attempt |
+| recovery | original provider seal committed before decode/validation/publication; local settlement without provider/catalog calls |
+| uncertainty | absent original seal and authoritative non-submission proof blocks redispatch; parent outcomes grant no recovery authority |
 
-the current `RequestBudget` describes prompt-context and reserved-output policy.
-native enforcement of inner-loop context/output ceilings is **UNQUALIFIED**; a
-frozen number or observed usage is not proof of enforcement. the provider review
-must document exactly what the installed route supports before acceptance. do not
-silently reinterpret either number, change reasoning, or substitute a model.
+64,000/8,000 are nexus admission/output-reservation semantics. stock 0.160.0 has
+no hard native inner-loop output-token ceiling. no such enforcement is claimed.
+jarvis's fresh-reasoning policy does not authorize restarting an uncertain
+metadata step.
 
-metadata's conservative uncertainty policy is explicit. jarvis's selected automatic
-reasoning recovery does not authorize retrying an uncertain metadata step.
-authoritative rejection before submission and a durable valid terminal are separate
-states; neither is manufactured from a generic provider exception.
+## artifact status
 
-## delivery and readiness
+all five isolated worktrees use `feature/native-agent-supervision`.
 
-the [native contract](../native-agent-spec.md#9-delivery-and-acceptance) assigns:
-
-- n1: provider/kernel submission and terminal evidence.
-- n2: nexus adapter/terminal-recovery repair on its current route, independently
-  useful to metadata; current route acceptance does not qualify native callbacks.
-- n3/n5: contained callback qualification and hard cutover of the replaced shell
-  route. metadata domain code retains the generation-service seam.
-
-| artifact/proof | current status |
+| artifact/proof | status |
 | --- | --- |
-| kernel checkout | `feature/native-agent-supervision`, `/Users/nnandal/Documents/code/llm-agent-kernel-native`; implementation underway |
-| current declared provider pin | `69d41d38a3d290e7ae3bde9b57556dda41e1b2f1`; baseline, not the repair |
-| current declared tools pin | `9e6d155f3b64f03495911435b7cae8b8d131f9a2`; baseline, not callback qualification |
-| ready integration branch / new immutable pins | unavailable; candidate branches are unqualified |
-| exact selected model/effort + strict-json + successful web search/read | actual personal `gpt-6-luna`/`xhigh` and strict json + declared echo callback green on 0.160.0; actual research pending separately |
-| four-tool declaration, dispatch, result and scope proof | frozen declaration is present; live research underway, unqualified |
-| controlled preflight/native-failure/cleanup/uncertainty fixtures | provider native 10/10 and kernel native 5/5 candidate green; real nexus postgres unresolved/local-stop/parent-terminal anomaly block redispatch |
-| durable terminal -> forced product failure -> local recovery | candidate postgres green: exact own seal retained, cold local recovery and Completed replay with provider/catalog trap |
+| kernel candidate | `04381b8`; model-text and containment identity contracts; fetchable, not final qualified pin |
+| provider candidate | `23bd67420c9aaac78f5a6689d795b1eb02a1d5e9`; startup catalogue/version preflight and raw visibility; fetchable candidate |
+| tools candidate | `cad13af1289c247897236959bfff0d6791956d4b`; reader v3; fetchable, not final qualified pin |
+| nexus adapter | `/Users/nnandal/Documents/code/nexus-web-native`; aggregate commit/pins pending |
+| exact four-tool research | genuine source-overlay luna/xhigh strict-json success with useful actual results from all four tools; final frozen installed repeat pending |
+| local terminal recovery | real postgres and process kill/reclaim green; original terminal/usage retained with zero provider/catalog calls; current-tools trap green |
+| uncertain barriers | unresolved, local-stop and parent-terminal-only cases stay blocked; original authoritative non-submission settles failure locally without a fabricated native seal |
+| citations/progress | actual postgres original-result/model-projection separation, numbered resource citations, atomic progress/SSE replay and stopped-owner refusal green; controlled native identity |
+| migration | 0254 principal backfill/synthetic raw-byte retention/credential deletion/historical undo green; combined0255 rejection rolls back whole transaction; valid historical continuation fixture pending metadata owner |
+| installed readiness | open; source overlays and controlled peers cannot qualify it |
 
-before marking ready, replace the unavailable row with fetchable commits for each
-dependency and the nexus adapter branch; record clean installed lock resolution,
-schema migration, installed native build, actual selected model/effort, acceptance
-commands and results. successful live search/read must include real returned tool
-results and valid final metadata. controlled provider failures are separate proof,
-never a substitute for that successful live journey.
+stock feature flags proved insufficient: model metadata can force vendor
+CodeMode/clock and async user-input tools. the supported host-start catalogue
+restriction passes actual direct-callback/clock/inherited-authority probes; final
+installed consumer qualification remains open. no hidden builtin activity is relabeled
+inert; native authority/permissions continue to fail-stop. jarvis now requires a
+separate contained endpoint; nexus retains its dedicated host.
 
-the metadata owner chooses its domain fixtures and expected metadata. the kernel
-owner supplies adapter/capability evidence and does not edit the metadata worktree.
+## consumer integration
 
-implementation progress is recorded in [evidence](../native-agent-evidence.md).
-an inactive Uncertain journal remains blocked even if a parent terminal exists.
-native terminal recovery must use the kernel-owned authoritative native receipt
-and perform no provider call; metadata's Completed publication memo is separate.
+use original frozen `GenerationSpec` and `GenerationIntent` through
+`admit_job_generation` and `execute_generation` in `llm_execution`;
+`generation_service` owns admission. admitted handles remain in `request.intent.input`.
+product projections import `generation_terminal`; no native adapter internals.
+retain current source/credit/access/claim fences on publication.
 
-the shared execution seam is `execute_generation`: it reads the stable journal
-before catalog/provider work. on an Uncertain native generation it accepts only
-that exact model attempt's independently committed provider seal (or authoritative
-non-submission proof), then resolves product state locally. an early domain guard
-must eventually defer to that qualified seam; parent outcomes remain irrelevant.
-this describes candidate implementation, not permission to weaken metadata's guard
-before installed integrated proof.
+`generation_has_local_recovery(db, state)` is the shared eligibility check for
+an early Uncertain guard. it proves the exact native attempt/spec has its original
+seal or authoritative non-submission evidence. it authorizes only local
+`execute_generation` inspection/settlement, no dispatch or publication. metadata
+keeps its current early guard until installed qualified integration.
 
-the adapter migration is `0254_native_agent.py`, standalone parent `0252`.
-metadata's uncommitted `0253_metadata_operations.py` has the same parent. final
-integration requires a single agreed chain; metadata's owner retains its migration
-ownership. neither branch may publish a two-head deployment.
+recovery reads original attempt facts before current catalogue/provider/tools or
+definition construction. encoder failure after seal, source/credit/access changes
+and cold reclaim of the SAME job must retain original terminal/usage, make zero
+provider/catalog calls and refuse stale/revoked publication. absent proof remains
+blocked. Completed pending-publication memo replay remains a separate metadata proof.
+
+## single migration chain
+
+agreed chain: **0252 -> native0254 -> metadata0255**. standalone metadata0253 is
+committed and undeployed; only disposable databases used it. after delivery the
+metadata owner renames/reparents it, rebuilds those databases and retains old
+receipts as historical. no stamp, alias, two-head deployment or metadata edits by
+kernel ownership.
+
+0254 removes the prohibited conditional callback-arguments CHECK. raw invalid
+arguments/rejected replies remain; existing authority and executor boundaries
+validate executable work. it preserves original principals, historical effects
+and raw continuation bytes without invented native seals, then intentionally
+drops shell credentials.
+
+the current continuation fixture has synthetic envelope/nonce/ciphertext. it proves
+byte retention, not a valid historical continuation. metadata is preparing a
+finite baseline-owner fixture and separate open provider-api parent for that gate.
+
+actual transaction proof:0254 accepts the historical fixture; copied/reparented
+0255 rejects inactive Uncertain beside a terminal parent; one Alembic upgrade
+transaction restores original credentials/principals/history/schema/version.
+
+final delivery must replace candidate pins with full fetchable hashes and record
+frozen installation, stock binary, contained host configuration, exact model/effort,
+real returned search/read results and valid final output. metadata's three-unit
+bibliographic acceptance remains owner-run after that prerequisite.
+
+see [implementation evidence](../native-agent-evidence.md) and
+[acceptance ownership](../native-agent-spec.md#9-delivery-and-acceptance).

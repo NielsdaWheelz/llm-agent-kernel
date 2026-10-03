@@ -24,7 +24,7 @@ consumer manifests pin that version.
 | dependency | exact candidate revision |
 | --- | --- |
 | llm-tools | `cad13af1289c247897236959bfff0d6791956d4b` |
-| provider-runtime | `b2ce2bc6ad01f39838ca44b865daa0d47e9f9254` | any unsupported exact capability fails
+| provider-runtime | `23bd67420c9aaac78f5a6689d795b1eb02a1d5e9` | any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.
 
 provider-runtime owns SDK integration, structured-output lowering, native callback
@@ -63,7 +63,8 @@ isolated gate. native call ids identify proposals; they never authorize effects.
 `NativeInvocationProposal` freezes original arguments, call/tool identity,
 input/checkpoint lineage and all plan/binding revisions. `InvocationRecord`
 identifies host acceptance and immutable `NativeReply`. `DispatchCompleted`
-contains the original llm-tools result and host receipt reference;
+contains the original llm-tools result, required host-rendered `model_text` and
+optional host receipt reference. the kernel submits that text unchanged;
 `DispatchSuspended` is an existing durable host wait, not execution success.
 
 ## 5. exact provider surface and containment

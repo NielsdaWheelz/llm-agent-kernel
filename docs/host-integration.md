@@ -4,7 +4,10 @@ compose exact provider configuration, role/output schema and maximum profile int
 `NativeDefinition`; select a tightening frozen plan and canonical ordered inputs
 for `NativeRequest`. supply current `OwnerPermit`, `OwnerPort`, `NativeJournal`,
 `NativeInputPort`, `NativeMessagePort`, tool dispatch and budget factory ports.
-provider account/server lifecycle stays outside the kernel.
+provider account/server lifecycle stays outside the kernel. the stock server loads
+the provider-owned restricted model catalogue at startup; per-thread overrides
+cannot establish this ceiling. jarvis uses its own contained endpoint; nexus uses
+its dedicated host. see [adr 0011](decisions/0011-contained-native-host.md).
 
 ## required durable facts
 

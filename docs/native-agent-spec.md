@@ -100,7 +100,7 @@ async def run_native(
     definition: NativeDefinition,
     request: NativeRequest,
     provider: ProviderSessionPort,
-    session: ProviderSessionLease,
+    session: ProviderSessionLease | None,
     owner: OwnerPort,
     journal: NativeJournal,
     inputs: NativeInputPort,
@@ -335,6 +335,13 @@ provider/tool/delivery i/o. late cancel/expiry/cleanup never rewrites native tru
 or usage. historical rows lacking provenance remain unknown and non-executable
 until their host disposition is established.
 
+local settlement validates the original frozen spec, attempt and provider seal;
+it does not reconstruct today's tool plan, instruction or provider definition.
+dependency changes cannot revoke an already recorded terminal. current ownership
+and domain publication fences still apply. synapse/oracle retain typed target and
+plate projections in the existing frozen intent so local settlement never selects
+new targets by rerunning retrieval.
+
 ## 6. callbacks before terminal
 
 provider events are small immutable facts, not action authority:
@@ -384,6 +391,13 @@ commit the immutable reply receipt -> recheck owner/attempt -> native reply.
 later approval executes the original action position. check authority again at actual
 external dispatch. an old worker may retain an already-running effect's receipt
 through the recovery owner; it may not dispatch a new effect or advance native work.
+
+`DispatchCompleted(result: ToolResult, model_text: str, host_ref: HostRef | None)`
+retains the original executor result separately from its required host-rendered
+model projection. the kernel submits `model_text` unchanged, including the host's
+numbered citations. native reply journaling commits those exact bytes; duplicate
+delivery reuses them rather than rerendering with current state. isolated tool
+observations use the same projection. no kernel copy of an application renderer.
 
 known-tool invalid input returns a bounded typed rejection recorded before reply,
 without executor reservation or effect. keep its proposal digest and rejection,
@@ -624,10 +638,17 @@ bounded pending requests; completed messages/results go to host records. use no
 arbitrary main-turn timer: max_turn_seconds and deadline_at can be null. nexus's
 300-second metadata deadline consumes one remaining job window, not 300s per attempt.
 
-jarvis uses its existing shared server; provider/kernel never own that process.
-nexus n5 explicitly adopts a persistent host service; n2 proof covers only its old
-topology. session/account/socket/cwd containment and two-job isolation are separate
-from one job's successful output.
+the stock host must load the provider-owned restricted vendor catalogue at startup;
+per-thread catalogue overrides are no-ops. direct mode and removal of inherited
+clock/async user-input close the model-metadata override exposed by adversarial
+proof. provider preflight and raw-event drift guards enforce the qualified host
+prerequisite. model/account/effort and all other vendor metadata remain exact.
+
+jarvis uses a separate contained endpoint, selected by the owner after this finding.
+host operations owns its process/account/socket; provider/kernel never do. preserve
+the existing coding server. nexus n5 adopts its dedicated persistent host; n2 proof
+covers only the old topology. actual cross-uid socket/cwd visibility, catalogue
+policy and two-job isolation require separate proof. see [adr 0011](decisions/0011-contained-native-host.md).
 
 metadata requires codex personal gpt-6-luna/xhigh, strict json, 32,768 content bytes,
 64,000 context tokens and 8,000 reserved output tokens, plus the four tools named
@@ -674,7 +695,7 @@ memory or delegation upgrade is prerequisite. no cross-repo mega-release.
 | N016 | pending approval permits independent work; stop/approval/dispatch race both ways; immutable pending reply; fresh approval on resume cannot repeat an entered effect |
 | N017 | jarvis real-store process/connection loss, reply loss and automatic fresh-thread recovery fence old callbacks; old action references replay/refuse safely; terminal-commit -> stop/resume -> product-commit cannot settle stale requests |
 | N018 | jarvis catalog/instruction/session rotation and stopped migration preserve requests/receipts; old pending approvals need fresh consent; unresolved legacy effects block hard cutover |
-| N019 | representative jarvis quality/completion/progress/input/stop/content tasks on actual shared server; measured latency/usage limitations; retired main code has no users |
+| N019 | representative jarvis quality/completion/progress/input/stop/content tasks on actual contained host; measured latency/usage limitations; retired main code has no users |
 | N020 | nexus callback research quality, metadata contract, citations, private socket/two-job isolation, historical effect undo and final deletion of replaced shell/credential paths |
 
 ## 10. decisions, tradeoffs and implementation gates
@@ -688,6 +709,7 @@ memory or delegation upgrade is prerequisite. no cross-repo mega-release.
 | conservative recovered-write barrier | semantic equivalence cannot be proven by new model ids; some new writes for partly executed old requests need fresh owner intent |
 | owner permits, optional cumulative quotas | matches single-user requirements; no cost ceiling, while transport/effect bounds still apply |
 | nexus direct worker/socket topology | removes remote shell and callback relay; trusted socket holders have account-runtime authority and one service crash affects several jobs |
+| separate contained host, pinned vendor catalogue | keeps other coding clients unchanged; adds one jarvis service and explicit model-inventory requalification |
 | hard cutover | one implementation to understand; requires stopped migration, reconciled legacy effects and fresh approvals rather than execution compatibility |
 | delete new feature tests after proof | follows owner instruction; forfeits their ongoing regression protection and requires fresh focused proof for later changes |
 

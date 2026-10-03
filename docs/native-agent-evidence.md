@@ -8,8 +8,8 @@ installed acceptance.
 
 | boundary | observed proof | remaining |
 | --- | --- | --- |
-| provider transport | 153 affected provider cases green; raw api 482/482 green; actual personal stock 0.160.0 selects `gpt-6-luna`/`xhigh`, strict json and a real declared echo callback | final frozen install and consumer topology |
-| kernel generation | original terminal/product rollback and cleanup red→green; native controlled transport 7/7 including silent withheld start acknowledgement and prompt stop fence; 181 selected conformance green before new feature-test deletion | final consumer and frozen install |
+| provider transport | 998 deterministic cases green, 4 skips and 40 live cases excluded; actual personal stock 0.160.0 selects `gpt-6-luna`/`xhigh`, strict json and a real declared echo callback | final frozen install and consumer topology |
+| kernel generation | original terminal/product rollback and cleanup red→green; native controlled transport 7/7 including silent withheld start acknowledgement and prompt stop fence; 186 conformance green with frozen provider23bd/tools cad before new feature-test deletion | final consumer and frozen install |
 | tools | optional-quota and reader/header red→green; 219 selected existing/temporary cases; ruff/pyright clean at `cad13af1289c247897236959bfff0d6791956d4b` | consumer budgets and final artifact |
 | nexus persistence | real postgres red→green: product fault retains native terminal/usage; own sealed cold recovery and Completed replay make no provider call; unresolved/local stop/parent-terminal anomaly block redispatch; invalid raw failure and positive non-submission stay distinct | real SIGKILL/new-owner sealed recovery, callback facts/counts and combined migration rollback green; final frozen runtime |
 | jarvis | real postgres schema/content, prepared isolated decisions, read replay/barriers, approval entry/stop and sealed terminal recovery probes green | actual native web.search/web.read, progress, new-topic steer, stop and SIGKILL fresh-thread recovery green; final frozen runtime |
@@ -58,10 +58,18 @@ a disposable test graph as 0255 after 0254. 0254 accepted a historical shell
 terminal, then 0255 rejected its inactive Uncertain metadata journal; one actual
 Alembic transaction rolled back credentials, principals, rows, schema and version.
 a separate 0254 upgrade backfilled the original principal, retained old positions
-and continuation bytes without native seals, deleted credentials and performed
+and synthetic continuation bytes without native seals, deleted credentials and performed
 real idempotent historical undo. the redundant native conditional-nullability
 CHECK was removed under Nexus database rules.
 
-actual N014 adversarial qualification remains open: a native authority event was
-observed and contained. source investigation and exact event classification are
-in progress; echo and Linux sibling-isolation receipts do not qualify this gate.
+the synthetic continuation fixture proves byte retention, not validity or usable
+historical continuation preservation. the metadata owner is preparing that proof
+through baseline chat/ledger/continuation codec/cipher/tool/authorship owners,
+including a separate open provider-api parent. its result remains pending.
+
+N014 source investigation found an actual hidden native clock execution despite
+feature-off defaults. the provider-owned startup catalogue restricts tool mode
+to direct and removes inherited native selectors. actual contained Linux direct
+callback/strict-json and adversarial clock/inherited-authority probes are green;
+exact public0.160.0/config-origin preflight rejects unsupported hosts before
+thread creation. final installed consumer and cross-uid host proof remain open.

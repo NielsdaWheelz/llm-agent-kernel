@@ -130,7 +130,8 @@ path belongs exclusively to this slice after its last consumer moves.
    completion is explicit; unanswered earlier requests survive a new topic's answer.
    preserve host-event consumption and existing scheduled-wake action settlement.
    test terminal commit -> stop/resume -> stale product commit under actual locks.
-5. use the existing owner lock and session server. process/connection loss fences
+5. use the existing owner lock and separately contained host endpoint under
+   [adr 0011](decisions/0011-contained-native-host.md). process/connection loss fences
    the old attempt and recovers canonical inputs/results into a fresh native thread.
 6. cut over the main entry point. delete its structured-step loop, prompt, capacity
    reservation arithmetic and duplicate budget implementation. retain isolated
