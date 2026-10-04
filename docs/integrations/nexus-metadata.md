@@ -35,7 +35,8 @@ explicitly finished finite host use; no further provider call is needed.
 
 metadata's [final verification](https://github.com/NielsdaWheelz/nexus-web/blob/16514144780bbddef4691ddb5c5e6114e932c21c/docs/metadata-enrichment-verification.md)
 is published in draft [pr482](https://github.com/NielsdaWheelz/nexus-web/pull/482),
-head `16514144780bbddef4691ddb5c5e6114e932c21c`; hosted checks are GREEN.
+recorded at `16514144780bbddef4691ddb5c5e6114e932c21c`; that head's hosted checks
+passed. later pr heads/checks remain independently owned.
 6f036a29a has the qualified bcb86e tree and native bd093 ancestry; 165 changes
 only six docs. shared pins/lock and research803 are unchanged. owned fixture
 cleanup2fb2685c and post-deletion static108ca215 pass; original evidence and real

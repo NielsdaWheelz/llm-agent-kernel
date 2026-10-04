@@ -89,8 +89,9 @@ parsed-source/Viewer fixtures are controlled; this cohort claims no genuine
 ingestion, HTTP/JWT/browser, injection-canary or production qualification.
 64k/8k remain policy reservations. the owner explicitly finished finite host use.
 
-metadata draft [pr482](https://github.com/NielsdaWheelz/nexus-web/pull/482) is
-published at `16514144780bbddef4691ddb5c5e6114e932c21c`, with hosted checks GREEN.
+metadata draft [pr482](https://github.com/NielsdaWheelz/nexus-web/pull/482) has a
+recorded publication at `16514144780bbddef4691ddb5c5e6114e932c21c`; that head's
+hosted checks passed. later pr heads/checks remain independently owned.
 its `6f036a29a` parent tree equals qualified bcb86e and retains native bd093;
 165 changes only six documentation files. pins/lock and research803 are unchanged.
 the owner removed its disposable proofs/fixtures and verified 150 retained hashes;
