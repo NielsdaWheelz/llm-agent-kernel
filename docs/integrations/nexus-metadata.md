@@ -7,6 +7,32 @@ jarvis's application schema is independent. metadata's installed domain acceptan
 remains independently owned; production release is separately **BLOCKED** by historical
 uncertainty. this is artifact qualification, not deployment.
 
+current-main composition, 2026-10-03/04 utc: shared tools/provider/kernel prs
+23/37/6 are merged with green hosted checks; qualified e149/9d57/2adb pins remain
+unchanged and reachable from main. nexus pr481 merged as
+`bd093521265388734e8975857cf46c186c49dfcc`, with green hosted checks and a tree
+equal to qualified `517471b4cdb312af850c513d49cdc242fcb78f37`, including typed media citations v6
+and native0255/down0254. its fresh frozen installed generic research is GREEN:
+generation `e39e21c8-3422-407e-ae81-0f684ae73aae`, original native luna/xhigh,
+strict JSON and all four useful actual tools; root verified original stock bytes,
+seal and exact immutable result/reply pairs. metadata root's combined current-chain
+composition is GREEN at separate product bcb86e; its fresh eight-field cohort and
+cleanup/final static remain owner-pending. original qualified bc9584 artifacts and
+receipts below retain their historical attribution; they are not current-main
+qualification. see [delivery evidence](../native-agent-evidence.md#current-main-delivery-2026-10-0304-utc).
+
+the NEW contained host is retained for that finite metadata cohort. descriptor:
+`/private/tmp/nexus-main-native-live-1_m1scr0/isolation.json`; stock0.160.0,
+pid74219/supervisor74205. socket:
+`/private/tmp/codex-daemon-501/nexus-main-955145d0ef0845c0ab91ff5927b55870.sock`;
+private cognition parent:
+`/private/tmp/codex-daemon-501/cwds-nexus-main-nexus-main-native-live-1_m1scr0-b94e4a7d`.
+same-personal isolated auth provenance, account/catalog readiness, installed source
+and raw wire receipts are in the descriptor's private proof directory.
+`qualified-handoff.v2.json` records final scope and frozen receipt attribution.
+the retired original host stays
+retired; this is a new finite fixture, not production service activation.
+
 ## ownership
 
 metadata owns `/Users/nnandal/Documents/code/nexus-web-metadata` and
@@ -50,14 +76,17 @@ secondary-source/publisher attribution limits are retained in the review receipt
 final docs-only closure `8258b4908ec673fe9386a4eb288558e898337aa7` leaves
 qualified product bcdaf51 unchanged. the owner's sole post-deletion
 `./scripts/test` passed exit 0 at canonical 0255; disposable test sources, fixtures
-and synthetic databases are deleted. [consumer verification](../../../nexus-web-metadata/docs/metadata-enrichment-verification.md)
-is committed. private `artifacts.json` in the receipt directory records cleanup/
+and synthetic databases are deleted. the owner's `docs/metadata-enrichment-verification.md`
+is committed. immutable private owner-document snapshots and source hashes are in
+`/private/tmp/native-metadata-cutover-gu65429d/metadata-document-snapshots/manifest.json`;
+these local git objects make no remote-publication claim. private `artifacts.json`
+in the receipt directory records cleanup/
 static proof and original stock/native evidence. both genuine uncertain databases
 and backups remain preserved, with their owned postgres stopped. this is finite
 local closure; literal metadata plan section 9 and production rollout remain blocked.
 
 kernel integration owns provider/kernel/tools contracts, nexus adapters, native
-0254 and immutable dependency pins. metadata consumes admission, execution and
+0255 and immutable dependency pins. metadata consumes admission, execution and
 terminal projection; it implements no native loop or dispatch recovery.
 
 ## exact capability
@@ -80,9 +109,10 @@ no hard native inner-loop output-token ceiling. no such enforcement is claimed.
 jarvis's fresh-reasoning policy does not authorize restarting an uncertain
 metadata step.
 
-## artifact status
+## original artifact qualification
 
-all five isolated worktrees use `feature/native-agent-supervision`.
+the following table records the original pre-current-main qualification. current
+merged delivery is above; the immutable pins remain unchanged.
 
 | artifact/proof | status |
 | --- | --- |
@@ -184,12 +214,30 @@ blocked. Completed pending-publication memo replay remains a separate metadata p
 
 ## single migration chain
 
-adopted chain: **0252 -> native0254 -> metadata0255**. standalone metadata0253
+current agreed chain: **0252 -> resource0253 -> atlas0254 -> native0255 ->
+metadata0256 -> effects0257**. main owns resource/atlas migrations. native owner
+mechanically renames/reparents its unchanged migration body; metadata root owns
+its metadata/effects renames. composed product `bcb86e020` has one canonical0257
+head, exact noneditable source/pins and green static checks. actual controlled
+owner-populated0241 restore through the complete chain, eight whole-transaction refusals, remaining
+resource/atlas data, undo and stale-owner refusal are GREEN. copied resource-positive
+projection is a separate rollback-only fixture; original activation memos were
+deleted at0244. current255-pass/256-refusal rollback proof is GREEN: native255
+passes and drops credentials, metadata256 refuses the controlled inactive Uncertain
+journal beside a copied completed parent, and all 114 public tables/full DDL/rows/
+version/credentials roll back exactly252. zero authoritative native child rows or
+provider/catalog calls; no historical continuation recovery is inferred. receipt:
+`/private/tmp/nexus-metadata-release-uy48cjy2/0257-late-native-metadata-guard.receipt.json`,
+sha256 `13d02c88c9c4d47ac327a2a10bcd5c9d27da6ce0b59f221fcbfccd75a7e922f9`.
+timestamp removal is existing main's atlas migration, not native history proof.
+
+historically qualified chain: **0252 -> native0254 -> metadata0255**. standalone metadata0253
 was committed and undeployed; only disposable databases used it. the metadata owner
 renamed/reparented it and rebuilt those databases; old receipts remain historical.
 no stamp, alias, two-head deployment or metadata edits by kernel ownership.
 
-0254 removes the prohibited conditional callback-arguments CHECK. raw invalid
+historical native0254, now canonical native0255, removes the prohibited conditional
+callback-arguments CHECK. raw invalid
 arguments/rejected replies remain; existing authority and executor boundaries
 validate executable work. it preserves original principals, historical effects
 and raw continuation bytes without invented native seals, then intentionally
@@ -201,7 +249,7 @@ parent is separate from the settled shell parent. its authenticated continuation
 opens after cutover; original effects/authorships persist and remaining-note undo
 executes once. no native seals are invented.
 
-the installed migration-only candidate adds metadata's exact committed 0253 body
+the historical installed migration-only candidate adds metadata's exact committed 0253 body
 as canonical 0255/down 0254. the unchanged owner verifier passes both original
 portable archives in separate kernel-owned databases. 0254 accepts the terminal
 shell parent; 0255 rejects its inactive Uncertain journal; one actual upgrade
@@ -217,7 +265,8 @@ no reseed or check expansion occurred. receipts:
 `/private/tmp/native-combined-migration.PNQFIS/{success,blocked}.receipt.json`.
 owner databases and the metadata worktree remain untouched.
 
-all pins are pushed and fetchable on `feature/native-agent-supervision`. adoption
+all qualified pins are reachable through their merged repository main histories;
+adoption does not depend on temporary feature branches or worktrees. adoption
 uses the consumer's committed frozen lock, never editable source overlays. metadata's
 actual enrich_metadata/codex/metadata recovery, 21-case composed driver and three-unit
 genuine bibliographic acceptance are GREEN with their own receipts above. generic
@@ -227,9 +276,10 @@ generation 95d85ea3 and initial 5d50 migration/adoption proof remain separate.
 
 the [historical uncertainty disposition](../issues/historical-uncertainty-release.md)
 is **OPEN / RELEASE BLOCKED**. old production unsealed work gains no authority
-from this runtime. the required fresh census, executable exact-id application
-disposition, verified pre-disposition restore and old effect/undo/stale-replay proofs
-still await owner qualification. on 2026-10-03 metadata root,
+from this runtime. metadata root's preliminary live census/restore, executable
+exact-id archival transition and controlled0241→0257 effect/undo/stale-replay proof
+are GREEN. the drained release census, fresh verified R2 backup/restore and aligned
+production execution remain separately gated. on 2026-10-03 metadata root,
 `t-81545cb9ac775ed8` on macbook, accepted application reset/release preparation in
 `feature/metadata-enrichment`, including the release snapshot forwarding repair
 and finite archival transition. the kernel/native team has no active overlapping
@@ -240,7 +290,8 @@ tools/native adapter or pin changes are requested. production disposition, drain
 and deployment remain separately authorized final actions after concrete review.
 no production writes or metadata edits were performed by the kernel owner.
 stored-item repair and final release/restore remain separately blocked; the
-qualification host remains retired and original uncertain-job evidence preserved.
+original qualification host remains retired and original uncertain-job evidence
+is preserved. the new finite host remains for current consumer research above.
 
 see [implementation evidence](../native-agent-evidence.md) and
 [acceptance ownership](../native-agent-spec.md#9-delivery-and-acceptance).
