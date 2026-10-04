@@ -37,7 +37,7 @@ owner-populated0241 restored-copy proof, eight whole-transaction refusals, six
 typed-consumer cases and current release forwarding/controller checks are GREEN.
 these prove metadata product bcb86e, separately from adapter517 research.
 current255-pass/256-refusal rollback proof and the fresh three-item eight-field
-model cohort are GREEN; metadata's cleanup/final static closure remains owner-pending.
+model cohort and metadata's owned cleanup/post-deletion static closure are GREEN.
 prior 617baf/0256 proof is historical. final reviewed restore receipt:
 `/private/tmp/nexus-metadata-release-uy48cjy2/0257-metadata-restored-cutover.receipt.json`,
 sha256 `b0b50e9f192fe785b4290f030204d01b7d6134e8a4b6627b67cc3c7c1aa07f48`.
@@ -89,6 +89,19 @@ parsed-source/Viewer fixtures are controlled; this cohort claims no genuine
 ingestion, HTTP/JWT/browser, injection-canary or production qualification.
 64k/8k remain policy reservations. the owner explicitly finished finite host use.
 
+metadata draft [pr482](https://github.com/NielsdaWheelz/nexus-web/pull/482) has a
+recorded publication at `16514144780bbddef4691ddb5c5e6114e932c21c`; that head's
+hosted checks passed. later pr heads/checks remain independently owned.
+its `6f036a29a` parent tree equals qualified bcb86e and retains native bd093;
+165 changes only six documentation files. pins/lock and research803 are unchanged.
+the owner removed its disposable proofs/fixtures and verified 150 retained hashes;
+protected original uncertainty/evidence remain preserved. cleanup2fb2685c and
+sole post-deletion static108ca215 at 6f/head0257 are retained in
+`/private/tmp/nexus-metadata-release-uy48cjy2/`; published-pr receipt sha256
+`4954f200f2fdfc7af88610bd1c772bb53360feb75920299485a2b9a94430966f`.
+see the owner's [final verification](https://github.com/NielsdaWheelz/nexus-web/blob/16514144780bbddef4691ddb5c5e6114e932c21c/docs/metadata-enrichment-verification.md).
+metadata pr merge and production disposition/release remain separately owned and unexecuted.
+
 jarvis main adds captured worker targets and durable wait observation. the full
 native callback test exposed stored action envelopes being compared with tool
 results, and schedule receipts hashing a payload instead of the admitted action.
@@ -120,7 +133,8 @@ its exact container/anonymous volume are removed after 15 private database archi
 were retained. archive TOC parsing is not a fresh restore proof. receipt:
 `/private/tmp/native-metadata-cutover-gu65429d/proof-postgres-cleanup.receipt.json`,
 sha256 `ed744d0d7050c3dab099e5412b7a732a96199bac0f97ff8e84983781e6966ef6`.
-metadata's named55443 volume and stopped original-uncertainty database remain untouched.
+this native cleanup preserved metadata resources and original-uncertainty stores;
+metadata's subsequent owned fixture deletion is separately recorded above.
 the original macOS host remains retired. the old linux host exited0; 27 exact task containers and four
 exact account/socket volumes are removed after 21 original stock rollouts, two
 two-uid rollouts and private logs were retained and hashed. that earlier cleanup
