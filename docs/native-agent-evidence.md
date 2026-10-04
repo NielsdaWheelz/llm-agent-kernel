@@ -1,10 +1,106 @@
 # native agent implementation evidence
 
-status: accepted scope implemented and qualified, 2026-10-02. five isolated worktrees
-use `feature/native-agent-supervision`. all N001–N020 gates below pass; new temporary
-feature tests are deleted. nexus artifacts are independently qualified.
-original checkouts and metadata ownership are
-preserved. controlled peers establish their boundary; they are never research.
+status: accepted scope implemented and qualified. all N001–N020 gates below pass;
+new temporary feature tests are deleted. current-main delivery is recorded below.
+unrelated checkout state and metadata ownership are preserved. controlled peers
+establish their boundary; they are never research.
+
+## current-main delivery, 2026-10-03/04 utc
+
+the original acceptance below remains tied to its recorded artifacts. composing
+subsequent consumer main changes requires fresh affected proof, not relabeling the
+old receipts. production reset/release remains separately owned and gated.
+
+| artifact | tested pr head | merged main | current status |
+| --- | --- | --- | --- |
+| tools, pr 23 | `2adb9790` | `593de5d3` | merged; hosted checks green |
+| provider, pr 37 | `f069d9d1` | `09c52036` | merged; hosted checks green |
+| kernel, pr 6 | `391fb74e` | `01e59486` | merged; hosted checks green |
+| nexus, pr 481 | `517471b4` | `bd093521` | merged; hosted checks and fresh installed generic four-tool research green |
+| jarvis, pr 49 | `78d3af6c` | `f3b4dc3b` | merged; hosted/final installed/static/test-deletion checks green |
+
+all three merged library trees equal their tested pr heads and retain the
+qualified e149/9d57/2adb pins as ancestors. consumers keep those exact pins;
+merge commits do not silently change their installed library bytes. the provider
+pr also preserves current-main's control interface and socket-path resolution,
+with focused transport proof. the inherited raw-provider api matrix is **NOT_RUN**;
+the user explicitly waived it for this delivery. it has no native-model proof claim.
+private merge/ancestry receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/shared-merges.receipt.json`, sha256
+`cea182e0c1cddf74eb6d0763aa619649d9ed18f4bbd80ba2d638052592c8e10b`.
+
+nexus main changes its media tool result to the existing typed citation projection;
+the native binding revision is v6. canonical native migration is now 0255/down0254.
+metadata root's composed `bcb86e020` retains all exact shared pins, with installed
+source equality and canonical 0257 static checks green. its actual controlled
+owner-populated0241 restored-copy proof, eight whole-transaction refusals, six
+typed-consumer cases and current release forwarding/controller checks are GREEN.
+these prove metadata product bcb86e, separately from adapter517 research.
+current255-pass/256-refusal rollback proof is GREEN; the new three-item eight-field
+model cohort and metadata's cleanup/final static closure remain owner-pending.
+prior 617baf/0256 proof is historical. final reviewed restore receipt:
+`/private/tmp/nexus-metadata-release-uy48cjy2/0257-metadata-restored-cutover.receipt.json`,
+sha256 `b0b50e9f192fe785b4290f030204d01b7d6134e8a4b6627b67cc3c7c1aa07f48`.
+it proves original remaining atlas fields and resource rows; existing atlas timestamp
+loss is inventoried. the copied nested resource-positive fixture is rollback-only;
+original activation memos were deleted at0244. no broader projection claim is made.
+the separate late guard receipt, under the same directory,
+`0257-late-native-metadata-guard.receipt.json`, sha256
+`13d02c88c9c4d47ac327a2a10bcd5c9d27da6ce0b59f221fcbfccd75a7e922f9`,
+observes native255 pass/credential deletion followed by exact metadata256 refusal.
+all 114 public tables, full DDL, rows, version and credentials roll back to252.
+the copied terminal parent's nested evidence creates zero authoritative native
+child rows. this proves controlled refusal, not historical continuation recovery.
+nexus merged-tree/ancestry receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/nexus-merge.receipt.json`, sha256
+`06abb57c0d88cfebf1c649e8ac6f1cb289940bb6d3d9debd41b4d7eef19c7fbe`.
+
+fresh frozen nexus517 research generation
+`e39e21c8-3422-407e-ae81-0f684ae73aae` is GREEN: original stock turn_context
+proves personal luna/xhigh; strict JSON, useful actual four-tool Success, original
+seal and 15,546 input/342 output tokens are retained. root independently verified
+stock bytes and each immutable result/reply pair. Completed local replay makes no
+new model call and completed owner authority cannot dispatch again. receipt:
+`/private/tmp/nexus-main-native-live-1_m1scr0/research.receipt.json`, sha256
+`3ef8aa1946bb0e2013d371991f1697863f0c0e66babefc4866d6ad19f3b05975`.
+the earlier869aea hash was published before adding only stock path/hash and
+qualification scope. removing those three bookkeeping fields reproduces the old
+hash exactly; original facts are unchanged. final receipt is frozen, with separate
+`receipt-freeze-attribution.json` and `qualified-handoff.v2.json` amendments.
+raw-stock receipt is in `stock-evidence/four-tool-green/receipt.json`, sha256
+`598ac5125282139658bd6a2cdced14c35a65e9142d63b6068a43785599f028ed`;
+retained rollout sha256
+`a6f6105a3f08ea675999b6de366636c8e9802cd816b431da90a0947f29690651`.
+the first new-host attempt73a0cc77 sealed Succeeded/Completed but failed the content
+target by guessing invalid handles; its original facts remain separate. the green
+new intent supplies the actual admitted canonical media URI, matching consumer
+bootstrap. no prior attempt is redispatched or reclassified, and no result is edited.
+
+jarvis main adds captured worker targets and durable wait observation. the full
+native callback test exposed stored action envelopes being compared with tool
+results, and schedule receipts hashing a payload instead of the admitted action.
+the action owner now supplies one immutable result projection for initial reply,
+replay and existing-action references; the schedule owner reads its frozen digest.
+ten real-postgres callback/replay cases pass with controlled worker/gate leaves
+and zero provider calls. nine wait/product checks and five release-shell cases pass.
+final `78d3af6` deletes temporary drivers and has all 68 runtime/deploy/lock files
+equal live-qualified `8f91c3b`; 51 installed consumer files match noneditable
+sources, with unchanged pins. final static/types/docs/build/import/audit pass.
+actual personal terra/high web read, prose progress, recorded steering, both requests
+completed with 42 and truthful stop/Cancelled seal pass. live receipt:
+`/var/folders/cb/dy22pnwn5_9c_rzxkbzymbm00000gn/T/jarvis-native-web-v6lisg1q/actual-jarvis-main-web.json`,
+sha256 `9cc2972f68bbc70c664f5fecb529b0f2cd86047041860511a7bcf9cb229e8893`.
+closure receipt: `jarvis-native-final-fj5wuvyi/closure.json` under the same temporary
+root, sha256 `89be1b0dab5450e09c2a54ec26e72fb58603f05d2120a6da99662400512942e4`.
+earlier broader restart/nested-gate/content proof retains796 attribution.
+
+new macOS host is retained for metadata's one finite three-item cohort. original
+host remains retired. the old linux host exited0; 27 exact task containers and four
+exact account/socket volumes are removed after 21 original stock rollouts, two
+two-uid rollouts and private logs were retained and hashed. all other containers
+remain. cleanup receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/linux-fixture-cleanup.receipt.json`,
+sha256 `c65428a7cd9e707c65b024633c764e6e55155456d8a72798675f0689a3bc4596`.
 
 ## acceptance map
 
@@ -31,7 +127,10 @@ preserved. controlled peers establish their boundary; they are never research.
 | N019 | final actual search/read and honest missing-source/original-versus-edition answers; useful prose progress; composed 2,000-character overflow yields one bounded failure with original seal/usage | pass |
 | N020 | final nexus genuine research, atomic progress/final SSE, original resource citations/model projection; unknown[999] yields CitationsUnavailable and zero fabricated edges; two-job cancellation isolation and original historical undo | pass |
 
-## installed research and current artifacts
+## original installed research and artifacts
+
+this section records the pre-current-main bc9584/e149/9d57/2adb qualification;
+its counts and artifact identities remain historical. current delivery is above.
 
 research generation `95d85ea3-c6eb-4acc-a7bc-35a5a37905b5` ran committed nexus
 `bc9584be6f53902e430943f28e0f40ed68401cfa`, committed lock sha256
@@ -47,16 +146,19 @@ this includes schema-neutral base-v3, final frozen dependency fixes and provider
 kernel/tools/nexus feature-test deletion. original d108/b91 research and rollout
 remain historical evidence; the owner independently reviewed them.
 
-current required checks: provider 960 pass/2 skip/40 live excluded; kernel 172
+original required checks: provider 960 pass/2 skip/40 live excluded; kernel 172
 pass/2 live deselected after 192 pre-deletion cases; tools 203 remaining
 conformance pass after 16 new feature cases were deleted. whole-repo types/lint
 pass; kernel/tools builds and dependency audit pass. jarvis `./scripts/verify`
 (static/docs/wheel/sdist/import/audit) and nexus `./scripts/test` (static/backend/
 web/extension/offline/wire/migration graph) pass against current committed locks.
 git-installed internal packages are outside pip-audit's public advisory database.
-no hosted-ci/deployed-service claim is made.
+these original checks make no hosted-ci/deployed-service claim.
 
-## final installed jarvis
+## original installed jarvis
+
+this section records the original 3f53/796 qualification. current-main Jarvis
+proof and merge are above; broader original proofs retain their original scope.
 
 qualified consumer `3f53fbe789d1041f56d679293f8d24a646afa236`, committed lock
 sha256 `e7475de7933317086dcab6b4f15e3e727bbece0e80270fc9407273eb4aca151f`,
@@ -148,9 +250,11 @@ drops retired credentials on success and has no redundant conditional callback
 arguments CHECK; invalid raw arguments/rejected replies remain durable evidence.
 
 earlier production 0241→0246 historical uncertainty remains an independent
-[release blocker](issues/historical-uncertainty-release.md). its fresh census,
-owner archival disposition and actual restore/effect/undo/stale-replay proof are
-NOT_RUN. new seals cannot certify old unsealed work.
+[release blocker](issues/historical-uncertainty-release.md). the preliminary
+read-only production census/backup/restore and controlled owner archival/effect/
+undo/stale-replay proofs are GREEN, with separate archives and scope. drained
+production disposition, fresh release backup/restore and deployment remain NOT_RUN.
+new seals cannot certify old unsealed work.
 
 ## commands and evidence retention
 
