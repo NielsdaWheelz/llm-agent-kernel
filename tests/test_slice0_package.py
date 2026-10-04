@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -9,34 +10,36 @@ from pathlib import Path
 from typing import TYPE_CHECKING, assert_type
 
 if TYPE_CHECKING:
-    from llm_agent_kernel import AgentDefinition, DispatchLineage, ModelDecisionJournal
+    from llm_agent_kernel import AgentDefinition, ModelDecisionJournal, NativeDispatchLineage
     from llm_agent_kernel.decisions import ModelDecisionJournal as DefinedModelDecisionJournal
     from llm_agent_kernel.definitions import AgentDefinition as DefinedAgentDefinition
-    from llm_agent_kernel.definitions import DispatchLineage as DefinedDispatchLineage
+    from llm_agent_kernel.definitions import NativeDispatchLineage as DefinedNativeDispatchLineage
 
     assert_type(AgentDefinition, type[DefinedAgentDefinition])
-    assert_type(DispatchLineage, type[DefinedDispatchLineage])
+    assert_type(NativeDispatchLineage, type[DefinedNativeDispatchLineage])
     assert_type(ModelDecisionJournal, type[DefinedModelDecisionJournal])
 
 ROOT = Path(__file__).parents[1]
 
 
-def test_package_metadata_locks_qualified_git_dependencies() -> None:
+def test_package_metadata_locks_matching_immutable_git_dependencies() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
     packages = {package["name"]: package for package in lock["package"]}
 
     assert project["project"]["requires-python"] == ">=3.12"
-    assert project["project"]["dependencies"][:2] == [
-        "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@9e6d155f3b64f03495911435b7cae8b8d131f9a2",
-        "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@f769c236075a66f470c4b2f47f763ee554bfbe9e",
-    ]
-    assert packages["provider-runtime"]["source"]["git"].endswith(
-        "?rev=f769c236075a66f470c4b2f47f763ee554bfbe9e#f769c236075a66f470c4b2f47f763ee554bfbe9e"
-    )
-    assert packages["llm-tools"]["source"]["git"].endswith(
-        "?rev=9e6d155f3b64f03495911435b7cae8b8d131f9a2#9e6d155f3b64f03495911435b7cae8b8d131f9a2"
-    )
+    names = []
+    for dependency in project["project"]["dependencies"][:2]:
+        match = re.fullmatch(
+            r"([a-z-]+) @ git\+https://github.com/NielsdaWheelz/([^/]+)\.git@([0-9a-f]{40})",
+            dependency,
+        )
+        assert match is not None, "runtime dependency must select one immutable Git revision"
+        name, repository, revision = match.groups()
+        assert repository == {"llm-tools": "llm-tools", "provider-runtime": "llm-calling"}[name]
+        assert packages[name]["source"]["git"].endswith(f"?rev={revision}#{revision}")
+        names.append(name)
+    assert names == ["llm-tools", "provider-runtime"]
     provider = packages["provider-runtime"]
     assert "websockets" in {dependency["name"] for dependency in provider["dependencies"]}
     assert "optional-dependencies" not in provider
@@ -80,15 +83,15 @@ def test_flat_public_api_preserves_exports_identity_and_introspection(tmp_path: 
     script = """
 import typing
 import llm_agent_kernel
-from llm_agent_kernel import AgentDefinition, DispatchLineage, ModelDecisionJournal, run_thread
+from llm_agent_kernel import AgentDefinition, NativeDispatchLineage, ModelDecisionJournal, run_native
 from llm_agent_kernel.definitions import AgentDefinition as DefinedAgentDefinition
 from llm_agent_kernel.decisions import ModelDecisionJournal as DefinedModelDecisionJournal
-from llm_agent_kernel.kernel import run_thread as defined_run_thread
+from llm_agent_kernel.native import run_native as defined_run_native
 
 assert AgentDefinition is DefinedAgentDefinition
 assert ModelDecisionJournal is DefinedModelDecisionJournal
-assert run_thread is defined_run_thread
-assert typing.get_type_hints(DispatchLineage)
+assert run_native is defined_run_native
+assert typing.get_type_hints(NativeDispatchLineage)
 assert set(llm_agent_kernel.__all__) <= set(dir(llm_agent_kernel))
 from llm_agent_kernel import *
 for name in llm_agent_kernel.__all__:

@@ -43,7 +43,9 @@ def recorded_model_context(terminal: AgentTerminal) -> str:
                         {
                             "status": terminal.status,
                             "final_text": terminal.final_text,
-                            "structured_output": thaw_json_value(terminal.structured_output),
+                            "raw_structured_output": None
+                            if terminal.raw_structured_output is None
+                            else {"value": thaw_json_value(terminal.raw_structured_output.value)},
                         }
                     ),
                 ),
@@ -57,6 +59,7 @@ class ToolObservation:
     binding: ToolBinding[Any, Any, Any]
     result: ToolResult
     model_step_ordinal: int | None
+    model_text: str
     recomputable: bool = False
     source_references: tuple[str, ...] = ()
     initial_read_position: InvocationPosition | None = field(
@@ -70,6 +73,8 @@ class ToolObservation:
             raise TypeError("an observation requires its exact tool binding")
         if not isinstance(self.result, dict):
             raise TypeError("an observation result must be an llm-tools ToolResult")
+        if type(self.model_text) is not str:
+            raise TypeError("an observation model text must be str")
         if self.initial_read_position is None:
             if type(self.model_step_ordinal) is not int or self.model_step_ordinal <= 0:
                 raise ValueError("observation model-step ordinal must be positive")
@@ -128,45 +133,7 @@ def bootstrap_context(
             *definition.stable_context.sections,
             *source_sections.sections,
             publish_host_plan(plan, definition.maximum_profile),
-            _input_batch(
-                inputs,
-                as_of,
-                render_source_timestamps=render_source_timestamps,
-                render_batch_as_of=render_batch_as_of,
-            ),
-        ),
-        observations,
-        correction,
-        prior_visible_bytes,
-    )
-
-
-def run_context(
-    definition: AgentDefinition,
-    inputs: tuple[HostInput, ...],
-    as_of: datetime,
-    plan: FrozenToolPlan,
-    source_sections: PromptSections,
-    *,
-    observations: tuple[ToolObservation, ...] = (),
-    correction: str | None = None,
-    prior_visible_bytes: int = 0,
-    input_projection: InputProjectionRequest | None = None,
-) -> ContextProjection:
-    """Build the first delta for a healthy continuing session and new run."""
-
-    if not isinstance(source_sections, PromptSections):
-        raise TypeError("run source must be PromptSections")
-    render_source_timestamps, render_batch_as_of = _resolve_input_projection(
-        definition, input_projection
-    )
-    return _project(
-        definition,
-        plan,
-        (
-            *source_sections.sections,
-            publish_host_plan(plan, definition.maximum_profile),
-            _input_batch(
+            input_batch(
                 inputs,
                 as_of,
                 render_source_timestamps=render_source_timestamps,
@@ -203,7 +170,7 @@ def continuation_context(
     dynamic = (
         (
             *source_sections.sections,
-            _input_batch(
+            input_batch(
                 inputs,
                 as_of,
                 render_source_timestamps=render_source_timestamps,
@@ -286,7 +253,7 @@ def _resolve_input_projection(
     return definition.input_projection_policy.resolve(request)
 
 
-def _input_batch(
+def input_batch(
     inputs: tuple[HostInput, ...],
     as_of: datetime,
     *,
@@ -355,11 +322,17 @@ def _observation(observation: ToolObservation) -> PromptSection:
                 str(observation.binding.spec.id),
             ),
         ),
-        body=PromptJson(
-            {
-                "result": observation.result,
-                "source_references": list(observation.source_references),
-            }
+        body=PromptSections(
+            (
+                PromptSection(
+                    PromptSectionKind("model_reply"), (), PromptText(observation.model_text)
+                ),
+                PromptSection(
+                    PromptSectionKind("source_references"),
+                    (),
+                    PromptJson(list(observation.source_references)),
+                ),
+            )
         ),
     )
 
@@ -398,5 +371,5 @@ __all__ = [
     "ToolObservation",
     "bootstrap_context",
     "continuation_context",
-    "run_context",
+    "input_batch",
 ]

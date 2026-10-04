@@ -29,6 +29,7 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    canonical_json_bytes,
     render_prompt,
 )
 from provider_runtime.agent_runtime import CredentialRef, TextContent
@@ -39,13 +40,11 @@ from llm_agent_kernel.context import (
     ToolObservation,
     bootstrap_context,
     continuation_context,
-    run_context,
 )
 from llm_agent_kernel.definitions import (
     AgentDefinition,
     AgentRole,
     BatchAsOfMode,
-    ConversationalOutput,
     DefinitionId,
     HostInput,
     InputId,
@@ -109,8 +108,8 @@ def _definition(*, effect: ToolEffect = ToolEffect.Read, max_new_context_bytes: 
         definition_id=DefinitionId("assistant"),
         role=AgentRole("assistant", PromptSections((_section("role", "Be useful."),))),
         stable_context=PromptSections((_section("application", "Stable application."),)),
-        session_mode=SessionMode.continuing,
-        output_contract=ConversationalOutput(),
+        session_mode=SessionMode.isolated,
+        output_contract=StructuredOutput("context_result", Success),
         maximum_profile=maximum,
         provider=ProviderConfiguration(
             auth=CredentialRef("local_account", "owner"),
@@ -238,14 +237,14 @@ def test_batch_as_of_on_request_does_not_expose_source_timestamps() -> None:
     )
     as_of = datetime(2026, 9, 2, 12, 1, tzinfo=UTC)
 
-    hidden = run_context(
+    hidden = bootstrap_context(
         definition,
         (_input(),),
         as_of,
         plan,
         PromptSections(()),
     )
-    visible = run_context(
+    visible = bootstrap_context(
         definition,
         (_input(),),
         as_of,
@@ -280,28 +279,12 @@ def test_unauthorized_batch_as_of_projection_is_rejected_before_rendering() -> N
         )
 
 
-def test_healthy_run_context_sends_dynamic_material_without_repeating_stable_context() -> None:
-    definition, plan, _binding = _definition()
-
-    projection = run_context(
-        definition,
-        (_input(),),
-        datetime(2026, 9, 2, 12, 1, tzinfo=UTC),
-        plan,
-        PromptSections((_section("retrieved", "Fresh retrieval."),)),
-    )
-
-    assert "Fresh retrieval." in projection.rendered
-    assert "Be useful." not in projection.rendered
-    assert "Stable application." not in projection.rendered
-    assert 'kind="host_table"' in projection.rendered
-
-
 def test_tool_only_continuation_gets_no_repeated_input_or_ambient_clock() -> None:
     definition, plan, binding = _definition()
     observation = ToolObservation(
         binding,
         {"type": "Success", "value": {"text": "bounded"}},
+        model_text=canonical_json_bytes({"type": "Success", "value": {"text": "bounded"}}).decode(),
         model_step_ordinal=1,
     )
 
@@ -349,6 +332,9 @@ def test_old_recomputable_read_is_replaced_by_explicit_reference_preserving_mark
     observation = ToolObservation(
         narrow_binding,
         {"type": "Success", "value": {"text": "x" * 2_000}},
+        model_text=canonical_json_bytes(
+            {"type": "Success", "value": {"text": "x" * 2_000}}
+        ).decode(),
         model_step_ordinal=1,
         recomputable=True,
         source_references=("source-42",),
@@ -375,6 +361,9 @@ def test_read_without_a_stable_source_reference_is_not_omittable() -> None:
         ToolObservation(
             binding,
             {"type": "Success", "value": {"text": "temporary"}},
+            model_text=canonical_json_bytes(
+                {"type": "Success", "value": {"text": "temporary"}}
+            ).decode(),
             model_step_ordinal=1,
             recomputable=True,
         )
@@ -389,12 +378,18 @@ def test_write_and_required_context_are_never_silently_truncated() -> None:
         ToolObservation(
             binding,
             {"type": "Success", "value": {"text": "done"}},
+            model_text=canonical_json_bytes(
+                {"type": "Success", "value": {"text": "done"}}
+            ).decode(),
             model_step_ordinal=1,
             recomputable=True,
         )
     observation = ToolObservation(
         binding,
         {"type": "Success", "value": {"text": "effect evidence" * 100}},
+        model_text=canonical_json_bytes(
+            {"type": "Success", "value": {"text": "effect evidence" * 100}}
+        ).decode(),
         model_step_ordinal=1,
     )
 

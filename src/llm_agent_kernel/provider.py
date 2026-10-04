@@ -7,44 +7,39 @@ import os
 import shutil
 import stat
 import tempfile
-from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
+from llm_tools import FrozenToolPlan, render_prompt
 from provider_runtime.agent_runtime import (
-    AgentEvent,
-    AgentNative,
-    AgentPermissionRequest,
     AgentRuntime,
     AgentSession,
-    AgentSessionRef,
-    AgentTerminal,
-    AgentText,
-    AgentToolUse,
-    AgentUsage,
+    AgentTurn,
+    AgentTurnControls,
     CodexCatalogSessionRequest,
     ContentPart,
     JsonSchemaAgentOutput,
     NewSession,
-    ResumeSession,
-    SessionMismatch,
-    SessionUnavailable,
     TextContent,
-    TurnNotStarted,
     TurnRequest,
 )
-from provider_runtime.types import CancelSignal, Present, TokenUsage
+from provider_runtime.types import CancelSignal, TokenUsage
 
 from .definitions import (
     CODEX_NATIVE_OPTIONS,
     CONTAINMENT_POLICY,
     KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
+    OwnerPermit,
+    OwnerToken,
     ProviderUsage,
     SessionMode,
 )
 from .protocol import MODEL_STEP_OUTPUT_NAME, provider_wire_schema
+
+if TYPE_CHECKING:
+    from .native_contract import NativeDefinition
 
 
 class ProviderDefect(RuntimeError):
@@ -94,62 +89,70 @@ class ProviderSessionLease:
     session: AgentSession = field(repr=False)
     cwd: Path
     definition_fingerprint: str
-    continuing: bool
-    cold_bootstrap: bool
-    fallback_used: bool
+    owner_token: OwnerToken | None = None
     _usage: _Usage = field(default_factory=_Usage, repr=False, compare=False)
+    _diagnostics: list[str] = field(default_factory=list, repr=False, compare=False)
 
     @property
     def usage(self) -> ProviderUsage:
         return self._usage.value()
 
+    def record_usage(self, usage: TokenUsage | None) -> None:
+        """Record one observed turn's final invocation-local snapshot."""
+        self._usage.add(usage)
+
+    @property
+    def diagnostics(self) -> tuple[str, ...]:
+        return tuple(self._diagnostics)
+
+    def record_diagnostics(self, diagnostics: tuple[str, ...]) -> None:
+        self._diagnostics.extend(diagnostics)
+
 
 class ProviderSessionPort(Protocol):
     """The exact stateful provider lifecycle consumed by the kernel."""
 
-    async def acquire_continuing(
-        self,
-        definition: AgentDefinition,
-        saved_ref: AgentSessionRef | None,
-    ) -> ProviderSessionLease: ...
-
     async def open_isolated(self, definition: AgentDefinition) -> ProviderSessionLease: ...
 
-    async def run_observed_turn(
+    def prepare_observed_turn(
         self,
         lease: ProviderSessionLease,
         content: tuple[ContentPart, ...],
         cancellation: CancelSignal,
         *,
+        attempt_id: str,
+        input_id: str,
         timeout_seconds: float | None = None,
-    ) -> AgentTerminal: ...
+    ) -> AgentTurn: ...
+
+    async def acquire_native(
+        self,
+        definition: NativeDefinition,
+        plan: FrozenToolPlan,
+        permit: OwnerPermit,
+        previous: ProviderSessionLease | None,
+    ) -> ProviderSessionLease: ...
+
+    def prepare_native_turn(
+        self,
+        lease: ProviderSessionLease,
+        content: tuple[ContentPart, ...],
+        *,
+        attempt_id: str,
+        input_id: str,
+        controls: AgentTurnControls,
+        timeout_seconds: float | None,
+    ) -> AgentTurn: ...
 
     async def accumulated_usage(self, lease: ProviderSessionLease) -> ProviderUsage: ...
-
-    async def release(self, lease: ProviderSessionLease) -> None: ...
 
     async def discard(self, lease: ProviderSessionLease) -> None: ...
 
     async def close(self, lease: ProviderSessionLease) -> None: ...
 
-    async def discard_reference(
-        self,
-        definition_fingerprint: str,
-        ref: AgentSessionRef,
-    ) -> None: ...
-
-
-@dataclass(slots=True)
-class _LiveSession:
-    session: AgentSession
-    cwd: Path
-    definition_fingerprint: str
-    continuing: bool
-    closed: bool = False
-
 
 class CodexProvider:
-    """Exact v1 AgentRuntime adapter with optional continuing-session caching."""
+    """Contained native sessions; live reuse requires exact plan and owner."""
 
     def __init__(
         self,
@@ -157,7 +160,6 @@ class CodexProvider:
         *,
         cwd_parent: Path | None = None,
         share_cwd_with_group: bool = False,
-        cache_continuing: bool = True,
     ) -> None:
         if cwd_parent is not None and (not cwd_parent.is_absolute() or not cwd_parent.is_dir()):
             raise ValueError("cwd_parent must be an existing absolute directory")
@@ -168,156 +170,147 @@ class CodexProvider:
         self._runtime = runtime
         self._cwd_parent = cwd_parent
         self._share_cwd_with_group = share_cwd_with_group
-        self._cache_continuing = cache_continuing
-        self._leases: dict[ProviderSessionLease, _LiveSession] = {}
-        self._cache: dict[tuple[str, AgentSessionRef], _LiveSession] = {}
+        self._leases: set[ProviderSessionLease] = set()
         self._closed = False
         self._lock = asyncio.Lock()
-
-    async def acquire_continuing(
-        self,
-        definition: AgentDefinition,
-        saved_ref: AgentSessionRef | None,
-    ) -> ProviderSessionLease:
-        if definition.session_mode is not SessionMode.continuing:
-            raise ProviderConfigurationError("a continuing lease requires continuing session mode")
-        async with self._lock:
-            self._require_open()
-            if saved_ref is not None:
-                live = self._cache.pop((definition.fingerprint, saved_ref), None)
-                if live is not None:
-                    return self._lease(live, cold_bootstrap=False, fallback_used=False)
-            try:
-                live = await self._open(definition, saved_ref, continuing=True)
-            except (SessionMismatch, SessionUnavailable):
-                if saved_ref is None:
-                    raise
-                live = await self._open(definition, None, continuing=True)
-                return self._lease(live, cold_bootstrap=True, fallback_used=True)
-            return self._lease(
-                live,
-                cold_bootstrap=saved_ref is None,
-                fallback_used=False,
-            )
 
     async def open_isolated(self, definition: AgentDefinition) -> ProviderSessionLease:
         if definition.session_mode is not SessionMode.isolated:
             raise ProviderConfigurationError("an isolated lease requires isolated session mode")
         async with self._lock:
             self._require_open()
-            live = await self._open(definition, None, continuing=False)
-            return self._lease(live, cold_bootstrap=True, fallback_used=False)
+            cwd = self._create_cwd()
+            try:
+                session = await self._runtime.open_session(self._session_request(definition, cwd))
+            except BaseException:
+                self._remove_cwd(cwd)
+                raise
+            return self._lease(session, cwd, definition.fingerprint)
 
-    async def run_observed_turn(
+    def prepare_observed_turn(
         self,
         lease: ProviderSessionLease,
         content: tuple[ContentPart, ...],
         cancellation: CancelSignal,
         *,
+        attempt_id: str,
+        input_id: str,
         timeout_seconds: float | None = None,
-    ) -> AgentTerminal:
-        live = self._live(lease)
+    ) -> AgentTurn:
+        self._require_lease(lease)
         request = TurnRequest(input=content, timeout_seconds=timeout_seconds)
-        terminal: AgentTerminal | None = None
-        observed_usage: TokenUsage | None = None
-        try:
-            stream: AsyncGenerator[AgentEvent, None] = self._runtime.stream_turn(
-                live.session,
-                request,
-                approvals=None,
-                cancel=cancellation,
-            )
-            try:
-                async for event in stream:
-                    if terminal is not None:
-                        raise ProviderStreamDefect("provider emitted an event after its terminal")
-                    if isinstance(event, AgentText | AgentNative):
-                        continue
-                    if isinstance(event, AgentUsage):
-                        observed_usage = event.usage
-                        continue
-                    if isinstance(event, AgentToolUse | AgentPermissionRequest):
-                        raise ProviderContainmentViolation(
-                            "provider emitted native tool or permission activity"
-                        )
-                    if isinstance(event, AgentTerminal):
-                        terminal = event
-                        if event.session_ref != live.session.ref:
-                            raise ProviderStreamDefect(
-                                "provider terminal changed the live session reference"
-                            )
-                        continue
-                    raise ProviderStreamDefect("provider emitted an unknown event kind")
-            finally:
-                await stream.aclose()
-        except BaseException as error:
-            if not isinstance(error, TurnNotStarted):
-                self._record_usage(lease, terminal, observed_usage)
-            await self._discard_after_error(lease, error)
-            raise
+        turn = self._runtime.prepare_observed_turn(
+            lease.session,
+            request,
+            attempt_id=attempt_id,
+            input_id=input_id,
+            controls=AgentTurnControls(15.0, 16, 1_048_576),
+        )
+        if cancellation.is_set():
+            turn.revoke()
+        return turn
 
-        self._record_usage(lease, terminal, observed_usage)
-        if terminal is None:
-            error = ProviderStreamDefect("provider stream ended without a terminal")
-            await self._discard_after_error(lease, error)
-            raise error
-        if terminal.status != "succeeded":
-            await self.discard(lease)
-        return terminal
+    async def acquire_native(
+        self,
+        definition: NativeDefinition,
+        plan: FrozenToolPlan,
+        permit: OwnerPermit,
+        previous: ProviderSessionLease | None,
+    ) -> ProviderSessionLease:
+        from provider_runtime.tool_adapter import ToolPublication, lower_tools
+
+        from .native_contract import NATIVE_BASE_INSTRUCTION
+        from .tools import require_native_plan
+
+        require_native_plan(plan, definition.maximum_profile)
+        fingerprint = definition.session_fingerprint(plan)
+        if previous is not None:
+            if (
+                previous in self._leases
+                and previous.definition_fingerprint == fingerprint
+                and previous.owner_token == permit.owner_token
+                and self._runtime.session_usable(previous.session)
+            ):
+                return previous
+            await self.discard(previous)
+        async with self._lock:
+            self._require_open()
+            cwd = self._create_cwd()
+            provider = definition.provider
+            try:
+                session = await self._runtime.open_session(
+                    CodexCatalogSessionRequest(
+                        auth=provider.auth,
+                        open=NewSession(),
+                        cwd=os.fspath(cwd),
+                        policy=provider.policy,
+                        model_key=provider.model_key,
+                        agent_definition_revision=provider.agent_definition_revision,
+                        row_fingerprint=provider.row_fingerprint,
+                        reasoning=provider.reasoning,
+                        system=(
+                            TextContent(NATIVE_BASE_INSTRUCTION),
+                            *provider.system,
+                            TextContent(render_prompt(definition.role.instructions)),
+                        ),
+                        developer=provider.developer,
+                        additional_dirs=(),
+                        mcp_servers=(),
+                        output=definition.output,
+                        native=provider.native,
+                        tools=lower_tools(ToolPublication(plan, ())).tools,
+                    )
+                )
+            except BaseException:
+                self._remove_cwd(cwd)
+                raise
+            return self._lease(session, cwd, fingerprint, permit.owner_token)
+
+    def prepare_native_turn(
+        self,
+        lease: ProviderSessionLease,
+        content: tuple[ContentPart, ...],
+        *,
+        attempt_id: str,
+        input_id: str,
+        controls: AgentTurnControls,
+        timeout_seconds: float | None,
+    ) -> AgentTurn:
+        self._require_lease(lease)
+        return self._runtime.prepare_turn(
+            lease.session,
+            TurnRequest(input=content, timeout_seconds=timeout_seconds),
+            attempt_id=attempt_id,
+            input_id=input_id,
+            controls=controls,
+        )
 
     async def accumulated_usage(self, lease: ProviderSessionLease) -> ProviderUsage:
         return lease.usage
 
-    async def release(self, lease: ProviderSessionLease) -> None:
-        to_close: _LiveSession | None = None
-        async with self._lock:
-            live = self._leases.pop(lease, None)
-            if live is None:
-                return
-            if not live.continuing or not self._cache_continuing:
-                to_close = live
-            else:
-                key = (live.definition_fingerprint, live.session.ref)
-                to_close = self._cache.get(key)
-                self._cache[key] = live
-        if to_close is not None:
-            await self._close_live(to_close)
-
     async def discard(self, lease: ProviderSessionLease) -> None:
         async with self._lock:
-            live = self._leases.pop(lease, None)
-        if live is not None:
-            await self._close_live(live)
+            if lease not in self._leases:
+                return
+            self._leases.remove(lease)
+        try:
+            await self._runtime.close_session(lease.session)
+        finally:
+            self._remove_cwd(lease.cwd)
 
     async def close(self, lease: ProviderSessionLease) -> None:
         await self.discard(lease)
-
-    async def discard_reference(
-        self,
-        definition_fingerprint: str,
-        ref: AgentSessionRef,
-    ) -> None:
-        async with self._lock:
-            live = self._cache.pop((definition_fingerprint, ref), None)
-        if live is not None:
-            await self._close_live(live)
 
     async def shutdown(self) -> None:
         async with self._lock:
             if self._closed:
                 return
             self._closed = True
-            sessions = tuple(
-                {
-                    id(live): live for live in (*self._leases.values(), *self._cache.values())
-                }.values()
-            )
-            self._leases.clear()
-            self._cache.clear()
+            sessions = tuple(self._leases)
         errors: list[BaseException] = []
-        for live in sessions:
+        for lease in sessions:
             try:
-                await self._close_live(live)
+                await self.discard(lease)
             except BaseException as error:
                 errors.append(error)
         if errors:
@@ -325,48 +318,24 @@ class CodexProvider:
 
     def _lease(
         self,
-        live: _LiveSession,
-        *,
-        cold_bootstrap: bool,
-        fallback_used: bool,
+        session: AgentSession,
+        cwd: Path,
+        definition_fingerprint: str,
+        owner_token: OwnerToken | None = None,
     ) -> ProviderSessionLease:
         lease = ProviderSessionLease(
-            session=live.session,
-            cwd=live.cwd,
-            definition_fingerprint=live.definition_fingerprint,
-            continuing=live.continuing,
-            cold_bootstrap=cold_bootstrap,
-            fallback_used=fallback_used,
+            session=session,
+            cwd=cwd,
+            definition_fingerprint=definition_fingerprint,
+            owner_token=owner_token,
         )
-        self._leases[lease] = live
+        self._leases.add(lease)
         return lease
-
-    async def _open(
-        self,
-        definition: AgentDefinition,
-        saved_ref: AgentSessionRef | None,
-        *,
-        continuing: bool,
-    ) -> _LiveSession:
-        cwd = self._create_cwd()
-        try:
-            request = self._session_request(definition, cwd, saved_ref)
-            session = await self._runtime.open_session(request)
-            return _LiveSession(
-                session=session,
-                cwd=cwd,
-                definition_fingerprint=definition.fingerprint,
-                continuing=continuing,
-            )
-        except BaseException:
-            self._remove_cwd(cwd)
-            raise
 
     @staticmethod
     def _session_request(
         definition: AgentDefinition,
         cwd: Path,
-        saved_ref: AgentSessionRef | None,
     ) -> CodexCatalogSessionRequest:
         provider = definition.provider
         if provider.policy != CONTAINMENT_POLICY or provider.native != CODEX_NATIVE_OPTIONS:
@@ -375,7 +344,7 @@ class CodexProvider:
             raise ProviderConfigurationError("definition exposes forbidden provider resources")
         return CodexCatalogSessionRequest(
             auth=provider.auth,
-            open=NewSession() if saved_ref is None else ResumeSession(saved_ref),
+            open=NewSession(),
             cwd=os.fspath(cwd),
             policy=provider.policy,
             model_key=provider.model_key,
@@ -420,47 +389,9 @@ class CodexProvider:
         cwd.chmod(stat.S_IRWXU)
         shutil.rmtree(cwd)
 
-    async def _close_live(self, live: _LiveSession) -> None:
-        if live.closed:
-            return
-        live.closed = True
-        try:
-            await self._runtime.close_session(live.session)
-        finally:
-            self._remove_cwd(live.cwd)
-
-    def _live(self, lease: ProviderSessionLease) -> _LiveSession:
-        live = self._leases.get(lease)
-        if live is None or live.closed:
+    def _require_lease(self, lease: ProviderSessionLease) -> None:
+        if lease not in self._leases:
             raise ProviderDefect("provider session lease is not active")
-        return live
-
-    @staticmethod
-    def _record_usage(
-        lease: ProviderSessionLease,
-        terminal: AgentTerminal | None,
-        observed: TokenUsage | None,
-    ) -> None:
-        usage = observed
-        if terminal is not None and isinstance(terminal.usage, Present):
-            usage = terminal.usage.value
-        lease._usage.add(usage)
-
-    async def _discard_after_error(
-        self,
-        lease: ProviderSessionLease,
-        error: BaseException,
-    ) -> None:
-        try:
-            await self.discard(lease)
-        except BaseException as cleanup_error:
-            if isinstance(error, ProviderContainmentViolation):
-                raise ProviderContainmentViolation(
-                    "provider emitted native authority activity and session cleanup failed"
-                ) from cleanup_error
-            raise ProviderDefect(
-                "provider session cleanup failed after turn error"
-            ) from cleanup_error
 
     def _require_open(self) -> None:
         if self._closed:

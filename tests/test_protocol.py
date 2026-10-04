@@ -27,15 +27,9 @@ from llm_tools import (
 from provider_runtime.agent_runtime import freeze_json_object
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field
 
-from llm_agent_kernel.definitions import (
-    ConversationalOutput,
-    FinishStep,
-    SayStep,
-    StructuredOutput,
-)
+from llm_agent_kernel.definitions import FinishStep, StructuredOutput
 from llm_agent_kernel.protocol import (
     ProtocolValidationError,
-    model_step_schema,
     provider_wire_schema,
     validate_model_step,
     validate_provider_step,
@@ -166,18 +160,6 @@ def _assert_codex_strict_subset(schema: dict[str, object]) -> None:
     walk(schema)
 
 
-def test_conversational_provider_schema_is_one_closed_required_object() -> None:
-    schema = provider_wire_schema(ConversationalOutput())
-    properties = cast(dict[str, dict[str, Any]], schema["properties"])
-
-    _assert_codex_strict_subset(schema)
-    assert model_step_schema(ConversationalOutput()) == schema
-    assert properties["type"]["enum"] == ["say", "call_tool", "finish"]
-    assert properties["say"]["anyOf"][1] == {"type": "null"}
-    call_payload = properties["call_tool"]["anyOf"][0]
-    assert call_payload["properties"]["arguments"]["type"] == "string"
-
-
 def test_structured_provider_schema_requires_optional_and_nested_fields() -> None:
     contract = StructuredOutput("answer", OptionalResult)
     schema = provider_wire_schema(contract)
@@ -186,7 +168,6 @@ def test_structured_provider_schema_requires_optional_and_nested_fields() -> Non
 
     _assert_codex_strict_subset(schema)
     assert properties["type"]["enum"] == ["call_tool", "finish"]
-    assert properties["say"] == {"type": "null"}
     assert definitions["NestedResult"]["required"] == ["value", "note"]
     assert definitions["NestedResult"]["properties"]["note"]["anyOf"][1] == {"type": "null"}
     finish = properties["finish"]["anyOf"][0]
@@ -248,7 +229,7 @@ def test_conversational_validation_rejects_empty_mixed_unknown_and_extra_values(
     plan, _binding = _plan()
 
     with pytest.raises(ProtocolValidationError):
-        validate_model_step(value, ConversationalOutput(), plan)
+        validate_model_step(value, StructuredOutput("result", OptionalResult), plan)
 
 
 @pytest.mark.parametrize(
@@ -267,77 +248,20 @@ def test_call_tool_forbids_model_authored_host_authority_metadata(
     }
 
     with pytest.raises(ProtocolValidationError):
-        validate_model_step(value, ConversationalOutput(), plan)
-
-
-def test_conversational_validation_returns_public_atomic_steps() -> None:
-    plan, _binding = _plan()
-
-    say = validate_model_step(
-        freeze_json_object({"type": "say", "text": "Ready."}),
-        ConversationalOutput(),
-        plan,
-    )
-    finish = validate_model_step(
-        freeze_json_object({"type": "finish", "reason": "No visible answer needed."}),
-        ConversationalOutput(),
-        plan,
-    )
-
-    assert say == SayStep("Ready.")
-    assert finish == FinishStep(reason="No visible answer needed.")
-
-
-def test_provider_envelope_decodes_conversation_and_tool_arguments_to_logical_steps() -> None:
-    plan, binding = _plan()
-    say_value = freeze_json_object(
-        {
-            "type": "say",
-            "say": {"text": "Ready."},
-            "call_tool": None,
-            "finish": None,
-        }
-    )
-    call_value = freeze_json_object(
-        {
-            "type": "call_tool",
-            "say": None,
-            "call_tool": {
-                "tool_id": "test.count",
-                "arguments": '{"count":3}',
-            },
-            "finish": None,
-        }
-    )
-    finish_value = freeze_json_object(
-        {
-            "type": "finish",
-            "say": None,
-            "call_tool": None,
-            "finish": {"reason": None},
-        }
-    )
-
-    assert validate_provider_step(say_value, ConversationalOutput(), plan) == SayStep("Ready.")
-    validated = validate_provider_step(call_value, ConversationalOutput(), plan)
-    assert isinstance(validated, ValidatedToolCall)
-    assert validated.binding is binding
-    assert validated.arguments == Input(count=3)
-    assert validate_provider_step(finish_value, ConversationalOutput(), plan) == FinishStep()
+        validate_model_step(value, StructuredOutput("result", OptionalResult), plan)
 
 
 def test_provider_tool_envelope_is_rejected_against_an_empty_plan() -> None:
     value = freeze_json_object(
         {
             "type": "call_tool",
-            "say": None,
             "call_tool": {"tool_id": "test.count", "arguments": '{"count":3}'},
             "finish": None,
         }
     )
 
     with pytest.raises(ProtocolValidationError, match="invalid tool call"):
-        validate_provider_step(value, ConversationalOutput(), _empty_plan())
+        validate_provider_step(value, StructuredOutput("result", OptionalResult), _empty_plan())
 
 
 def test_provider_envelope_decodes_structured_nested_optional_result() -> None:
@@ -346,7 +270,6 @@ def test_provider_envelope_decodes_structured_nested_optional_result() -> None:
     value = freeze_json_object(
         {
             "type": "finish",
-            "say": None,
             "call_tool": None,
             "finish": {
                 "reason": None,
@@ -379,31 +302,26 @@ def test_provider_envelope_decodes_structured_nested_optional_result() -> None:
         },
         {
             "type": "call_tool",
-            "say": None,
             "call_tool": {"tool_id": "test.count", "arguments": "[]"},
             "finish": None,
         },
         {
             "type": "call_tool",
-            "say": None,
             "call_tool": {"tool_id": "test.count", "arguments": '{"count":1,"count":2}'},
             "finish": None,
         },
         {
             "type": "call_tool",
-            "say": None,
             "call_tool": {"tool_id": "test.count", "arguments": '{"count":NaN}'},
             "finish": None,
         },
         {
             "type": "finish",
-            "say": None,
             "call_tool": None,
             "finish": {"reason": None, "extra": True},
         },
         {
             "type": "progress",
-            "say": None,
             "call_tool": None,
             "finish": None,
         },
@@ -416,7 +334,9 @@ def test_provider_envelope_rejects_malformed_branches_and_argument_strings(
     plan, _binding = _plan()
 
     with pytest.raises(ProtocolValidationError):
-        validate_provider_step(freeze_json_object(value), ConversationalOutput(), plan)
+        validate_provider_step(
+            freeze_json_object(value), StructuredOutput("result", OptionalResult), plan
+        )
 
 
 def test_structured_validation_forbids_say_and_strictly_validates_result() -> None:
@@ -456,7 +376,7 @@ def test_call_tool_resolves_exact_binding_and_purely_decodes_owned_input() -> No
         freeze_json_object(
             {"type": "call_tool", "tool_id": "test.count", "arguments": {"count": 3}}
         ),
-        ConversationalOutput(),
+        StructuredOutput("result", OptionalResult),
         plan,
     )
 
@@ -484,6 +404,6 @@ def test_invalid_tool_input_is_one_protocol_failure_before_dispatch(
             freeze_json_object(
                 {"type": "call_tool", "tool_id": "test.count", "arguments": arguments}
             ),
-            ConversationalOutput(),
+            StructuredOutput("result", OptionalResult),
             plan,
         )

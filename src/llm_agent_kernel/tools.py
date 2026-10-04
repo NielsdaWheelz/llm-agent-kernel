@@ -9,6 +9,7 @@ from llm_tools import (
     FrozenCapabilityProfile,
     FrozenToolPlan,
     HostTable,
+    Native,
     PromptSection,
     ToolBinding,
     ToolEffect,
@@ -54,12 +55,35 @@ def require_host_plan(
 ) -> None:
     """Prove exact plan integrity, containment, exposure, and serial execution."""
 
+    _require_plan(plan, maximum_profile)
+    if not isinstance(plan.exposure, HostTable):
+        raise PlanValidationError("a kernel run requires HostTable exposure")
+
+
+def require_native_plan(plan: FrozenToolPlan, maximum_profile: FrozenCapabilityProfile) -> None:
+    """Prove one declared native publication without cumulative tool quotas."""
+    _require_plan(plan, maximum_profile)
+    if not isinstance(plan.exposure, Native):
+        raise PlanValidationError("a native run requires Native exposure")
+    limits = plan.profile.run_limits
+    if any(
+        value is not None
+        for value in (
+            limits.max_calls,
+            limits.max_external_attempts,
+            limits.max_input_bytes,
+            limits.max_output_bytes,
+            limits.max_elapsed_seconds,
+        )
+    ):
+        raise PlanValidationError("native cumulative tool quotas must be absent")
+
+
+def _require_plan(plan: FrozenToolPlan, maximum_profile: FrozenCapabilityProfile) -> None:
     if not isinstance(plan, FrozenToolPlan):
         raise TypeError("run plan must be a FrozenToolPlan")
     if not isinstance(maximum_profile, FrozenCapabilityProfile):
         raise TypeError("definition maximum must be a FrozenCapabilityProfile")
-    if not isinstance(plan.exposure, HostTable):
-        raise PlanValidationError("a kernel run requires HostTable exposure")
     if not plan.is_tightening_of(maximum_profile):
         raise PlanValidationError(
             "the frozen plan is inconsistent or does not tighten the definition maximum"
@@ -143,6 +167,7 @@ __all__ = [
     "ValidatedToolCall",
     "publish_host_plan",
     "require_host_plan",
+    "require_native_plan",
     "require_read_only_plan",
     "validate_tool_call",
 ]

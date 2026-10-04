@@ -17,8 +17,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@9e6d155f3b64f03495911435b7cae8b8d131f9a2",
-    "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@f769c236075a66f470c4b2f47f763ee554bfbe9e",
+    "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@2adb9790fc7a54de5342effaca9391c2f3d24ff9",
+    "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@e1498d8382f192ae664ae9790b682a8e8a8b0d38",
     "pydantic>=2.11,<3",
 ]
 
@@ -63,7 +63,7 @@ quote-style = "double"
 [tool.pyright]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
-include = ["src", "tests", "examples"]
+include = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

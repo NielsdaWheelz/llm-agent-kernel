@@ -12,7 +12,6 @@ from typing import Any, Literal, Self
 
 from llm_tools import (
     FrozenCapabilityProfile,
-    FrozenToolPlan,
     InvocationPosition,
     PromptSections,
     ToolId,
@@ -21,6 +20,8 @@ from llm_tools import (
     render_prompt,
 )
 from provider_runtime.agent_runtime import (
+    CODEX_CONTAINMENT_CATALOG_REVISION,
+    CODEX_CONTAINMENT_VERSION,
     CodexNativeOptions,
     CredentialRef,
     FrozenJsonDict,
@@ -54,10 +55,6 @@ class RunId(_NonEmptyId):
     pass
 
 
-class ClaimId(_NonEmptyId):
-    pass
-
-
 class InputId(_NonEmptyId):
     pass
 
@@ -74,8 +71,25 @@ class HostRef(_NonEmptyId):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class OwnerPermit:
+    """Current host ownership, with an optional serial parent invocation."""
+
+    scope_id: str
+    owner_token: OwnerToken
+    operation_id: str
+    parent_invocation_id: str | None
+
+    def __post_init__(self) -> None:
+        if not self.scope_id or not self.operation_id:
+            raise ValueError("owner scope and operation identities are required")
+        if not isinstance(self.owner_token, OwnerToken):
+            raise TypeError("owner token must be OwnerToken")
+        if self.parent_invocation_id is not None and not self.parent_invocation_id:
+            raise ValueError("parent invocation identity must not be empty")
+
+
 class SessionMode(StrEnum):
-    continuing = "continuing"
     isolated = "isolated"
 
 
@@ -124,11 +138,6 @@ class InputProjectionPolicy:
 
 
 @dataclass(frozen=True, slots=True)
-class ConversationalOutput:
-    kind: Literal["conversational"] = field(default="conversational", init=False)
-
-
-@dataclass(frozen=True, slots=True)
 class StructuredOutput:
     name: str
     result_type: type[Any]
@@ -152,9 +161,6 @@ class StructuredOutput:
                 context="structured output wire schema",
             ),
         )
-
-
-type OutputContract = ConversationalOutput | StructuredOutput
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,7 +203,7 @@ CONTAINMENT_POLICY = PermissionPolicy(
 )
 CODEX_NATIVE_OPTIONS = CodexNativeOptions(web_search=False, builtin_tools="disabled")
 
-KERNEL_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-contained-structured-agent-v1"
+KERNEL_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-contained-structured-agent-v2"
 KERNEL_BASE_INSTRUCTION = (
     "You are a contained structured agent, not a coding agent. Return exactly one "
     "authoritative final response conforming to the kernel-supplied step schema; only that "
@@ -280,7 +286,7 @@ class AgentDefinition:
     role: AgentRole
     stable_context: PromptSections
     session_mode: SessionMode
-    output_contract: OutputContract
+    output_contract: StructuredOutput
     maximum_profile: FrozenCapabilityProfile
     provider: ProviderConfiguration
     session_compatibility_revision: str
@@ -297,7 +303,7 @@ class AgentDefinition:
             raise TypeError("stable context must be PromptSections")
         if not isinstance(self.session_mode, SessionMode):
             raise TypeError("session mode must be SessionMode")
-        if not isinstance(self.output_contract, ConversationalOutput | StructuredOutput):
+        if not isinstance(self.output_contract, StructuredOutput):
             raise TypeError("definition output contract is invalid")
         if not isinstance(self.maximum_profile, FrozenCapabilityProfile):
             raise TypeError("maximum profile must be frozen")
@@ -329,69 +335,6 @@ class HostInput:
         if not isinstance(self.sections, PromptSections):
             raise TypeError("host input must contain PromptSections")
         _require_aware(self.source_timestamp, "host input source timestamp")
-
-
-@dataclass(frozen=True, slots=True)
-class InputClaim:
-    claim_id: ClaimId
-    inputs: tuple[HostInput, ...]
-    through_checkpoint: Checkpoint
-    as_of: datetime
-    plan: FrozenToolPlan
-    attempt_number: int
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.claim_id, ClaimId):
-            raise TypeError("claim id must be ClaimId")
-        if type(self.inputs) is not tuple or not self.inputs:
-            raise ValueError("an input claim must contain a non-empty tuple")
-        if any(not isinstance(item, HostInput) for item in self.inputs):
-            raise TypeError("claim inputs must be HostInput values")
-        input_ids = tuple(item.input_id for item in self.inputs)
-        if len(input_ids) != len(set(input_ids)):
-            raise ValueError("claim input ids must be unique")
-        if not isinstance(self.through_checkpoint, Checkpoint):
-            raise TypeError("claim checkpoint must be Checkpoint")
-        _require_aware(self.as_of, "claim as_of")
-        if not isinstance(self.plan, FrozenToolPlan):
-            raise TypeError("claim plan must be FrozenToolPlan")
-        if type(self.attempt_number) is not int:
-            raise TypeError("claim attempt number must be an integer")
-        if self.attempt_number <= 0:
-            raise ValueError("claim attempt number must be positive")
-
-
-@dataclass(frozen=True, slots=True)
-class DispatchLineage:
-    claim_id: ClaimId
-    through_checkpoint: Checkpoint
-    input_ids: tuple[InputId, ...]
-    model_step_ordinal: int
-    definition_fingerprint: str
-    model_decision_id: str
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.claim_id, ClaimId):
-            raise TypeError("dispatch claim id must be ClaimId")
-        if not isinstance(self.through_checkpoint, Checkpoint):
-            raise TypeError("dispatch checkpoint must be Checkpoint")
-        if type(self.input_ids) is not tuple or not self.input_ids:
-            raise ValueError("thread dispatch lineage requires input ids")
-        if any(not isinstance(item, InputId) for item in self.input_ids):
-            raise TypeError("dispatch input ids must be InputId values")
-        _require_ordinal(self.model_step_ordinal)
-        if (
-            not isinstance(self.definition_fingerprint, str)
-            or len(self.definition_fingerprint) != 64
-            or any(character not in "0123456789abcdef" for character in self.definition_fingerprint)
-        ):
-            raise ValueError("dispatch definition fingerprint must be lowercase SHA-256")
-
-        _require_decision_id(self.model_decision_id)
-
-    @property
-    def position(self) -> InvocationPosition:
-        return InvocationPosition(f"model-decision:{self.model_decision_id}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -431,17 +374,33 @@ class InitialReadDispatchLineage:
         return _initial_read_position(self.operation_id)
 
 
-type ToolDispatchLineage = DispatchLineage | IsolatedDispatchLineage | InitialReadDispatchLineage
-
-
 @dataclass(frozen=True, slots=True)
-class SayStep:
-    text: str
-    type: Literal["say"] = field(default="say", init=False)
+class NativeDispatchLineage:
+    """One durably accepted callback, never a completed model decision."""
+
+    attempt_id: str
+    invocation_id: str
+    ordinal: int
+    permit: OwnerPermit
+    input_ids: tuple[InputId, ...]
+    through_checkpoint: Checkpoint | None
+    definition_fingerprint: str
 
     def __post_init__(self) -> None:
-        if type(self.text) is not str or not self.text.strip():
-            raise ValueError("say text must not be empty")
+        if not self.attempt_id or not self.invocation_id:
+            raise ValueError("native dispatch identities are required")
+        _require_ordinal(self.ordinal)
+        if not self.input_ids or len(set(self.input_ids)) != len(self.input_ids):
+            raise ValueError("native dispatch requires ordered unique input identities")
+
+    @property
+    def position(self) -> InvocationPosition:
+        return InvocationPosition(f"native-invocation:{self.invocation_id}")
+
+
+type ToolDispatchLineage = (
+    IsolatedDispatchLineage | InitialReadDispatchLineage | NativeDispatchLineage
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -503,7 +462,7 @@ class FinishStep:
             )
 
 
-type ModelStep = SayStep | CallToolStep | FinishStep
+type ModelStep = CallToolStep | FinishStep
 
 
 class WaitingFor(StrEnum):
@@ -514,11 +473,17 @@ class WaitingFor(StrEnum):
 @dataclass(frozen=True, slots=True)
 class DispatchCompleted:
     result: ToolResult
+    model_text: str
+    host_ref: HostRef | None = None
     type: Literal["completed"] = field(default="completed", init=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.result, dict):
             raise TypeError("completed dispatch result must be an llm-tools ToolResult")
+        if type(self.model_text) is not str:
+            raise TypeError("completed dispatch model text must be str")
+        if self.host_ref is not None and not isinstance(self.host_ref, HostRef):
+            raise TypeError("completed host reference must be HostRef")
 
 
 @dataclass(frozen=True, slots=True)
@@ -535,64 +500,6 @@ class DispatchSuspended:
 
 
 type DispatchResult = DispatchCompleted | DispatchSuspended
-
-
-@dataclass(frozen=True, slots=True)
-class ConversationConclusion:
-    text: str | None
-    type: Literal["conversation"] = field(default="conversation", init=False)
-
-    def __post_init__(self) -> None:
-        if self.text is not None and (type(self.text) is not str or not self.text.strip()):
-            raise ValueError("conversation text must not be empty when present")
-
-
-@dataclass(frozen=True, slots=True)
-class StructuredConclusion:
-    result: object
-    type: Literal["structured"] = field(default="structured", init=False)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self, "result", freeze_json_value(self.result, context="conclusion result")
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class SuspensionConclusion:
-    host_ref: HostRef
-    waiting_for: WaitingFor
-    type: Literal["suspension"] = field(default="suspension", init=False)
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.host_ref, HostRef):
-            raise TypeError("suspension host ref must be HostRef")
-        if not isinstance(self.waiting_for, WaitingFor):
-            raise TypeError("suspension waiting actor must be WaitingFor")
-
-
-class StopReason(StrEnum):
-    budget_exhausted = "budget_exhausted"
-    cancelled = "cancelled"
-    protocol_error = "protocol_error"
-    provider_error = "provider_error"
-    quota_exhausted = "quota_exhausted"
-    stopped = "stopped"
-
-
-@dataclass(frozen=True, slots=True)
-class StoppedConclusion:
-    reason: StopReason
-    type: Literal["stopped"] = field(default="stopped", init=False)
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.reason, StopReason):
-            raise TypeError("stopped conclusion reason must be StopReason")
-
-
-type HostConclusion = (
-    ConversationConclusion | StructuredConclusion | SuspensionConclusion | StoppedConclusion
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -629,44 +536,7 @@ class RunMetrics:
             raise TypeError("input_consumed must be bool")
 
 
-@dataclass(frozen=True, slots=True)
-class ThreadCompleted:
-    metrics: RunMetrics
-    type: Literal["completed"] = field(default="completed", init=False)
-
-
-@dataclass(frozen=True, slots=True)
-class ThreadSuspended:
-    metrics: RunMetrics
-    host_ref: HostRef
-    waiting_for: WaitingFor
-    type: Literal["suspended"] = field(default="suspended", init=False)
-
-
-@dataclass(frozen=True, slots=True)
-class ThreadNoWork:
-    metrics: RunMetrics
-    type: Literal["no_work"] = field(default="no_work", init=False)
-
-
-@dataclass(frozen=True, slots=True)
-class ThreadBusy:
-    metrics: RunMetrics
-    type: Literal["busy"] = field(default="busy", init=False)
-
-
-@dataclass(frozen=True, slots=True)
-class ThreadDeferred:
-    metrics: RunMetrics
-    until: datetime
-    type: Literal["deferred"] = field(default="deferred", init=False)
-
-    def __post_init__(self) -> None:
-        _require_aware(self.until, "thread deferral")
-
-
-class ThreadStopKind(StrEnum):
-    preempted = "preempted"
+class OneShotStopKind(StrEnum):
     cancelled = "cancelled"
     budget_exhausted = "budget_exhausted"
     quota_exhausted = "quota_exhausted"
@@ -674,21 +544,6 @@ class ThreadStopKind(StrEnum):
     provider_error = "provider_error"
     configuration_error = "configuration_error"
     model_decision_uncertain = "model_decision_uncertain"
-
-
-@dataclass(frozen=True, slots=True)
-class ThreadStopped:
-    metrics: RunMetrics
-    type: ThreadStopKind
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.type, ThreadStopKind):
-            raise TypeError("thread stop type must be ThreadStopKind")
-
-
-type ThreadOutcome = (
-    ThreadCompleted | ThreadSuspended | ThreadNoWork | ThreadBusy | ThreadDeferred | ThreadStopped
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -706,11 +561,11 @@ class OneShotCompleted:
 @dataclass(frozen=True, slots=True)
 class OneShotStopped:
     metrics: RunMetrics
-    type: ThreadStopKind
+    type: OneShotStopKind
 
     def __post_init__(self) -> None:
-        if not isinstance(self.type, ThreadStopKind):
-            raise TypeError("one-shot stop type must be ThreadStopKind")
+        if not isinstance(self.type, OneShotStopKind):
+            raise TypeError("one-shot stop type must be OneShotStopKind")
 
 
 type OneShotOutcome = OneShotCompleted | OneShotStopped
@@ -763,15 +618,11 @@ def _require_closed_objects(value: object) -> None:
 def _definition_fingerprint(definition: AgentDefinition) -> str:
     from .protocol import MODEL_STEP_OUTPUT_NAME, provider_wire_schema
 
-    output: dict[str, object]
-    if isinstance(definition.output_contract, ConversationalOutput):
-        output = {"kind": "conversational"}
-    else:
-        output = {
-            "kind": "structured",
-            "name": definition.output_contract.name,
-            "schema": thaw_json_value(definition.output_contract.schema),
-        }
+    output: dict[str, object] = {
+        "kind": "structured",
+        "name": definition.output_contract.name,
+        "schema": thaw_json_value(definition.output_contract.schema),
+    }
     provider = definition.provider
     value = {
         "definition_id": str(definition.definition_id),
@@ -814,6 +665,8 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
             "native": {
                 "builtin_tools": provider.native.builtin_tools,
                 "web_search": provider.native.web_search,
+                "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
+                "containment_version": CODEX_CONTAINMENT_VERSION,
             },
             "policy": {
                 "approval": provider.policy.approval,
@@ -852,24 +705,19 @@ __all__ = [
     "AgentRole",
     "CallToolStep",
     "Checkpoint",
-    "ClaimId",
-    "ConversationConclusion",
-    "ConversationalOutput",
     "DefinitionId",
     "DispatchCompleted",
-    "DispatchLineage",
     "DispatchResult",
     "DispatchSuspended",
     "FinishStep",
-    "HostConclusion",
     "HostInput",
     "HostRef",
-    "InputClaim",
     "InputId",
     "InputProjectionPolicy",
     "InputProjectionRequest",
     "InitialReadCall",
     "InitialReadDispatchLineage",
+    "NativeDispatchLineage",
     "IsolatedDispatchLineage",
     "KernelLimits",
     "ModelStep",
@@ -877,28 +725,16 @@ __all__ = [
     "OneShotCompleted",
     "OneShotOutcome",
     "OneShotStopped",
-    "OutputContract",
     "OwnerToken",
+    "OwnerPermit",
     "ProviderConfiguration",
     "ProviderUsage",
     "RunId",
     "RunMetrics",
-    "SayStep",
     "SessionMode",
-    "StopReason",
-    "StructuredConclusion",
     "StructuredOutput",
-    "SuspensionConclusion",
-    "StoppedConclusion",
-    "ThreadBusy",
-    "ThreadCompleted",
-    "ThreadDeferred",
     "ThreadId",
-    "ThreadNoWork",
-    "ThreadOutcome",
-    "ThreadStopKind",
-    "ThreadStopped",
-    "ThreadSuspended",
+    "OneShotStopKind",
     "ToolDispatchLineage",
     "WaitingFor",
 ]
