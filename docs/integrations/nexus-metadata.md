@@ -17,7 +17,7 @@ generation `e39e21c8-3422-407e-ae81-0f684ae73aae`, original native luna/xhigh,
 strict JSON and all four useful actual tools; root verified original stock bytes,
 seal and exact immutable result/reply pairs. metadata root's combined current-chain
 composition and fresh eight-field cohort are GREEN at separate product bcb86e;
-metadata cleanup/final static remain owner-pending. original qualified bc9584 artifacts and
+metadata's owned cleanup and sole post-deletion static gate are GREEN. original qualified bc9584 artifacts and
 receipts below retain their historical attribution; they are not current-main
 qualification. see [delivery evidence](../native-agent-evidence.md#current-main-delivery-2026-10-0304-utc).
 
@@ -32,6 +32,15 @@ honest. original runner18a6249 and setup/failed receipts are unchanged; setup
 failures create no extra paid attempt. controlled parsed-source/Viewer fixtures
 do not establish genuine ingestion or HTTP/JWT/browser acceptance. the owner
 explicitly finished finite host use; no further provider call is needed.
+
+metadata's [final verification](https://github.com/NielsdaWheelz/nexus-web/blob/16514144780bbddef4691ddb5c5e6114e932c21c/docs/metadata-enrichment-verification.md)
+is published in draft [pr482](https://github.com/NielsdaWheelz/nexus-web/pull/482),
+head `16514144780bbddef4691ddb5c5e6114e932c21c`; hosted checks are GREEN.
+6f036a29a has the qualified bcb86e tree and native bd093 ancestry; 165 changes
+only six docs. shared pins/lock and research803 are unchanged. owned fixture
+cleanup2fb2685c and post-deletion static108ca215 pass; original evidence and real
+uncertain stores remain preserved. metadata pr merge and production actions
+remain separately owned and unexecuted.
 
 the NEW contained host is now retired after the owner's explicit finished
 acknowledgement. historical descriptor:
@@ -51,8 +60,9 @@ release receipt:
 `2af2b2ef19fe9f35052629cc34d63beb9939d42b87b5d649433aedb4447f8e7e`.
 the Nexus qualification worktree/venv/feature refs and owned proof postgres/
 anonymous volume are removed; private fixture archives remain. qualified commits
-remain reachable through main. metadata's named55443 volume, stopped original
-uncertain databases, private backups and source worktree remain untouched.
+remain reachable through main. this native cleanup preserved metadata resources,
+original uncertain databases, private backups and source worktree; metadata's
+subsequent owned fixture deletion is separately recorded above.
 both qualification hosts are retired; neither qualification endpoint is available or deployed.
 
 ## ownership

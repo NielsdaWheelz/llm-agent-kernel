@@ -11,7 +11,10 @@ has accepted nexus application reset/release preparation in
 archival transition, complete controlled owner-populated0241→0257 proof and eight
 whole-transaction refusals are GREEN. eleven forwarding and ten controller cases
 are GREEN with controlled remote leaves. final255-pass/256-refusal rollback proof
-is GREEN; metadata cleanup/final static closure remains owner-pending. production disposition, drain and
+and metadata's owned cleanup/post-deletion static closure are GREEN. the owner's
+[final verification](https://github.com/NielsdaWheelz/nexus-web/blob/16514144780bbddef4691ddb5c5e6114e932c21c/docs/metadata-enrichment-verification.md)
+is published in draft pr482 at docs-only165, with qualified bcb86e runtime unchanged.
+metadata pr merge remains separately owned and unexecuted. production disposition, drain and
 deployment require separate final authorization; current quiescence and a fresh
 verified R2 backup/restore are still required.
 
