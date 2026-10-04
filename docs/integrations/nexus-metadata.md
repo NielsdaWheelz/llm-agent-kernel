@@ -16,12 +16,25 @@ and native0255/down0254. its fresh frozen installed generic research is GREEN:
 generation `e39e21c8-3422-407e-ae81-0f684ae73aae`, original native luna/xhigh,
 strict JSON and all four useful actual tools; root verified original stock bytes,
 seal and exact immutable result/reply pairs. metadata root's combined current-chain
-composition is GREEN at separate product bcb86e; its fresh eight-field cohort and
-cleanup/final static remain owner-pending. original qualified bc9584 artifacts and
+composition and fresh eight-field cohort are GREEN at separate product bcb86e;
+metadata cleanup/final static remain owner-pending. original qualified bc9584 artifacts and
 receipts below retain their historical attribution; they are not current-main
 qualification. see [delivery evidence](../native-agent-evidence.md#current-main-delivery-2026-10-0304-utc).
 
-the NEW contained host is retained for that finite metadata cohort. descriptor:
+fresh current-source domain receipt:
+`/private/tmp/nexus-metadata-release-uy48cjy2/0257-metadata-genuine-cohort.reviewed-v1.receipt.json`,
+sha256 `803fb806193406552f74697ee956b774d64c954a838543323583966068b671fa`.
+exactly three original MetadataResearch jobs at frozen bcb86e/0257 are GREEN;
+stock0.160 luna/xhigh, full eight-field submitted schema, declarations, seals,
+usage and all 37 original callback pairs are retained. all four tools are useful
+across the cohort; the book's empty local searches and expected failures remain
+honest. original runner18a6249 and setup/failed receipts are unchanged; setup
+failures create no extra paid attempt. controlled parsed-source/Viewer fixtures
+do not establish genuine ingestion or HTTP/JWT/browser acceptance. the owner
+explicitly finished finite host use; no further provider call is needed.
+
+the NEW contained host is now retired after the owner's explicit finished
+acknowledgement. historical descriptor:
 `/private/tmp/nexus-main-native-live-1_m1scr0/isolation.json`; stock0.160.0,
 pid74219/supervisor74205. socket:
 `/private/tmp/codex-daemon-501/nexus-main-955145d0ef0845c0ab91ff5927b55870.sock`;
@@ -30,8 +43,17 @@ private cognition parent:
 same-personal isolated auth provenance, account/catalog readiness, installed source
 and raw wire receipts are in the descriptor's private proof directory.
 `qualified-handoff.v2.json` records final scope and frozen receipt attribution.
-the retired original host stays
-retired; this is a new finite fixture, not production service activation.
+supervisor74205 and native74219 exited gracefully; both copied task accounts,
+socket pairs and original-stock-attributed empty cwds are removed. all seven
+original stock rollouts are retained pre-stop/post-exit with zero changes.
+release receipt:
+`/private/tmp/nexus-main-native-live-1_m1scr0/host-release.receipt.json`, sha256
+`2af2b2ef19fe9f35052629cc34d63beb9939d42b87b5d649433aedb4447f8e7e`.
+the Nexus qualification worktree/venv/feature refs and owned proof postgres/
+anonymous volume are removed; private fixture archives remain. qualified commits
+remain reachable through main. metadata's named55443 volume, stopped original
+uncertain databases, private backups and source worktree remain untouched.
+both qualification hosts are retired; neither qualification endpoint is available or deployed.
 
 ## ownership
 
@@ -291,7 +313,7 @@ and deployment remain separately authorized final actions after concrete review.
 no production writes or metadata edits were performed by the kernel owner.
 stored-item repair and final release/restore remain separately blocked; the
 original qualification host remains retired and original uncertain-job evidence
-is preserved. the new finite host remains for current consumer research above.
+is preserved. the new finite host is also retired after current consumer acceptance.
 
 see [implementation evidence](../native-agent-evidence.md) and
 [acceptance ownership](../native-agent-spec.md#9-delivery-and-acceptance).

@@ -36,8 +36,8 @@ source equality and canonical 0257 static checks green. its actual controlled
 owner-populated0241 restored-copy proof, eight whole-transaction refusals, six
 typed-consumer cases and current release forwarding/controller checks are GREEN.
 these prove metadata product bcb86e, separately from adapter517 research.
-current255-pass/256-refusal rollback proof is GREEN; the new three-item eight-field
-model cohort and metadata's cleanup/final static closure remain owner-pending.
+current255-pass/256-refusal rollback proof and the fresh three-item eight-field
+model cohort are GREEN; metadata's cleanup/final static closure remains owner-pending.
 prior 617baf/0256 proof is historical. final reviewed restore receipt:
 `/private/tmp/nexus-metadata-release-uy48cjy2/0257-metadata-restored-cutover.receipt.json`,
 sha256 `b0b50e9f192fe785b4290f030204d01b7d6134e8a4b6627b67cc3c7c1aa07f48`.
@@ -76,6 +76,19 @@ target by guessing invalid handles; its original facts remain separate. the gree
 new intent supplies the actual admitted canonical media URI, matching consumer
 bootstrap. no prior attempt is redispatched or reclassified, and no result is edited.
 
+metadata's fresh bcb86e/0257 domain cohort is separately GREEN: three original
+personal luna/xhigh attempts with full eight-field schema, original seals/usage
+and all 37 original callback pairs. all four tools are useful across the cohort;
+the book's empty local searches remain empty successes. first publication is 1952
+for the book, 1966 for the collection and 1941-11 for the printed essay; the
+collection's digital edition is 2017-02-14/ISBN9780062565808. reviewed receipt:
+`/private/tmp/nexus-metadata-release-uy48cjy2/0257-metadata-genuine-cohort.reviewed-v1.receipt.json`,
+sha256 `803fb806193406552f74697ee956b774d64c954a838543323583966068b671fa`.
+original runner18a6249, setup failures and older attempts remain unchanged.
+parsed-source/Viewer fixtures are controlled; this cohort claims no genuine
+ingestion, HTTP/JWT/browser, injection-canary or production qualification.
+64k/8k remain policy reservations. the owner explicitly finished finite host use.
+
 jarvis main adds captured worker targets and durable wait observation. the full
 native callback test exposed stored action envelopes being compared with tool
 results, and schedule receipts hashing a payload instead of the admitted action.
@@ -94,11 +107,24 @@ closure receipt: `jarvis-native-final-fj5wuvyi/closure.json` under the same temp
 root, sha256 `89be1b0dab5450e09c2a54ec26e72fb58603f05d2120a6da99662400512942e4`.
 earlier broader restart/nested-gate/content proof retains796 attribution.
 
-new macOS host is retained for metadata's one finite three-item cohort. original
-host remains retired. the old linux host exited0; 27 exact task containers and four
+after metadata's explicit finished acknowledgement, the new macOS host and
+supervisor exited gracefully; its exact account/socket/cwd resources are removed.
+all seven original stock rollouts are retained before and after shutdown, with
+zero changes. frozen generic3ef/stock-receipt598ac/rollouta6f are unchanged. release:
+`/private/tmp/nexus-main-native-live-1_m1scr0/host-release.receipt.json`, sha256
+`2af2b2ef19fe9f35052629cc34d63beb9939d42b87b5d649433aedb4447f8e7e`.
+the Nexus qualification worktree/venv and exact local/remote feature ref are removed;
+qualified517/bc remain reachable through merged main. other worktrees and the
+dirty original Nexus checkout remain unchanged. the owned proof postgres exited0;
+its exact container/anonymous volume are removed after 15 private database archives
+were retained. archive TOC parsing is not a fresh restore proof. receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/proof-postgres-cleanup.receipt.json`,
+sha256 `ed744d0d7050c3dab099e5412b7a732a96199bac0f97ff8e84983781e6966ef6`.
+metadata's named55443 volume and stopped original-uncertainty database remain untouched.
+the original macOS host remains retired. the old linux host exited0; 27 exact task containers and four
 exact account/socket volumes are removed after 21 original stock rollouts, two
-two-uid rollouts and private logs were retained and hashed. all other containers
-remain. cleanup receipt:
+two-uid rollouts and private logs were retained and hashed. that earlier cleanup
+preserved other containers. cleanup receipt:
 `/private/tmp/native-metadata-cutover-gu65429d/linux-fixture-cleanup.receipt.json`,
 sha256 `c65428a7cd9e707c65b024633c764e6e55155456d8a72798675f0689a3bc4596`.
 
