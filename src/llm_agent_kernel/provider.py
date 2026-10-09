@@ -7,7 +7,7 @@ import os
 import shutil
 import stat
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -338,7 +338,10 @@ class CodexProvider:
         cwd: Path,
     ) -> CodexCatalogSessionRequest:
         provider = definition.provider
-        if provider.policy != CONTAINMENT_POLICY or provider.native != CODEX_NATIVE_OPTIONS:
+        if (
+            provider.policy != CONTAINMENT_POLICY
+            or replace(provider.native, archive_internal=False) != CODEX_NATIVE_OPTIONS
+        ):
             raise ProviderConfigurationError("definition does not use the v1 containment posture")
         if provider.additional_dirs or provider.mcp_servers or provider.policy.environment:
             raise ProviderConfigurationError("definition exposes forbidden provider resources")

@@ -23,8 +23,8 @@ consumer manifests pin that version.
 
 | dependency | exact candidate revision |
 | --- | --- |
-| llm-tools | `2adb9790fc7a54de5342effaca9391c2f3d24ff9` |
-| provider-runtime | `e1498d8382f192ae664ae9790b682a8e8a8b0d38` |
+| llm-tools | `73056dfb23733e68bd32b6765cc34880f69674bd` |
+| provider-runtime | `9ecaa48298ec576765d0a62b3a610a825e81eea5` |
 
 any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.
@@ -84,6 +84,11 @@ are the only application tools. a native tool/permission event is a containment
 defect: fence callbacks and discard only that session. the account host retains
 credentials; worker state is empty and accountless. native host network for model
 authentication is distinct from model/tool network authority.
+
+the host may select `CodexNativeOptions.archive_internal` to keep disposable
+cognition outside native memory capture. this selection changes the definition
+fingerprint. all remaining native options keep the exact containment posture;
+the provider owns internal marking and persistence exclusion.
 
 ## 6. structured model protocol
 
