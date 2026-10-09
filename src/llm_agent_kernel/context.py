@@ -18,6 +18,7 @@ from llm_tools import (
     PromptText,
     ToolBinding,
     ToolEffect,
+    ToolId,
     ToolResult,
     render_prompt,
 )
@@ -298,7 +299,27 @@ def input_batch(
 
 
 def _observation(observation: ToolObservation) -> PromptSection:
-    if observation.initial_read_position is not None:
+    return tool_observation_section(
+        observation.binding.spec.id,
+        observation.model_text,
+        observation.model_step_ordinal,
+        initial_read_position=observation.initial_read_position,
+        source_references=observation.source_references,
+    )
+
+
+def tool_observation_section(
+    tool_id: ToolId,
+    model_text: str,
+    model_step_ordinal: int | None,
+    *,
+    initial_read_position: InvocationPosition | None = None,
+    source_references: tuple[str, ...] = (),
+) -> PromptSection:
+    """Build the actual isolated observation frame for host result budgeting."""
+    if initial_read_position is not None:
+        if model_step_ordinal is not None:
+            raise ValueError("an initial Read observation is not a model step")
         lineage_attributes = (
             PromptAttribute(
                 PromptAttributeName("origin"),
@@ -306,11 +327,12 @@ def _observation(observation: ToolObservation) -> PromptSection:
             ),
         )
     else:
-        assert observation.model_step_ordinal is not None
+        if type(model_step_ordinal) is not int or model_step_ordinal <= 0:
+            raise ValueError("observation model-step ordinal must be positive")
         lineage_attributes = (
             PromptAttribute(
                 PromptAttributeName("model_step_ordinal"),
-                observation.model_step_ordinal,
+                model_step_ordinal,
             ),
         )
     return PromptSection(
@@ -319,18 +341,16 @@ def _observation(observation: ToolObservation) -> PromptSection:
             *lineage_attributes,
             PromptAttribute(
                 PromptAttributeName("tool_id"),
-                str(observation.binding.spec.id),
+                str(tool_id),
             ),
         ),
         body=PromptSections(
             (
-                PromptSection(
-                    PromptSectionKind("model_reply"), (), PromptText(observation.model_text)
-                ),
+                PromptSection(PromptSectionKind("model_reply"), (), PromptText(model_text)),
                 PromptSection(
                     PromptSectionKind("source_references"),
                     (),
-                    PromptJson(list(observation.source_references)),
+                    PromptJson(list(source_references)),
                 ),
             )
         ),

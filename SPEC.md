@@ -117,6 +117,9 @@ call id. domain reconciliation remains application-owned.
 ## 8. context and steering
 
 canonical host context cold-bootstraps useful work; native history is disposable.
+`tool_observation_section` exposes the same isolated observation frame used by
+the kernel, so hosts can budget result paging with the actual `llm-tools`
+renderer and its escaping. it creates prompt data and grants no tool authority.
 new input is polled while reasoning and callbacks wait. `NativeDelivery` retains
 prepared/sent/queued/recorded/rejected facts. queued acknowledgment does not prove
 recorded input or model attention. later steer cannot reattribute an accepted

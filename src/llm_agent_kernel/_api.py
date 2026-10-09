@@ -8,6 +8,7 @@ from .context import (
     ToolObservation,
     bootstrap_context,
     continuation_context,
+    tool_observation_section,
 )
 from .coordination import (
     AppendInputs,
@@ -273,6 +274,7 @@ __all__ = [
     "WaitingFor",
     "bootstrap_context",
     "continuation_context",
+    "tool_observation_section",
     "emit_diagnostic",
     "emit_event",
     "provider_wire_schema",
