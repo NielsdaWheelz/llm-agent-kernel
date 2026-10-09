@@ -125,6 +125,12 @@ canonical host context cold-bootstraps useful work; native history is disposable
 `tool_observation_section` exposes the same isolated observation frame used by
 the kernel, so hosts can budget result paging with the actual `llm-tools`
 renderer and its escaping. it creates prompt data and grants no tool authority.
+`input_batch` exposes the same timestamp/as_of frame used for steering, so a
+host renders an initial native batch without copying kernel presentation.
+`native_request_fits(definition, sections)` uses the actual kernel renderer and
+the provider-owned contained request serializer/byte bound before provider i/o.
+hosts select whole records or block; this pure check is not a token estimate or
+an inference permit.
 new input is polled while reasoning and callbacks wait. `NativeDelivery` retains
 prepared/sent/queued/recorded/rejected facts. queued acknowledgment does not prove
 recorded input or model attention. later steer cannot reattribute an accepted

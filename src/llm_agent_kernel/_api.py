@@ -8,6 +8,7 @@ from .context import (
     ToolObservation,
     bootstrap_context,
     continuation_context,
+    input_batch,
     tool_observation_section,
 )
 from .coordination import (
@@ -104,7 +105,7 @@ from .fakes import (
     ScriptedToolDispatchPort,
 )
 from .kernel import KernelConfigurationDefect, run_one_shot
-from .native import run_native
+from .native import native_request_fits, run_native
 from .native_contract import (
     NATIVE_BASE_INSTRUCTION,
     NATIVE_BASE_INSTRUCTION_IDENTITY,
@@ -177,6 +178,8 @@ __all__ = [
     "model_decision_id",
     "ModelDecisionNotSubmitted",
     "run_native",
+    "native_request_fits",
+    "input_batch",
     "DecisionScope",
     "DurableIsolatedDecisions",
     "IsolatedDecisionScope",
