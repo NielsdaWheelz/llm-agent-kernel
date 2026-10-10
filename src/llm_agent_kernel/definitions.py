@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal, Self
@@ -264,7 +264,7 @@ class ProviderConfiguration:
             raise TypeError("provider developer material must be a tuple of TextContent")
         if self.policy != CONTAINMENT_POLICY:
             raise ValueError("provider policy must use the complete v1 containment posture")
-        if self.native != CODEX_NATIVE_OPTIONS:
+        if replace(self.native, archive_internal=False) != CODEX_NATIVE_OPTIONS:
             raise ValueError("Codex native built-ins and Web must be disabled")
 
 
@@ -663,6 +663,7 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
             "agent_definition_revision": provider.agent_definition_revision,
             "row_fingerprint": provider.row_fingerprint,
             "native": {
+                "archive_internal": provider.native.archive_internal,
                 "builtin_tools": provider.native.builtin_tools,
                 "web_search": provider.native.web_search,
                 "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,

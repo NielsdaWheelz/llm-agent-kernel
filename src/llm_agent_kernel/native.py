@@ -39,6 +39,7 @@ from provider_runtime.agent_runtime import (
     LocalStopEvidence,
     NativeTerminalEvidence,
     TextContent,
+    codex_native_request_fits,
     thaw_json_value,
 )
 from provider_runtime.tool_adapter import (
@@ -93,6 +94,16 @@ class _Callback:
     binding: ToolBinding[Any, Any, Any]
     validated_input: object
     size: int
+
+
+def native_request_fits(definition: NativeDefinition, sections: PromptSections) -> bool:
+    """Measure actual kernel framing against the provider's contained request bound."""
+    return codex_native_request_fits(
+        render_prompt(sections),
+        output=definition.output,
+        reasoning=definition.provider.reasoning,
+        input_id=_delivery_id("request-fit", ()),
+    )
 
 
 async def run_native(

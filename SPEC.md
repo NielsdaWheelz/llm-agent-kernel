@@ -23,8 +23,8 @@ consumer manifests pin that version.
 
 | dependency | exact candidate revision |
 | --- | --- |
-| llm-tools | `2adb9790fc7a54de5342effaca9391c2f3d24ff9` |
-| provider-runtime | `e1498d8382f192ae664ae9790b682a8e8a8b0d38` |
+| llm-tools | `73056dfb23733e68bd32b6765cc34880f69674bd` |
+| provider-runtime | `d9550d9c53af3d7b608250d9a0db131d78dccf64` |
 
 any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.
@@ -85,6 +85,11 @@ defect: fence callbacks and discard only that session. the account host retains
 credentials; worker state is empty and accountless. native host network for model
 authentication is distinct from model/tool network authority.
 
+the host may select `CodexNativeOptions.archive_internal` to keep disposable
+cognition outside native memory capture. this selection changes the definition
+fingerprint. all remaining native options keep the exact containment posture;
+the provider owns internal marking and persistence exclusion.
+
 ## 6. structured model protocol
 
 native main uses the provider's native reasoning loop, declared callbacks and
@@ -117,6 +122,15 @@ call id. domain reconciliation remains application-owned.
 ## 8. context and steering
 
 canonical host context cold-bootstraps useful work; native history is disposable.
+`tool_observation_section` exposes the same isolated observation frame used by
+the kernel, so hosts can budget result paging with the actual `llm-tools`
+renderer and its escaping. it creates prompt data and grants no tool authority.
+`input_batch` exposes the same timestamp/as_of frame used for steering, so a
+host renders an initial native batch without copying kernel presentation.
+`native_request_fits(definition, sections)` uses the actual kernel renderer and
+the provider-owned contained request serializer/byte bound before provider i/o.
+hosts select whole records or block; this pure check is not a token estimate or
+an inference permit.
 new input is polled while reasoning and callbacks wait. `NativeDelivery` retains
 prepared/sent/queued/recorded/rejected facts. queued acknowledgment does not prove
 recorded input or model attention. later steer cannot reattribute an accepted

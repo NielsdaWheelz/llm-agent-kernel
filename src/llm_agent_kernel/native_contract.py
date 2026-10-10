@@ -137,6 +137,7 @@ class NativeDefinition:
                     "network_allowlist": list(provider.policy.network_allowlist),
                 },
                 "native": {
+                    "archive_internal": provider.native.archive_internal,
                     "builtin_tools": provider.native.builtin_tools,
                     "web_search": provider.native.web_search,
                     "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,

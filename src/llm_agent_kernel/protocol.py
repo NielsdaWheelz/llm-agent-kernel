@@ -6,7 +6,7 @@ import json
 from functools import lru_cache
 from typing import Annotated, Any, Literal, cast
 
-from llm_tools import FrozenToolPlan, ToolId
+from llm_tools import FrozenToolPlan, ToolId, canonical_json_bytes
 from provider_runtime.agent_runtime import thaw_json_value
 from pydantic import (
     AfterValidator,
@@ -14,7 +14,6 @@ from pydantic import (
     ConfigDict,
     Field,
     TypeAdapter,
-    ValidationError,
     create_model,
     field_validator,
 )
@@ -130,11 +129,11 @@ def validate_model_step(
     """Validate a whole step before returning text or a dispatchable proposal."""
 
     try:
-        step = _step_adapter(output_contract).validate_python(
-            thaw_json_value(value),
+        step = _step_adapter(output_contract).validate_json(
+            canonical_json_bytes(thaw_json_value(value)),
             strict=True,
         )
-    except ValidationError:
+    except (TypeError, ValueError):
         raise ProtocolValidationError("model step violates the closed output contract") from None
 
     if isinstance(step, _CallToolStep):
