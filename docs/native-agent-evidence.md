@@ -1,75 +1,336 @@
 # native agent implementation evidence
 
-status: implementation in progress, 2026-10-02. the five isolated worktrees use
-`feature/native-agent-supervision`; no final qualified consumer pin set is ready; genuine source-overlay
-metadata research is green. original checkouts and the metadata worktree
-are preserved. this record distinguishes candidate boundary proof from final
-installed acceptance.
+status: accepted scope implemented and qualified. all N001–N020 gates below pass;
+new temporary feature tests are deleted. current-main delivery is recorded below.
+unrelated checkout state and metadata ownership are preserved. controlled peers
+establish their boundary; they are never research.
 
-| boundary | observed proof | remaining |
+## current-main delivery, 2026-10-03/04 utc
+
+the original acceptance below remains tied to its recorded artifacts. composing
+subsequent consumer main changes requires fresh affected proof, not relabeling the
+old receipts. production reset/release remains separately owned and gated.
+
+| artifact | tested pr head | merged main | current status |
+| --- | --- | --- | --- |
+| tools, pr 23 | `2adb9790` | `593de5d3` | merged; hosted checks green |
+| provider, pr 37 | `f069d9d1` | `09c52036` | merged; hosted checks green |
+| kernel, pr 6 | `391fb74e` | `01e59486` | merged; hosted checks green |
+| nexus, pr 481 | `517471b4` | `bd093521` | merged; hosted checks and fresh installed generic four-tool research green |
+| jarvis, pr 49 | `78d3af6c` | `f3b4dc3b` | merged; hosted/final installed/static/test-deletion checks green |
+
+all three merged library trees equal their tested pr heads and retain the
+qualified e149/9d57/2adb pins as ancestors. consumers keep those exact pins;
+merge commits do not silently change their installed library bytes. the provider
+pr also preserves current-main's control interface and socket-path resolution,
+with focused transport proof. the inherited raw-provider api matrix is **NOT_RUN**;
+the user explicitly waived it for this delivery. it has no native-model proof claim.
+private merge/ancestry receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/shared-merges.receipt.json`, sha256
+`cea182e0c1cddf74eb6d0763aa619649d9ed18f4bbd80ba2d638052592c8e10b`.
+
+nexus main changes its media tool result to the existing typed citation projection;
+the native binding revision is v6. canonical native migration is now 0255/down0254.
+metadata root's composed `bcb86e020` retains all exact shared pins, with installed
+source equality and canonical 0257 static checks green. its actual controlled
+owner-populated0241 restored-copy proof, eight whole-transaction refusals, six
+typed-consumer cases and current release forwarding/controller checks are GREEN.
+these prove metadata product bcb86e, separately from adapter517 research.
+current255-pass/256-refusal rollback proof and the fresh three-item eight-field
+model cohort and metadata's owned cleanup/post-deletion static closure are GREEN.
+prior 617baf/0256 proof is historical. final reviewed restore receipt:
+`/private/tmp/nexus-metadata-release-uy48cjy2/0257-metadata-restored-cutover.receipt.json`,
+sha256 `b0b50e9f192fe785b4290f030204d01b7d6134e8a4b6627b67cc3c7c1aa07f48`.
+it proves original remaining atlas fields and resource rows; existing atlas timestamp
+loss is inventoried. the copied nested resource-positive fixture is rollback-only;
+original activation memos were deleted at0244. no broader projection claim is made.
+the separate late guard receipt, under the same directory,
+`0257-late-native-metadata-guard.receipt.json`, sha256
+`13d02c88c9c4d47ac327a2a10bcd5c9d27da6ce0b59f221fcbfccd75a7e922f9`,
+observes native255 pass/credential deletion followed by exact metadata256 refusal.
+all 114 public tables, full DDL, rows, version and credentials roll back to252.
+the copied terminal parent's nested evidence creates zero authoritative native
+child rows. this proves controlled refusal, not historical continuation recovery.
+nexus merged-tree/ancestry receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/nexus-merge.receipt.json`, sha256
+`06abb57c0d88cfebf1c649e8ac6f1cb289940bb6d3d9debd41b4d7eef19c7fbe`.
+
+fresh frozen nexus517 research generation
+`e39e21c8-3422-407e-ae81-0f684ae73aae` is GREEN: original stock turn_context
+proves personal luna/xhigh; strict JSON, useful actual four-tool Success, original
+seal and 15,546 input/342 output tokens are retained. root independently verified
+stock bytes and each immutable result/reply pair. Completed local replay makes no
+new model call and completed owner authority cannot dispatch again. receipt:
+`/private/tmp/nexus-main-native-live-1_m1scr0/research.receipt.json`, sha256
+`3ef8aa1946bb0e2013d371991f1697863f0c0e66babefc4866d6ad19f3b05975`.
+the earlier869aea hash was published before adding only stock path/hash and
+qualification scope. removing those three bookkeeping fields reproduces the old
+hash exactly; original facts are unchanged. final receipt is frozen, with separate
+`receipt-freeze-attribution.json` and `qualified-handoff.v2.json` amendments.
+raw-stock receipt is in `stock-evidence/four-tool-green/receipt.json`, sha256
+`598ac5125282139658bd6a2cdced14c35a65e9142d63b6068a43785599f028ed`;
+retained rollout sha256
+`a6f6105a3f08ea675999b6de366636c8e9802cd816b431da90a0947f29690651`.
+the first new-host attempt73a0cc77 sealed Succeeded/Completed but failed the content
+target by guessing invalid handles; its original facts remain separate. the green
+new intent supplies the actual admitted canonical media URI, matching consumer
+bootstrap. no prior attempt is redispatched or reclassified, and no result is edited.
+
+metadata's fresh bcb86e/0257 domain cohort is separately GREEN: three original
+personal luna/xhigh attempts with full eight-field schema, original seals/usage
+and all 37 original callback pairs. all four tools are useful across the cohort;
+the book's empty local searches remain empty successes. first publication is 1952
+for the book, 1966 for the collection and 1941-11 for the printed essay; the
+collection's digital edition is 2017-02-14/ISBN9780062565808. reviewed receipt:
+`/private/tmp/nexus-metadata-release-uy48cjy2/0257-metadata-genuine-cohort.reviewed-v1.receipt.json`,
+sha256 `803fb806193406552f74697ee956b774d64c954a838543323583966068b671fa`.
+original runner18a6249, setup failures and older attempts remain unchanged.
+parsed-source/Viewer fixtures are controlled; this cohort claims no genuine
+ingestion, HTTP/JWT/browser, injection-canary or production qualification.
+64k/8k remain policy reservations. the owner explicitly finished finite host use.
+
+metadata draft [pr482](https://github.com/NielsdaWheelz/nexus-web/pull/482) has a
+recorded publication at `16514144780bbddef4691ddb5c5e6114e932c21c`; that head's
+hosted checks passed. later pr heads/checks remain independently owned.
+its `6f036a29a` parent tree equals qualified bcb86e and retains native bd093;
+165 changes only six documentation files. pins/lock and research803 are unchanged.
+the owner removed its disposable proofs/fixtures and verified 150 retained hashes;
+protected original uncertainty/evidence remain preserved. cleanup2fb2685c and
+sole post-deletion static108ca215 at 6f/head0257 are retained in
+`/private/tmp/nexus-metadata-release-uy48cjy2/`; published-pr receipt sha256
+`4954f200f2fdfc7af88610bd1c772bb53360feb75920299485a2b9a94430966f`.
+see the owner's [final verification](https://github.com/NielsdaWheelz/nexus-web/blob/16514144780bbddef4691ddb5c5e6114e932c21c/docs/metadata-enrichment-verification.md).
+metadata pr merge and production disposition/release remain separately owned and unexecuted.
+
+jarvis main adds captured worker targets and durable wait observation. the full
+native callback test exposed stored action envelopes being compared with tool
+results, and schedule receipts hashing a payload instead of the admitted action.
+the action owner now supplies one immutable result projection for initial reply,
+replay and existing-action references; the schedule owner reads its frozen digest.
+ten real-postgres callback/replay cases pass with controlled worker/gate leaves
+and zero provider calls. nine wait/product checks and five release-shell cases pass.
+final `78d3af6` deletes temporary drivers and has all 68 runtime/deploy/lock files
+equal live-qualified `8f91c3b`; 51 installed consumer files match noneditable
+sources, with unchanged pins. final static/types/docs/build/import/audit pass.
+actual personal terra/high web read, prose progress, recorded steering, both requests
+completed with 42 and truthful stop/Cancelled seal pass. live receipt:
+`/var/folders/cb/dy22pnwn5_9c_rzxkbzymbm00000gn/T/jarvis-native-web-v6lisg1q/actual-jarvis-main-web.json`,
+sha256 `9cc2972f68bbc70c664f5fecb529b0f2cd86047041860511a7bcf9cb229e8893`.
+closure receipt: `jarvis-native-final-fj5wuvyi/closure.json` under the same temporary
+root, sha256 `89be1b0dab5450e09c2a54ec26e72fb58603f05d2120a6da99662400512942e4`.
+earlier broader restart/nested-gate/content proof retains796 attribution.
+
+after metadata's explicit finished acknowledgement, the new macOS host and
+supervisor exited gracefully; its exact account/socket/cwd resources are removed.
+all seven original stock rollouts are retained before and after shutdown, with
+zero changes. frozen generic3ef/stock-receipt598ac/rollouta6f are unchanged. release:
+`/private/tmp/nexus-main-native-live-1_m1scr0/host-release.receipt.json`, sha256
+`2af2b2ef19fe9f35052629cc34d63beb9939d42b87b5d649433aedb4447f8e7e`.
+the Nexus qualification worktree/venv and exact local/remote feature ref are removed;
+qualified517/bc remain reachable through merged main. other worktrees and the
+dirty original Nexus checkout remain unchanged. the owned proof postgres exited0;
+its exact container/anonymous volume are removed after 15 private database archives
+were retained. archive TOC parsing is not a fresh restore proof. receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/proof-postgres-cleanup.receipt.json`,
+sha256 `ed744d0d7050c3dab099e5412b7a732a96199bac0f97ff8e84983781e6966ef6`.
+this native cleanup preserved metadata resources and original-uncertainty stores;
+metadata's subsequent owned fixture deletion is separately recorded above.
+the original macOS host remains retired. the old linux host exited0; 27 exact task containers and four
+exact account/socket volumes are removed after 21 original stock rollouts, two
+two-uid rollouts and private logs were retained and hashed. that earlier cleanup
+preserved other containers. cleanup receipt:
+`/private/tmp/native-metadata-cutover-gu65429d/linux-fixture-cleanup.receipt.json`,
+sha256 `c65428a7cd9e707c65b024633c764e6e55155456d8a72798675f0689a3bc4596`.
+
+## acceptance map
+
+| id | observed proof | status |
 | --- | --- | --- |
-| provider transport | 998 deterministic cases green, 4 skips and 40 live cases excluded; actual personal stock 0.160.0 selects `gpt-6-luna`/`xhigh`, strict json and a real declared echo callback | final frozen install and consumer topology |
-| kernel generation | original terminal/product rollback and cleanup red→green; native controlled transport 7/7 including silent withheld start acknowledgement and prompt stop fence; 186 conformance green with frozen provider23bd/tools cad before new feature-test deletion | final consumer and frozen install |
-| tools | optional-quota and reader/header red→green; 219 selected existing/temporary cases; ruff/pyright clean at `cad13af1289c247897236959bfff0d6791956d4b` | consumer budgets and final artifact |
-| nexus persistence | real postgres red→green: product fault retains native terminal/usage; own sealed cold recovery and Completed replay make no provider call; unresolved/local stop/parent-terminal anomaly block redispatch; invalid raw failure and positive non-submission stay distinct | real SIGKILL/new-owner sealed recovery, callback facts/counts and combined migration rollback green; final frozen runtime |
-| jarvis | real postgres schema/content, prepared isolated decisions, read replay/barriers, approval entry/stop and sealed terminal recovery probes green | actual native web.search/web.read, progress, new-topic steer, stop and SIGKILL fresh-thread recovery green; final frozen runtime |
-| exact metadata research | genuine source-overlay gpt-6-luna/xhigh strict JSON and useful results from all four actual tools green; exact native/citation receipts retained separately from controlled faults | final frozen install/live repeat with reader v3 |
+| N001 | exact provider preflight/schema/prepare refusal before writer; consumer authority cutover refusals | pass |
+| N002 | real loopback writer/revocation/deferred-send cancellation and post-entry errors | pass |
+| N003 | dropped-response attempt identity; real-store original decision reopen and unresolved nexus journal barriers | pass |
+| N004 | native seal/tail/cleanup races; original consumer seal and usage survive secondary failures | pass |
+| N005 | actual baseline-owner combined migration preserves authenticated continuation/principals/effects/authorships; no invented native certainty | pass |
+| N006 | real nexus same-job SIGKILL after seal/encoder fault, queue lease expiry/new execution and zero provider/catalog recovery; original domain targets | pass |
+| N007 | final frozen noneditable personal luna/xhigh strict-json; original stock wire identity; useful actual document search/resource read/web search/web read | pass |
+| N008 | unresolved/local-stop/parent-terminal-only remain blocked; authoritative original non-submission settles locally; terminal/control races retain truth | pass |
+| N009 | genuine declared callbacks plus strict JSON; loopback callback-before-start-ack remains live; undeclared authority refuses dispatch | pass |
+| N010 | actual executor null-quota algebra and replay settlement; real-store host read/action budgets; exact declared/executed schema and reader/header behavior | pass |
+| N011 | real executor/journals enforce invocation before effect and result before reply, immutable duplicates/owner fences; nine precise consumer process deaths | pass |
+| N012 | 300 sequential callbacks retire completed transport state; distinct overlapping A/B/C execute/reply in arrival order with concurrency 1; progress/recorded steer stay live; overflow dispatches no queued work | pass |
+| N013 | final installed genuine prose progress plus actual recorded 17+25, final 42/TaskGroup and both requests complete; strict phase-aware message schema | pass |
+| N014 | actual stock hidden clock/CodeMode exposed feature-off insufficiency; restricted startup catalogue + version/origin prerequisite now denies inherited native authority; private cross-uid hosts pass | pass |
+| N015 | absent usage and optional quotas do not gate work; genuine isolated write gate under waiting native parent seals deny and parent read completes; stop owner fence persists | pass |
+| N016 | real-store pending approval allows independent work; both stop/approval/dispatch orders; fresh consent cannot repeat entered effect | pass |
+| N017 | final installed genuine SIGKILL/fresh owner/native session completes original request; old callbacks fenced; original sealed product survives instruction/plan rotation; nine precise consumer process deaths | pass |
+| N018 | real stopped migration/catalog/instruction rotation preserves canonical requests; entered legacy effects block; old approvals require fresh consent | pass |
+| N019 | final actual search/read and honest missing-source/original-versus-edition answers; useful prose progress; composed 2,000-character overflow yields one bounded failure with original seal/usage | pass |
+| N020 | final nexus genuine research, atomic progress/final SSE, original resource citations/model projection; unknown[999] yields CitationsUnavailable and zero fabricated edges; two-job cancellation isolation and original historical undo | pass |
 
-nexus persistence command from `nexus-web-native`:
-`NATIVE_PROOF_DATABASE_URL=<isolated-postgres> python/.venv/bin/python _native_acceptance/terminals.py`.
-the fixture uses the actual queue claim, journal, ledger and lifecycle with a
-controlled local encoding failure. it performs no native inference or research.
-the task-owned database is `nexus-native-proof-pg`, created from `pgvector/pgvector:pg15`;
-the existing migration chain through 0252 passed on an empty database.
+## original installed research and artifacts
 
-metadata's existing parent terminal plus Uncertain journal remains blocked. only
-the kernel's independently committed, exact native terminal evidence can authorize
-local terminal recovery. Completed pending-publication memo replay remains
-metadata-owned. native attempt uncertainty never authorizes another model call.
+this section records the pre-current-main bc9584/e149/9d57/2adb qualification;
+its counts and artifact identities remain historical. current delivery is above.
 
-new acceptance tests remain until final integrated proof, then are deleted under
-the accepted plan. historical source-overlay or controlled-peer checks do not
-qualify installed pins or genuine research.
+research generation `95d85ea3-c6eb-4acc-a7bc-35a5a37905b5` ran committed nexus
+`bc9584be6f53902e430943f28e0f40ed68401cfa`, committed lock sha256
+`da68f22297fd37830d3b8f939fd124869adfa864afd3ab7a1d7c30fd0f3be4c1`.
+provider `e1498d83`, kernel `9d57e894` and tools `2adb9790` were frozen/noneditable;
+all 461 nexus and every library py/json source file matched installed site-packages.
+original stock turn_context proves luna/xhigh, stock 0.160.0.
+pydantic 2.12.5, urllib3 2.8.0, anyio 4.15.1 and pyjwt 2.15.1. all four actual tools returned
+useful evidence; pride and prejudice/jane austen/1813 and source URLs validated.
+`/tmp/nexus-native-research.json` retains selected/wire/native identities, tool
+receipts, strict final output, usage, module origins and exact package commits.
+this includes schema-neutral base-v3, final frozen dependency fixes and provider/
+kernel/tools/nexus feature-test deletion. original d108/b91 research and rollout
+remain historical evidence; the owner independently reviewed them.
 
-the provider prerequisite drift was repaired by adopting the complete raw generation
-contract from nexus's existing immutable `6a7093f799c88c205c8d797bbb8b14c2a9980db1`
-provider source. the older declared baseline lacked its continuation/preflight/
-resume contract; copying one helper would have been false compatibility.
+original required checks: provider 960 pass/2 skip/40 live excluded; kernel 172
+pass/2 live deselected after 192 pre-deletion cases; tools 203 remaining
+conformance pass after 16 new feature cases were deleted. whole-repo types/lint
+pass; kernel/tools builds and dependency audit pass. jarvis `./scripts/verify`
+(static/docs/wheel/sdist/import/audit) and nexus `./scripts/test` (static/backend/
+web/extension/offline/wire/migration graph) pass against current committed locks.
+git-installed internal packages are outside pip-audit's public advisory database.
+these original checks make no hosted-ci/deployed-service claim.
 
-the current installed stock binary changed from 0.159.2 to 0.160.0 during this
-task. the actual qualified probe uses 0.160.0, whose public settings notification
-is checked for exact model/effort/cwd and contained approval/filesystem/network.
-its native turn schema has no hard context/output token-ceiling field. nexus's
-64,000/8,000 values remain admission and output-reservation policy, as specified.
+## original installed jarvis
 
-jarvis cutover imports the old boolean deployment pause without inventing stopped
-request targets. never-entered legacy approvals receive fresh consent; queued
-work returns through the current gate. unresolved entered effects block cutover.
+this section records the original 3f53/796 qualification. current-main Jarvis
+proof and merge are above; broader original proofs retain their original scope.
 
-2026-10-02 additional real-store evidence: same-job SIGKILL after native seal and
-encoder failure, new queue execution/owner and zero provider/catalog local replay;
-64 invalid native callbacks exceed the former cumulative cap while retaining raw
-null/rejected facts; closed-scope additive write retains provenance, count and
-idempotent replay independently of read visibility; fencing refuses new effect
-entry while original factual settlement remains possible.
+qualified consumer `3f53fbe789d1041f56d679293f8d24a646afa236`, committed lock
+sha256 `e7475de7933317086dcab6b4f15e3e727bbece0e80270fc9407273eb4aca151f`,
+uses the same provider e149/kernel 9d57/tools 2adb pins. all 51 jarvis py/json files
+and library sources equal frozen noneditable installed packages before live I/O.
+all 26 production bindings remain declared; these are actual model receipts:
 
-combined migration proof copied the separately committed metadata migration into
-a disposable test graph as 0255 after 0254. 0254 accepted a historical shell
-terminal, then 0255 rejected its inactive Uncertain metadata journal; one actual
-Alembic transaction rolled back credentials, principals, rows, schema and version.
-a separate 0254 upgrade backfilled the original principal, retained old positions
-and synthetic continuation bytes without native seals, deleted credentials and performed
-real idempotent historical undo. the redundant native conditional-nullability
-CHECK was removed under Nexus database rules.
+final jarvis source `796fb8cb88deee69dc63fbf0bfb694415f23b432` removes the
+temporary probes after documentation closure. all 64 runtime/deploy files and the
+lock equal the qualified 3f53 tree. final static/docs/build/import/audit checks pass;
+a fresh frozen noneditable install matches all 52 jarvis, 47 provider, 18 kernel and 19
+tools py/json/py.typed files exactly. bounded artifact record:
+`/private/tmp/native-metadata-cutover-gu65429d/jarvis-final-artifacts.json`.
 
-the synthetic continuation fixture proves byte retention, not validity or usable
-historical continuation preservation. the metadata owner is preparing that proof
-through baseline chat/ledger/continuation codec/cipher/tool/authorship owners,
-including a separate open provider-api parent. its result remains pending.
+| case | final receipt directory under the task's macOS temporary root | sha256 |
+| --- | --- | --- |
+| original recorded input delayed until canonical stop; retained exact fact, accepted interrupt and native cancellation | `jarvis-native-web-1frgm1bw/actual-jarvis-main-web.json` | `27c2294b4a9bf0f3fca432e827ecf46fc61848b7c8461415dacdb55f0e66a306` |
+| ordinary useful prose, actual recorded 17+25, final 42/TaskGroup/both complete; stop | `jarvis-native-web-qvqnql9_/actual-jarvis-main-web.json` | `8e7be6c89159aca128a9da3dfef80451cf30af5769a913709a063c3320e2933f` |
+| actual search and gutenberg/newberry/digitalausten reads; original 1813 versus ebook 1998/update 2026; honest private-locator refusal | `jarvis-native-web-wmb8yj8m/actual-jarvis-main-web.json` | `928dab42f8526898db732e8f0c0d48198fba4b5ad24d1b6fa56116b27fb574f1` |
+| waiting parent callback/current-owner isolated gate; genuine gpt-5.6-terra/high child seals deny in 3.884s within 300s, then parent web read/final succeeds | `jarvis-native-web-xcylobi0/actual-jarvis-main-web.json` | `f09b024c8b6209bb33989fbac655adbb85cd0053a5ca421ae2f95d2b7c231e52` |
+| actual accepted-worker SIGKILL; original unknown terminal/fence retained; new owner epoch/native thread completes original sqrt2 request | `jarvis-native-web-pv_rhal_/actual-jarvis-main-web.json` | `0d869573f64839c6fa1c7da077062483ae19d317f5914702e06f014eb5dcacd9` |
 
-N014 source investigation found an actual hidden native clock execution despite
-feature-off defaults. the provider-owned startup catalogue restricts tool mode
-to direct and removes inherited native selectors. actual contained Linux direct
-callback/strict-json and adversarial clock/inherited-authority probes are green;
-exact public0.160.0/config-origin preflight rejects unsupported hosts before
-thread creation. final installed consumer and cross-uid host proof remain open.
+temporary root: `/var/folders/cb/dy22pnwn5_9c_rzxkbzymbm00000gn/T`.
+the delayed-observation case controls scheduling at the journal port only; model,
+provider, event and postgres stop are real. an interrupt ack never proves a native
+terminal. the original RED source required live authority for an observed input;
+the journal now retains original facts after fencing, keeps prepared input live-only,
+and atomically ignores stale progress. invocation/effect/product fences are unchanged.
+two independent source reviews and real-store changed/unknown identity refusals pass.
+
+controlled publication overflow receipt `native-content-proof-kxdxc5wh/N019.json`,
+sha256 `4188cd6d392663fccc9b69f24c88b03fc395562794f52b1060b2a47dfe6123eb`,
+retains original seal/usage/request and produces one bounded failure with zero
+provider calls. it proves publication behavior; model quality is the separate live
+content receipt. five exact process deaths are in
+`/private/tmp/jarvis-fenced-crash.VjJx57/jarvis.receipt.json`; recovery is scoped to
+the original action, not an aggregate global action-recovery pass. the startup-memory
+probe proves the public canonical selector with an explicit fixture scan bound,
+not the shipped service's default batch size.
+
+## native host boundary
+
+qualified stock native build 0.160.0; provider-owned complete catalogue sha256
+`b8b588f4b03c8e08fdb7e2994c03578d9b94bbc01665b7adb6490bd234b3cf54`,
+revision `codex-contained-catalog.v1:<sha256>`. startup direct tool mode removes
+inherited clock and async user-input authority. public initialize/config-origin
+checks refuse unsupported hosts before thread creation. the kernel owns no
+process/account/socket.
+
+actual Linux uid/group topology proves a resolved private shared socket and two
+simultaneous genuine Luna native sessions: interrupting A preserves B, its own
+reply and strict final. this source-overlay topology proof is distinct from the
+noneditable installed application research. committed jarvis host helper and
+installed provider publish only the owned namespace-isolated socket to another
+uid; graceful and SIGKILL stale rebinding pass. deployed systemd activation is
+not run. other coding hosts retain their native authority.
+
+stock schema has no hard native context/output token-ceiling field. nexus 64,000/
+8,000 remain accepted admission/output-reservation policy. model selection/effort,
+containment, actual returned tools and strict output are independently checked.
+
+## product, migration and crash boundaries
+
+actual SIGKILL process seams: nexus arm, accepted invocation, note handler before
+atomic commit, result/effect committed before reply; jarvis arm, accepted invocation,
+read result before reply, entered action and write result before reply. recover using
+fresh queue leases/owner tokens and retain original attempt/effect/usage facts.
+nexus keeps unknown dispatch blocked with zero provider calls. jarvis replays durable
+read facts but a new native call id cannot bypass entered-action uncertainty.
+these are controlled native peers, not genuine research or external mutations.
+
+original native evidence commits before product decoding/encoding/publication.
+original-seal recovery precedes current definitions/catalogue/tool construction;
+a parent terminal grants no native recovery authority. positive original-attempt
+non-submission settles a local failure without inventing a native seal. Completed
+pending-publication memo replay remains metadata-owned.
+
+installed migration-only candidate `f13bb04bf9e801a1d75c6d79141132220c4405d1`
+adds metadata's exact committed migration body as 0255 after native 0254. restored
+original portable 0252 archives, then ran the unchanged baseline-owner verifier.
+success preserves authenticated continuation, original principals/effects and
+authorships; remaining-note undo is true once then false. blocked 0255 rejects an
+inactive Uncertain journal beside a terminal parent and rolls back the ENTIRE
+0252→0254→0255 transaction, preserving captured public-schema definitions and
+all baseline table columns plus original credentials/version. comments are
+outside snapshots. no provider/catalog/model calls, fabricated seals or post-cutover
+legacy decoders. original metadata databases are untouched. native 0254 intentionally
+drops retired credentials on success and has no redundant conditional callback
+arguments CHECK; invalid raw arguments/rejected replies remain durable evidence.
+
+earlier production 0241→0246 historical uncertainty remains an independent
+[release blocker](issues/historical-uncertainty-release.md). the preliminary
+read-only production census/backup/restore and controlled owner archival/effect/
+undo/stale-replay proofs are GREEN, with separate archives and scope. drained
+production disposition, fresh release backup/restore and deployment remain NOT_RUN.
+new seals cannot certify old unsealed work.
+
+## commands and evidence retention
+
+pre-deletion feature commands were run from their owning worktree using installed
+frozen environments: provider/kernel/tools `uv run --frozen pytest`; nexus
+`python/.venv/bin/python _native_acceptance/{terminals,process_recovery,callback_facts,
+chat_progress,citations,domain_projection,research}.py`; jarvis `.venv/bin/python
+tests/native_acceptance/{decision_evidence,store,control,service_control,read_recovery,
+process_recovery,terminal_control,cutover,cutover_activation,action_context,live_web,
+live_process_restart,content}_probe.py`. real-store drivers set the task-only
+postgres URL; actual native drivers also set the qualified private socket. these
+are historical temporary commands, not a promised permanent harness.
+
+all five new feature test sets and the temporary nexus repeat drivers are deleted.
+jarvis's 21 temporary py files were absent from its original baseline; runtime/deploy
+bytes equal the qualified 3f53 tree after deletion. deletion requires final
+static/type/build checks and exact runtime/dependency byte comparison; changed
+artifacts require affected final-artifact live proof. retaining proof notes
+instead of those tests sacrifices their continuing regression protection.
+metadata consumer bcdaf51 reports 21 actual composed checks, eight SIGKILL/cold-reclaim
+cases and three genuine personal luna/xhigh eight-field domain jobs GREEN. initial
+5d50 adoption/combined migration and generic 95d85ea3 capability remain separately
+attributed. independent review verifies the owner receipt hash, original copied
+stock traces, exact seals, strict output and successful actual four-tool results.
+the two earlier jobs remain uncertain/unpublished with their original evidence;
+later success grants neither recovery authority nor retroactive completion.
+source-precision and soft-token-policy limits remain explicit. these domain checks
+and final owner static/cleanup proof are recorded in the
+[handoff](integrations/nexus-metadata.md). no metadata worktree edits or deployment
+are authorized here. metadata docs-only 8258b490 preserves qualified bcdaf51;
+its post-deletion static pass/canonical 0255 and disposable-fixture cleanup are
+owner-reported GREEN. both original uncertain databases/backups remain preserved.
+after the owner's explicit finite-use-finished acknowledgement,
+the qualified macOS host exited on SIGTERM and only its recorded socket/account/
+cognition/worker state were released. all 49 original stock rollouts remain hashed
+and private at `/private/tmp/native-metadata-cutover-gu65429d/stock-rollouts/`, with
+path/hash mapping and scope in `host-release.receipt.json`. metadata evidence copies,
+databases, unrelated hosts and global socket parent remain untouched. no provider
+calls or production writes accompanied release; historical production remains BLOCKED.
