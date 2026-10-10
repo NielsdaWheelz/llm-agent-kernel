@@ -13,6 +13,11 @@ immutable reply and current owner. a local fence/stop is never a native terminal
 a parent terminal never clears an uncertain step. settled receipt replay cannot
 charge or execute twice.
 
+`tests/test_native_transient.py` is retained conformance for N021 (plan slice
+n6): a controlled app-server peer drives `TransientNative` through real
+provider-runtime callback transport. it proves kernel ordering only, never model
+behavior.
+
 owner-requested feature-test deletion forfeits those tests' continuing regression
 protection. later changes need fresh focused proof; historical green is not a
 claim about modified runtime bytes.

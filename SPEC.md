@@ -9,10 +9,10 @@ behavior, controlled proof and installed live qualification.
 ## 1. goals
 
 one shared supervisor for jarvis and nexus; truthful provider evidence, durable
-acceptance before actions, responsive control and useful work after cold restart.
-keep application authority and canonical state in the application. codapt supplies
-native supervision semantics; byte parity, workspace tools and its machine/billing
-infrastructure are excluded.
+(or explicitly transient) acceptance before actions, responsive control and useful
+work after cold restart. keep application authority and canonical state in the
+application. codapt supplies native supervision semantics; byte parity, workspace
+tools and its machine/billing infrastructure are excluded.
 
 ## 2. dependencies and implementation gate
 
@@ -68,6 +68,11 @@ identifies host acceptance and immutable `NativeReply`. `DispatchCompleted`
 contains the original llm-tools result, required host-rendered `model_text` and
 optional host receipt reference. the kernel submits that text unchanged;
 `DispatchSuspended` is an existing durable host wait, not execution success.
+
+`run_native` takes a host `NativeJournal` or the explicit `TransientNative`
+marker ([adr 0012](docs/decisions/0012-transient-native-attempts.md)). the marker
+selects per-call kernel memory with the same acceptance, duplicate and reply
+order and no durability or recovery claim. there is no default.
 
 ## 5. exact provider surface and containment
 
@@ -174,7 +179,9 @@ policy is admission/reservation, not an invented native inner-loop token ceiling
 stop promptly revokes callback authority, records control independently and
 interrupts only the affected turn. stopping cancels never-entered approval/action
 work in the host. entered effects still settle truthfully or require reconciliation.
-a stalled callback or withheld start acknowledgment cannot starve control.
+a callback that settles after stop records its reply, never sends it, and the turn
+still ends with its stop terminal. a stalled callback or withheld start
+acknowledgment cannot starve control.
 
 ## 11. run algorithms
 
@@ -183,6 +190,9 @@ prepare exact provider request -> durably arm -> submit -> supervise input,
 commentary and serial callbacks -> commit original terminal -> cleanup. each
 callback is validation -> host acceptance -> dispatch -> durable result -> durable
 reply -> wire reply. the transport reader remains independent of effect execution.
+recoverable native work supplies `NativeJournal`; disposable native work explicitly
+selects `TransientNative`, which keeps that order in memory, recovers nothing and
+loses the attempt with its process.
 
 `run_one_shot`: validate frozen read-only plan -> require owner -> recover or arm
 exact model decision -> stream provider turn -> commit original evidence -> decode
@@ -194,24 +204,29 @@ disposable inference explicitly selects `TransientModelDecisions`.
 
 native execution returns provider `AgentTerminal` with mandatory
 `NativeTerminalEvidence` or `LocalStopEvidence`. only exact own native seal can
-produce `NativeRecovery`; local stop never supplies recovery authority.
+produce `NativeRecovery`; local stop and transient work never supply it.
 `AgentNotSubmitted` is a separate authoritative provider submission fact.
-`NativeUncertain` preserves the armed unresolved attempt. it is never automatic
-redispatch permission. isolated outcomes remain `OneShotCompleted` or
-`OneShotStopped`, with original accepted decision/usage retained.
+the kernel never redispatches. with a `NativeJournal`, `NativeUncertain` preserves
+the armed unresolved attempt and is never redispatch permission. under
+`TransientNative` it preserves nothing: failing or rerunning from scratch is
+explicit host policy that accepts duplicate paid work and owns its effect
+identity ([adr 0012](docs/decisions/0012-transient-native-attempts.md)). isolated
+outcomes remain `OneShotCompleted` or `OneShotStopped`, with original accepted
+decision/usage retained.
 
 ## 13. observability and privacy
 
 use existing redacted kernel events/diagnostics. do not persist private raw
 transcripts or credentials for qualification. public fixtures may retain exact
-receipts. raw provider evidence belongs to the host's durable journal; product
-text is its separately derived projection. XML-like prompt structure establishes
-provenance, not a security boundary.
+receipts. raw provider evidence belongs to the host's durable journal, or for
+transient work only to the returned terminal; product text is its separately
+derived projection. XML-like prompt structure establishes provenance, not a
+security boundary.
 
 ## 14. required conformance
 
 [native acceptance](docs/native-agent-spec.md#9-delivery-and-acceptance) assigns
-N001–N020 exactly once. required verification includes controlled transport faults,
+N001–N021 exactly once. required verification includes controlled transport faults,
 actual recorder/store transactions, owner/process loss, real selected model plus
 research tools and strict JSON, containment and installed immutable artifacts.
 [the delivery plan](docs/native-agent-plan.md) specifies red/green/refactor and
@@ -255,8 +270,9 @@ paid decisions from their original record, never by regenerating a similar choic
 ### 17.1 explicit recovery contract
 
 `DurableIsolatedDecisions` supplies journal and `IsolatedDecisionScope`;
-`TransientModelDecisions` marks disposable work explicitly. supplied resume state
-must match exact definition, run/step, plan and request identity. accepted action
+`TransientModelDecisions` marks disposable work explicitly; native work chooses
+`NativeJournal` or `TransientNative` the same way. supplied resume state must
+match exact definition, run/step, plan and request identity. accepted action
 records, original arguments/revisions and effect identity remain host authority.
 
 ### 17.2 recovery and uncertainty
@@ -265,12 +281,15 @@ own native seal permits local product replay with zero provider/catalog calls.
 exact original-attempt non-submission proof permits local failure settlement.
 missing proof, local stop, parent outcome or exception naming stays uncertain.
 jarvis may restart reasoning in a fresh thread only after fencing the old attempt;
-original action barriers survive. nexus never redispatches an uncertain generation.
+original action barriers survive. journal-backed nexus generation never redispatches
+when uncertain. under `TransientNative` no uncertain record survives the call;
+nexus fails or reruns from scratch by its own policy, accepting that the lost
+attempt may have been charged (adr 0012).
 
 ## 18. native agent target requirements
 
 [the accepted detailed contract](docs/native-agent-spec.md) governs jarvis/nexus
-composition, schemas, content requirements and N001–N020. implementation status and
+composition, schemas, content requirements and N001–N021. implementation status and
 exact qualified artifacts live in [evidence](docs/native-agent-evidence.md), with
 [metadata handoff](docs/integrations/nexus-metadata.md). historical ADRs describe
 former decisions; they cannot reactivate deleted runtime paths.

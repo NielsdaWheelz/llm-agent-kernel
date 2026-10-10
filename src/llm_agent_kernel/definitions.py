@@ -376,7 +376,7 @@ class InitialReadDispatchLineage:
 
 @dataclass(frozen=True, slots=True)
 class NativeDispatchLineage:
-    """One durably accepted callback, never a completed model decision."""
+    """One accepted callback, durable unless transient; never a model decision."""
 
     attempt_id: str
     invocation_id: str

@@ -19,7 +19,7 @@ responsive control and understandable ownership are.
 | tools | both apps use declared native callbacks and the existing llm-tools executor; no native shell/files/web/network, mcp or unsolicited approvals |
 | autonomy | no task-wide model usage/call quota; no arbitrary jarvis main cutoff; finite operation and buffer bounds remain |
 | recovery | jarvis automatically restarts reasoning after fencing old callback authority; external effects retain reconciliation barriers |
-| metadata | exact frozen generation contract; uncertain journal step blocks redispatch; valid terminal supports local product recovery |
+| metadata | exact frozen generation contract; with a journal, an uncertain step blocks redispatch and a valid terminal supports local product recovery; `TransientNative` work fails or reruns from scratch (adr 0012) |
 | conversation | useful public progress/partial answers; ordinary new topics arrive promptly and retain unfinished requests |
 | approval | only the action and dependent work wait; return a durable pending receipt and continue independent work |
 | stop | atomically stop targeted work and cancel its unentered approvals/actions; already-dispatched effects settle or reconcile |
@@ -102,7 +102,7 @@ async def run_native(
     provider: ProviderSessionPort,
     session: ProviderSessionLease | None,
     owner: OwnerPort,
-    journal: NativeJournal,
+    journal: NativeJournal | TransientNative,
     inputs: NativeInputPort,
     dispatch: ToolDispatchPort,
     budgets: ToolBudgetFactoryPort,
@@ -277,9 +277,11 @@ it does not permit the event-discarding run_turn shortcut.
 
 recovery policy is frozen per host operation. jarvis restart_reasoning fences the old
 attempt, restores host action/result/input truth, then creates a NEW thread/attempt.
-metadata reconcile_only blocks redispatch of an uncertain journal step. credential,
-configuration and protocol defects block for correction; they are not endless
-transient retries. existing host reconnect backoff handles unavailable transport.
+metadata reconcile_only blocks redispatch of an uncertain journal step. under
+`TransientNative` nothing is recovered and recovery_policy is inert: it enters only
+a request fingerprint that nothing retains; host policy after loss is its own.
+credential, configuration and protocol defects block for correction; they are not
+endless transient retries. existing host reconnect backoff handles unavailable transport.
 
 retain healthy live session history. after connection loss, process restart,
 abandonment or containment fault, do not resume its native thread. cold-bootstrap
@@ -394,6 +396,16 @@ ownership/attempt/plan and assigns a host invocation id plus serial ordinal.
 matching duplicate call identity reopens its original record; changed bytes/revisions
 fail. record_reply/outcome allow only an identical duplicate. fencing is monotonic,
 does not erase evidence, and forbids new dispatch/reply authority.
+
+`TransientNative` ([adr 0012](decisions/0012-transient-native-attempts.md)) is
+the explicit alternative for disposable work. the kernel substitutes per-call
+memory: recover finds nothing; invocation acceptance assigns a random uuid4 id
+and a serial ordinal; a repeated call id reopens its original record and reply;
+other facts are kept nowhere. ordering, owner checks, stop/revoke and the returned
+terminal are unchanged. nothing survives the call; process loss loses the attempt,
+and an exception discards any seal the reader latched. invocation ids and positions
+are unique per acceptance, never cross-rerun effect identity: a host granting Write
+tools commits each effect atomically with its own record or owns reconciliation.
 
 callback sequence: correlate -> validate plan and pure input -> durable invocation ->
 host action/read-position acceptance. executable work then uses the existing
@@ -696,8 +708,9 @@ actual consumer topology are required for installed claims.
 | n3 | portable native callbacks/control and shared tools contracts | N009–N015 |
 | n4 | jarvis schema/main/control cutover and retired main-path deletion | N016–N019 |
 | n5 | nexus native callbacks/topology and shell-route deletion | N020 |
+| n6 | transient native attempts ([adr 0012](decisions/0012-transient-native-attempts.md)) | N021 |
 
-n2 and n3 depend on n1; n4/n5 depend on n3; n5 incorporates n2. no jarvis work-table,
+n2 and n3 depend on n1; n4/n5/n6 depend on n3; n5 incorporates n2. no jarvis work-table,
 memory or delegation upgrade is prerequisite. no cross-repo mega-release.
 
 | id | proof required |
@@ -722,6 +735,7 @@ memory or delegation upgrade is prerequisite. no cross-repo mega-release.
 | N018 | jarvis catalog/instruction/session rotation and stopped migration preserve requests/receipts; old pending approvals need fresh consent; unresolved legacy effects block hard cutover |
 | N019 | representative jarvis quality/completion/progress/input/stop/content tasks on actual contained host; measured latency/usage limitations; retired main code has no users |
 | N020 | nexus callback research quality, metadata contract, citations, private socket/two-job isolation, historical effect undo and final deletion of replaced shell/credential paths |
+| N021 | `TransientNative` needs no host journal; acceptance precedes dispatch and the reply follows its result; a repeated call id replays its reply without dispatch; stop cancels the entered callback before interrupt and returns the cancelled native terminal, sending no reply even when the callback settles after stop; a fresh attempt recovers nothing |
 
 ## 10. decisions, tradeoffs and implementation gates
 
@@ -737,6 +751,7 @@ memory or delegation upgrade is prerequisite. no cross-repo mega-release.
 | separate contained host, pinned vendor catalogue | keeps other coding clients unchanged; adds one jarvis service and explicit model-inventory requalification |
 | hard cutover | one implementation to understand; requires stopped migration, reconciled legacy effects and fresh approvals rather than execution compatibility |
 | phase-aware strict jarvis message | stock schema applies to commentary too; one additional Progress case keeps prose and final authority separate |
+| explicit transient native attempts | a host without recovery keeps no replay rows and copies no ordering; a crash loses the attempt and its evidence |
 | delete new feature tests after proof | follows owner instruction; forfeits their ongoing regression protection and requires fresh focused proof for later changes |
 
 technical choices above are selected, not deferred to a junior. native capability,

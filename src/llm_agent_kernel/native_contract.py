@@ -340,6 +340,11 @@ class NativeJournal(Protocol):
     async def fence(self, attempt_id: str, reason: str) -> None: ...
 
 
+@dataclass(frozen=True, slots=True)
+class TransientNative:
+    """Explicitly disposable native work: in-process order, no durability or recovery."""
+
+
 class NativeInputPort(Protocol):
     async def poll(
         self, request: NativeRequest, through_checkpoint: Checkpoint | None
@@ -372,4 +377,5 @@ __all__ = [
     "NATIVE_BASE_INSTRUCTION_REVISION",
     "OwnerPermit",
     "OwnerPort",
+    "TransientNative",
 ]

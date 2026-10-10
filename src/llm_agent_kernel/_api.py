@@ -124,6 +124,7 @@ from .native_contract import (
     NativeReply,
     NativeRequest,
     NativeUncertain,
+    TransientNative,
 )
 from .protocol import (
     MODEL_STEP_OUTPUT_NAME,
@@ -168,6 +169,7 @@ __all__ = [
     "NativeReply",
     "NativeRequest",
     "NativeUncertain",
+    "TransientNative",
     "NATIVE_BASE_INSTRUCTION",
     "NATIVE_BASE_INSTRUCTION_IDENTITY",
     "NATIVE_BASE_INSTRUCTION_REVISION",

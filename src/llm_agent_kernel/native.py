@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import uuid
 from collections import deque
 from collections.abc import Awaitable
 from dataclasses import dataclass, replace
@@ -34,6 +35,7 @@ from provider_runtime.agent_runtime import (
     AgentToolReply,
     AgentToolUse,
     AgentTurnControls,
+    AgentTurnRef,
     AgentUncertain,
     AgentUsage,
     LocalStopEvidence,
@@ -50,7 +52,7 @@ from provider_runtime.tool_adapter import (
     ToolPublication,
     lower_tools,
 )
-from provider_runtime.types import Present, TokenUsage, ToolCall
+from provider_runtime.types import JsonObject, Present, TokenUsage, ToolCall
 
 from .cancellation import CancellationToken
 from .context import input_batch
@@ -71,6 +73,7 @@ from .definitions import (
     NativeDispatchLineage,
 )
 from .native_contract import (
+    InvocationRecord,
     NativeDefect,
     NativeDefinition,
     NativeDelivery,
@@ -82,6 +85,7 @@ from .native_contract import (
     NativeReply,
     NativeRequest,
     NativeUncertain,
+    TransientNative,
 )
 from .provider import ProviderContainmentViolation, ProviderSessionLease, ProviderSessionPort
 from .tools import require_native_plan
@@ -94,6 +98,52 @@ class _Callback:
     binding: ToolBinding[Any, Any, Any]
     validated_input: object
     size: int
+
+
+class _TransientJournal:
+    """One call's memory: the same order as a journal, lost with the process."""
+
+    def __init__(self) -> None:
+        self._accepted: dict[str, InvocationRecord] = {}
+        self._replies: dict[str, NativeReply] = {}
+
+    async def recover(self, attempt_id: str) -> None:
+        return None
+
+    async def arm(
+        self,
+        request: NativeRequest,
+        provider_attempt: AgentAttempt,
+        *,
+        definition_fingerprint: str,
+        submitted_request: JsonObject,
+    ) -> None:
+        return None
+
+    async def bind(self, attempt_id: str, native_turn: AgentTurnRef) -> None:
+        return None
+
+    async def record_invocation(self, proposal: NativeInvocationProposal) -> InvocationRecord:
+        # A repeated native call id reopens its original acceptance and reply.
+        record = self._accepted.get(proposal.call_id)
+        if record is None:
+            record = InvocationRecord(str(uuid.uuid4()), len(self._accepted) + 1, proposal, None)
+            self._accepted[proposal.call_id] = record
+        return replace(record, reply=self._replies.get(record.invocation_id))
+
+    async def record_reply(self, invocation_id: str, receipt: NativeReply) -> None:
+        self._replies[invocation_id] = receipt
+
+    async def record_delivery(self, delivery: NativeDelivery) -> None:
+        return None
+
+    async def record_outcome(
+        self, attempt_id: str, evidence: AgentSubmission | AgentTerminal | AgentControlReceipt
+    ) -> None:
+        return None
+
+    async def fence(self, attempt_id: str, reason: str) -> None:
+        return None
 
 
 def native_request_fits(definition: NativeDefinition, sections: PromptSections) -> bool:
@@ -113,14 +163,20 @@ async def run_native(
     provider: ProviderSessionPort,
     session: ProviderSessionLease | None,
     owner: OwnerPort,
-    journal: NativeJournal,
+    journal: NativeJournal | TransientNative,
     inputs: NativeInputPort,
     dispatch: ToolDispatchPort,
     budgets: ToolBudgetFactoryPort,
     messages: NativeMessagePort,
     cancellation: CancellationToken,
 ) -> AgentNotSubmitted | AgentTerminal:
-    """Supervise one native attempt; host policy owns task continuation/recovery."""
+    """Supervise one native attempt; host policy owns task continuation/recovery.
+
+    `TransientNative` keeps every ordering guarantee in this call's memory and
+    makes no durable or recovery claim: process loss loses the attempt.
+    """
+    if isinstance(journal, TransientNative):
+        journal = _TransientJournal()
     await owner.require_current(request.permit)
     recovered = await journal.recover(request.attempt_id)
     if recovered is not None:
@@ -254,6 +310,9 @@ async def run_native(
             receipt = _reply(result)
             await journal.record_reply(record.invocation_id, receipt)
         await owner.require_current(request.permit)
+        if stop_reason is not None:
+            # A callback that settles after stop keeps its recorded reply unsent.
+            return receipt
         await turn.reply(callback.call, AgentToolReply(receipt.text, receipt.success))
         return receipt
 
