@@ -3,7 +3,8 @@
 status: accepted scope implemented and qualified; exact artifacts and proof are in
 [implementation evidence](native-agent-evidence.md). the [contract](native-agent-spec.md) owns behavior, types and schemas;
 this document owns delivery, file boundaries and proof. all n1–n5 slices are
-implemented on isolated feature branches. the [metadata handoff](integrations/nexus-metadata.md) records
+implemented on isolated feature branches; n6 is implemented with controlled proof
+and awaits its first consumer. the [metadata handoff](integrations/nexus-metadata.md) records
 the separately running consumer and exact capability requirement.
 
 ## working rules
@@ -173,6 +174,22 @@ reviewer attacks private socket permissions, shared-server session isolation,
 historical undo and uncertainty during job cancellation. designer checks metadata
 precision and citation fidelity; callback migration adds no domain schema fields.
 
+## n6 — transient native attempts
+
+owns N021 ([adr 0012](decisions/0012-transient-native-attempts.md)). depends on n3.
+files: kernel `native_contract.py` (`TransientNative`), `native.py` (per-call
+journal substitution; no mode branch in the loop), `_api.py` and the normative
+docs. no provider-runtime, llm-tools or consumer change.
+
+proof: controlled app-server peer through installed provider-runtime callback
+transport, no journal: acceptance before dispatch, reply after result, repeated
+call id without second dispatch, stop cancelling the entered dispatch before
+interrupt with no reply (also when the dispatch settles after stop), fresh attempt
+recovers nothing. `tests/test_native_transient.py` is RETAINED conformance, an
+explicit exception to the deletion rule below: it is the only `run_native`
+coverage. reviewer attacks effect identity across reruns and uncertainty wording.
+nexus adoption is a separate consumer slice under the owner's generation rewrite.
+
 ## red, green, refactor, delete
 
 create one temporary acceptance folder per owning repo. provider/tools/kernel use
@@ -208,10 +225,11 @@ isolated environments, never from an accidental sibling import.
 
 after green, refactor within the same slice; repeat only affected acceptance and
 required checks. rerun affected dependent consumer cases on the final integrated
-tree once. record proof, then delete all newly created feature acceptance tests,
-fault proxies, fixtures and test-only dependencies as requested. remove superseded
-existing cases only when their runtime path is deleted. unrelated existing tests
-remain. no test deletion counts as a passing test.
+tree once. record proof, then delete all newly created feature acceptance tests
+(except n6's retained N021 conformance), fault proxies, fixtures and test-only
+dependencies as requested. remove superseded existing cases only when their runtime
+path is deleted. unrelated existing tests remain. no test deletion counts as a
+passing test.
 
 after deletion, run the final static/type/build checks and compare runtime artifact
 bytes and resolved runtime dependencies with the qualified artifact. if they changed,

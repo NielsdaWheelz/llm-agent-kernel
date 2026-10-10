@@ -1,6 +1,6 @@
 # acceptance
 
-current acceptance is N001–N020 in the normative
+current acceptance is N001–N021 in the normative
 [native contract](native-agent-spec.md#9-delivery-and-acceptance). each id belongs
 to one slice in [the delivery plan](native-agent-plan.md). former conversational
 loop/capacity/CAS acceptance is superseded by adr 0010 and its path deletion.

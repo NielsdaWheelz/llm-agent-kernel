@@ -1,9 +1,10 @@
 # native agent implementation evidence
 
 status: accepted scope implemented and qualified. all N001–N020 gates below pass;
-new temporary feature tests are deleted. current-main delivery is recorded below.
-unrelated checkout state and metadata ownership are preserved. controlled peers
-establish their boundary; they are never research.
+new temporary feature tests are deleted. N021 (adr 0012) passes retained
+controlled conformance only; no consumer has adopted it yet. current-main
+delivery is recorded below. unrelated checkout state and metadata ownership are
+preserved. controlled peers establish their boundary; they are never research.
 
 ## current-main delivery, 2026-10-03/04 utc
 
@@ -166,6 +167,7 @@ sha256 `c65428a7cd9e707c65b024633c764e6e55155456d8a72798675f0689a3bc4596`.
 | N018 | real stopped migration/catalog/instruction rotation preserves canonical requests; entered legacy effects block; old approvals require fresh consent | pass |
 | N019 | final actual search/read and honest missing-source/original-versus-edition answers; useful prose progress; composed 2,000-character overflow yields one bounded failure with original seal/usage | pass |
 | N020 | final nexus genuine research, atomic progress/final SSE, original resource citations/model projection; unknown[999] yields CitationsUnavailable and zero fabricated edges; two-job cancellation isolation and original historical undo | pass |
+| N021 | 2026-10-09 `uv run pytest -q tests/test_native_transient.py` (4 cases): controlled app-server peer over installed provider-runtime d9550d9; no host journal; zero replies before dispatch result; repeated call id dispatches once with identical replies; stop cancels the entered dispatch before the peer sees interrupt and returns the cancelled native terminal with zero replies, whether the dispatch re-raises or settles after cancellation; a fresh attempt id starts fresh with a new invocation id. mutants removing call-id reuse, stop's dispatch cancel or the post-stop reply guard each fail; removing stop's revoke survives (it fences only a reply already handed to provider-runtime, which owns that check). no model, consumer or installed-host claim | pass (controlled) |
 
 ## original installed research and artifacts
 

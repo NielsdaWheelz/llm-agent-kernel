@@ -2,14 +2,41 @@
 
 compose exact provider configuration, role/output schema and maximum profile into
 `NativeDefinition`; select a tightening frozen plan and canonical ordered inputs
-for `NativeRequest`. supply current `OwnerPermit`, `OwnerPort`, `NativeJournal`,
-`NativeInputPort`, `NativeMessagePort`, tool dispatch and budget factory ports.
+for `NativeRequest`. supply current `OwnerPermit`, `OwnerPort`, a `NativeJournal`
+or explicit `TransientNative`, `NativeInputPort`, `NativeMessagePort`, tool dispatch
+and budget factory ports.
 provider account/server lifecycle stays outside the kernel. the stock server loads
 the provider-owned restricted model catalogue at startup; per-thread overrides
 cannot establish this ceiling. jarvis uses its own contained endpoint; nexus uses
 its dedicated host. see [adr 0011](decisions/0011-contained-native-host.md).
 
+## transient native work
+
+a host that claims no native recovery passes `journal=TransientNative()`
+([adr 0012](decisions/0012-transient-native-attempts.md)). the kernel keeps
+acceptance, duplicate-callback replay and reply-before-send order in per-call
+memory; the durable facts below are not kept. the host still checks ownership,
+polls input, dispatches tools and records whatever tool/effect rows it needs,
+commits public messages and acquires the session. use a fresh `attempt_id` per
+call. on return, persist what the product needs from the returned terminal or
+`AgentNotSubmitted`; an exception or process loss leaves no kernel evidence (not
+even a latched seal; observed usage stays on the lease), so the host settles the
+work as failed or reruns it from scratch, accepting that the lost attempt may
+have been charged. `recovery_policy` is inert in this mode.
+
+the kernel keeps no effect barrier here. invocation ids and positions are unique
+per acceptance, never an effect identity a rerun can recognize. for Write tools,
+commit each effect atomically with its durable row, or own its reconciliation;
+derive any cross-rerun idempotency from host identity, not from lineage. a rerun
+is new model work and may repeat an equivalent write. a dispatch that settles
+after stop may return its result; the kernel records and never sends it.
+
+the owner selected this mode for nexus generation on 2026-10-09; until that
+cutover lands, the nexus section below describes the deployed durable adapter.
+
 ## required durable facts
+
+with a `NativeJournal`:
 
 - arm original provider attempt/request digest and submitted bytes before send;
 - bind the exact native turn; retain submission facts separately from terminal;

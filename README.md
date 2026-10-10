@@ -4,7 +4,8 @@ portable native agent supervision for jarvis and nexus. the kernel shares contro
 callback ordering and truthful recovery; applications keep canonical context,
 effects, consent and publication.
 
-`run_native` supervises one exact native turn with declared host callbacks.
+`run_native` supervises one exact native turn with declared host callbacks, over a
+host journal or explicitly `TransientNative` per-call memory.
 `run_one_shot` serves retained isolated read-only gate/context/memory roles.
 `generation.run_generation` serves nexus's raw API lane. the conversational
 structured-step loop and shell tool relay are removed.

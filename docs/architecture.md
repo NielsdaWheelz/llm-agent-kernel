@@ -2,11 +2,12 @@
 
 provider-runtime owns native protocol facts; llm-tools owns executable tool
 contracts; the kernel orders those mechanisms beneath host authority. jarvis and
-nexus supply different durable application ports to the same `run_native`.
+nexus supply different application ports to the same `run_native`; a host without
+native recovery selects `TransientNative` instead of a journal.
 
 | module | hidden responsibility | public contract |
 | --- | --- | --- |
-| `native_contract.py` | frozen definition/work identity, base instruction and port types | `NativeDefinition`, `NativeRequest`, journal/input/message ports |
+| `native_contract.py` | frozen definition/work identity, base instruction and port types | `NativeDefinition`, `NativeRequest`, `TransientNative`, journal/input/message ports |
 | `native.py` | one native turn, independent control, bounded callback queue and serial dispatch | `run_native` |
 | `provider.py` | contained isolated sessions and typed native-event consumption | `CodexProvider`, `ProviderSessionLease` |
 | `decisions.py` | exact paid model-decision recovery before interpretation | durable/transient isolated decision selection |
@@ -29,8 +30,9 @@ private persistent codex hosts expose a uid-restricted socket and read-only cwd.
 workers retain no account credentials. no remote HTTP shell relay or second
 registry/executor exists. an owned handle's cancellation cannot stop its sibling.
 
-the kernel adds no operational store. jarvis's real request/attempt/invocation
-rows and nexus's existing journal/model-turn/tool-position rows own durability.
+the kernel adds no operational store; transient native memory lives for one call.
+jarvis's real request/attempt/invocation rows and nexus's existing
+journal/model-turn/tool-position rows own durability.
 owner checks grant entry authority; original accepted work may still record its
 factual result after entry authority is revoked.
 
