@@ -75,6 +75,7 @@ MODEL_TEXT = '<section kind="tool_result">bounded observation</section>'
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
     query: str
+    tags: list[str]
 
 
 class Output(BaseModel):
@@ -92,6 +93,7 @@ class Peer:
         self.starts = 0
         self.responses: list[dict[str, Any]] = []
         self.repeat_callback = False
+        self.arguments: dict[str, object] = {"query": "bounded", "tags": ["one", "two"]}
         self.log: list[str] = []
 
     async def send(self, value: object) -> None:
@@ -113,7 +115,7 @@ class Peer:
                     "turnId": "turn",
                     "callId": "call",
                     "tool": self.tool_name,
-                    "arguments": {"query": "bounded"},
+                    "arguments": self.arguments,
                 },
             }
         )
@@ -125,7 +127,7 @@ class Peer:
                 "id": "call",
                 "type": "dynamicToolCall",
                 "tool": self.tool_name,
-                "arguments": {"query": "bounded"},
+                "arguments": self.arguments,
                 "status": "completed" if success else "failed",
             },
         )
@@ -205,7 +207,7 @@ class Peer:
                         "id": "call",
                         "type": "dynamicToolCall",
                         "tool": self.tool_name,
-                        "arguments": {"query": "bounded"},
+                        "arguments": self.arguments,
                     },
                 )
                 await self.callback("callback")
@@ -229,6 +231,7 @@ class Host:
         self.log = log
         self.settle_after_cancel = settle_after_cancel
         self.lineages: list[NativeDispatchLineage] = []
+        self.inputs: list[object] = []
         self.messages: list[str] = []
         self.entered = asyncio.Event()
         self.progress = asyncio.Event()
@@ -247,9 +250,12 @@ class Host:
         self.messages.append(message.text)
         self.progress.set()
 
-    async def dispatch(self, *, lineage: Any, **_: object) -> DispatchCompleted:
+    async def dispatch(
+        self, *, lineage: Any, validated_input: object, **_: object
+    ) -> DispatchCompleted:
         assert isinstance(lineage, NativeDispatchLineage)
         self.lineages.append(lineage)
+        self.inputs.append(validated_input)
         self.entered.set()
         try:
             await self.release.wait()
@@ -383,6 +389,8 @@ async def test_transient_turn_accepts_before_dispatch_and_replies_after_result(
     (lineage,) = host.lineages
     assert (lineage.attempt_id, lineage.ordinal) == ("attempt", 1)
     assert UUID(lineage.invocation_id).version == 4
+    # Array arguments reach dispatch validated, not refused as frozen tuples.
+    assert host.inputs[0] == Input(query="bounded", tags=["one", "two"])
 
     # Nothing survives the call: a fresh attempt with the same marker starts fresh work.
     provider, definition, request = native
