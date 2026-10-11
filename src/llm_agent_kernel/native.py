@@ -696,7 +696,8 @@ def _callback(
         )
     elif isinstance(resolved, CanonicalToolCall):
         try:
-            validated = validate_tool_input(binding, dict(resolved.arguments))
+            # the plain JSON the model sent: resolved.arguments freezes arrays into tuples.
+            validated = validate_tool_input(binding, cast(dict[str, object], raw))
         except (TypeError, ValueError):
             rejection = NativeRejected(
                 "invalid_arguments",
