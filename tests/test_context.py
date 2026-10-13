@@ -154,7 +154,7 @@ def test_bootstrap_contains_stable_canonical_input_time_and_exact_host_table() -
     assert projection.visible_bytes == len(projection.rendered.encode("utf-8"))
 
 
-def test_default_input_projection_is_byte_for_byte_legacy_rendering() -> None:
+def test_default_input_projection_keeps_canonical_input_framing() -> None:
     definition, plan, _binding = _definition()
     item = _input()
     as_of = datetime(2026, 9, 2, 12, 1, tzinfo=UTC)
@@ -167,12 +167,12 @@ def test_default_input_projection_is_byte_for_byte_legacy_rendering() -> None:
         plan,
         PromptSections((history,)),
     )
-    legacy_sections = PromptSections(
+    expected_sections = PromptSections(
         (
             *definition.role.instructions.sections,
             *definition.stable_context.sections,
-            history,
             publish_host_plan(plan, definition.maximum_profile),
+            history,
             PromptSection(
                 PromptSectionKind("host_input_batch"),
                 (PromptAttribute(PromptAttributeName("as_of"), as_of.isoformat()),),
@@ -197,8 +197,8 @@ def test_default_input_projection_is_byte_for_byte_legacy_rendering() -> None:
         )
     )
 
-    assert projection.rendered == render_prompt(legacy_sections)
-    assert projection.sections == legacy_sections
+    assert projection.rendered == render_prompt(expected_sections)
+    assert projection.sections == expected_sections
 
 
 def test_definition_can_hide_all_model_visible_input_timestamps() -> None:

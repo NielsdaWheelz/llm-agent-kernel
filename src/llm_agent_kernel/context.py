@@ -132,8 +132,8 @@ def bootstrap_context(
         (
             *definition.role.instructions.sections,
             *definition.stable_context.sections,
-            *source_sections.sections,
             publish_host_plan(plan, definition.maximum_profile),
+            *source_sections.sections,
             input_batch(
                 inputs,
                 as_of,
@@ -346,7 +346,7 @@ def tool_observation_section(
         ),
         body=PromptSections(
             (
-                PromptSection(PromptSectionKind("model_reply"), (), PromptText(model_text)),
+                PromptSection(PromptSectionKind("model_reply"), (), PromptJson(model_text)),
                 PromptSection(
                     PromptSectionKind("source_references"),
                     (),

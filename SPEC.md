@@ -23,8 +23,8 @@ consumer manifests pin that version.
 
 | dependency | exact candidate revision |
 | --- | --- |
-| llm-tools | `73056dfb23733e68bd32b6765cc34880f69674bd` |
-| provider-runtime | `d9550d9c53af3d7b608250d9a0db131d78dccf64` |
+| llm-tools | `5a37102bc73c1af0c23e63c5b70df320661f63ed` |
+| provider-runtime | `bf428c098e707e98791ce1c6efbfd58671179aff` |
 
 any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.
@@ -127,9 +127,18 @@ call id. domain reconciliation remains application-owned.
 ## 8. context and steering
 
 canonical host context cold-bootstraps useful work; native history is disposable.
+isolated bootstrap order is role instructions, stable context, the proved frozen
+host-tool plan, host source sections, then operative inputs and clocks. stable
+definitions and tools precede changing historical views and tasks; continuations
+append only their new material.
 `tool_observation_section` exposes the same isolated observation frame used by
 the kernel, so hosts can budget result paging with the actual `llm-tools`
 renderer and its escaping. it creates prompt data and grants no tool authority.
+the observation's `model_reply` body is a json string encoding the original
+arbitrary host text. decode that presentation layer once; do not parse or
+reconstruct the host reply during rendering. canonical receipts and native
+callback reply bytes remain unchanged. the isolated base instruction names this
+presentation and includes its revision in definition fingerprints.
 `input_batch` exposes the same timestamp/as_of frame used for steering, so a
 host renders an initial native batch without copying kernel presentation.
 `native_request_fits(definition, sections)` uses the actual kernel renderer and
