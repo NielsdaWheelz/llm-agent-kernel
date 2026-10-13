@@ -8,6 +8,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
+from xml.etree import ElementTree
 
 import pytest
 from llm_tools import (
@@ -679,8 +680,14 @@ async def test_declared_initial_read_failure_is_a_typed_first_turn_observation(
 
     assert isinstance(outcome, OneShotCompleted)
     submitted = cast(TextContent, runtime.turns[0].input[0]).text
-    assert '"type":"Failure"' in submitted
-    assert '"reason":"not-found"' in submitted
+    model_reply = ElementTree.fromstring(f"<root>{submitted}</root>").findtext(
+        ".//section[@kind='model_reply']"
+    )
+    assert model_reply is not None
+    assert (
+        json.loads(model_reply)
+        == canonical_json_bytes({"type": "Failure", "error": {"reason": "not-found"}}).decode()
+    )
 
 
 @pytest.mark.parametrize("effect", [ToolEffect.Pure, ToolEffect.Write])
@@ -914,7 +921,12 @@ async def test_initial_read_budget_boundary_is_rendered_without_external_work(
 
     assert isinstance(outcome, OneShotCompleted)
     assert len(dispatcher.calls) == 1
-    assert '"type":"BudgetExceeded"' in cast(TextContent, runtime.turns[0].input[0]).text
+    submitted = cast(TextContent, runtime.turns[0].input[0]).text
+    model_reply = ElementTree.fromstring(f"<root>{submitted}</root>").findtext(
+        ".//section[@kind='model_reply']"
+    )
+    assert model_reply is not None
+    assert json.loads(model_reply) == canonical_json_bytes({"type": "BudgetExceeded"}).decode()
 
 
 async def test_initial_read_cancellation_before_dispatch_and_after_completion(

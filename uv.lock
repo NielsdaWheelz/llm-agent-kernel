@@ -621,8 +621,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=73056dfb23733e68bd32b6765cc34880f69674bd" },
-    { name = "provider-runtime", git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=e0c30b31b0d507f77f676c2b9e4f18a7c7331815" },
+    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=5a37102bc73c1af0c23e63c5b70df320661f63ed" },
+    { name = "provider-runtime", git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=98ea2f2a8646bf42aec943596f88135512f612bd" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
 
@@ -640,7 +640,7 @@ dev = [
 [[package]]
 name = "llm-tools"
 version = "0.1.0"
-source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=73056dfb23733e68bd32b6765cc34880f69674bd#73056dfb23733e68bd32b6765cc34880f69674bd" }
+source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=5a37102bc73c1af0c23e63c5b70df320661f63ed#5a37102bc73c1af0c23e63c5b70df320661f63ed" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
@@ -876,7 +876,7 @@ wheels = [
 [[package]]
 name = "provider-runtime"
 version = "0.1.0"
-source = { git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=e0c30b31b0d507f77f676c2b9e4f18a7c7331815#e0c30b31b0d507f77f676c2b9e4f18a7c7331815" }
+source = { git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=98ea2f2a8646bf42aec943596f88135512f612bd#98ea2f2a8646bf42aec943596f88135512f612bd" }
 dependencies = [
     { name = "anthropic" },
     { name = "google-genai" },
