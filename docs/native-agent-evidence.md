@@ -6,6 +6,25 @@ controlled conformance only; no consumer has adopted it yet. current-main
 delivery is recorded below. unrelated checkout state and metadata ownership are
 preserved. controlled peers establish their boundary; they are never research.
 
+## unpublished-call refusal, 2026-10-13 utc
+
+owner decision 2026-10-13: a model's call to an unpublished function that stock
+codex refuses itself (`unsupported call: <name>`) and runs nothing for is a model
+error. [provider pr 39](https://github.com/NielsdaWheelz/llm-calling/pull/39)
+(merged `e0c30b31`, tree equal to tested head `472f694b`) holds the raw proposal
+until that exact refusal. the kernel pins it and changes no code: every
+`AgentToolUse` still raises `ProviderContainmentViolation`.
+
+temporary composition cases drove `run_native` over the n6 controlled peer with
+the raw proposal before the declared callback. at d9550d9 the refused call raised
+`ProviderContainmentViolation`; at the provider head the turn completed with one
+dispatch, and a call answered by anything but the refusal still raised. they were
+deleted after the integrated proof; provider runtime bytes are identical between
+the tested head and the merged pin. integrated proof: nexus tools harness on stock
+codex 0.160.0 with a fake model on a sealed network; journey T4e failed
+`policy_violation` on the old pins and passes, with all 30 journeys, at the
+tested provider head. paid native model and raw-provider matrix: NOT_RUN.
+
 ## current-main delivery, 2026-10-03/04 utc
 
 the original acceptance below remains tied to its recorded artifacts. composing
