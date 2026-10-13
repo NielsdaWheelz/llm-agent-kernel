@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@5a37102bc73c1af0c23e63c5b70df320661f63ed",
-    "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@bf428c098e707e98791ce1c6efbfd58671179aff",
+    "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@ac547ad2a0be0523b32c7f54a831038b0191d6cd",
     "pydantic>=2.11,<3",
 ]
 
