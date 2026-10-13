@@ -6,6 +6,11 @@ controlled conformance only; no consumer has adopted it yet. current-main
 delivery is recorded below. unrelated checkout state and metadata ownership are
 preserved. controlled peers establish their boundary; they are never research.
 
+owner waiver, 2026-10-13: paid live runs (native model qualification, the
+provider-runtime raw and agent matrices, the containment probe) gate no kernel or
+provider-runtime change and no nexus pin bump. deterministic conformance and
+controlled proofs qualify a change; record paid runs not made as `NOT_RUN`.
+
 ## unpublished-call refusal, 2026-10-13 utc
 
 owner decision 2026-10-13: a model's call to an unpublished function that stock
