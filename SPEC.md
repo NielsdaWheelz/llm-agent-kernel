@@ -24,7 +24,7 @@ consumer manifests pin that version.
 | dependency | exact candidate revision |
 | --- | --- |
 | llm-tools | `5a37102bc73c1af0c23e63c5b70df320661f63ed` |
-| provider-runtime | `ac547ad2a0be0523b32c7f54a831038b0191d6cd` |
+| provider-runtime | `98ea2f2a8646bf42aec943596f88135512f612bd` |
 
 any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.
@@ -86,7 +86,11 @@ preflight refusal, not a route fallback.
 native codex built-ins, web, MCP, inherited environment, network and unsolicited
 permissions are disabled. cwd is private, empty and read-only. host callbacks
 are the only application tools. a native tool/permission event is a containment
-defect: fence callbacks and discard only that session. the account host retains
+defect: fence callbacks and discard only that session. a model's call to a function
+the plan never published, which the stock host refuses itself and runs nothing for,
+is a model error, not such an event: provider-runtime reports nothing and the turn
+continues ([provider decision](https://github.com/NielsdaWheelz/llm-calling/blob/e0c30b31b0d507f77f676c2b9e4f18a7c7331815/docs/decisions/2026-10-13-codex-refused-unpublished-calls.md)).
+the account host retains
 credentials; worker state is empty and accountless. native host network for model
 authentication is distinct from model/tool network authority.
 
