@@ -44,6 +44,7 @@ from provider_runtime.agent_runtime import (
     AgentRuntime,
     AgentRuntimeConfig,
     AgentTerminal,
+    CodexUnixEndpoint,
     CredentialRef,
     JsonSchemaAgentOutput,
     NativeTerminalEvidence,
@@ -305,7 +306,7 @@ async def native(
         ProfileId("native"), (ToolGrant(spec.id, None),), RunLimits(None, None, None, None, 1, None)
     ).freeze(catalog)
     plan = ToolPlan(maximum.id, Native()).freeze(catalog, maximum)
-    runtime = AgentRuntime(AgentRuntimeConfig(tmp_path, {"test": peer.socket}))
+    runtime = AgentRuntime(AgentRuntimeConfig(tmp_path, {"test": CodexUnixEndpoint(peer.socket)}))
     auth = CredentialRef("local_account", "test")
     models = await runtime.model_catalog(backend="codex", transport="sdk", auth=auth)
     row = models.models[0]

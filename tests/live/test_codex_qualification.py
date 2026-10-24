@@ -53,6 +53,7 @@ from llm_tools import (
 from provider_runtime.agent_runtime import (
     AgentRuntime,
     AgentRuntimeConfig,
+    CodexUnixEndpoint,
     CredentialRef,
     TextContent,
     TurnRequest,
@@ -113,7 +114,7 @@ def _live_runtime_config(profile_key: str) -> tuple[AgentRuntimeConfig, Path]:
     return (
         AgentRuntimeConfig(
             state_root_base=state_root,
-            codex_endpoints={profile_key: socket_path},
+            codex_endpoints={profile_key: CodexUnixEndpoint(socket_path)},
         ),
         cwd_parent,
     )
