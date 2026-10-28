@@ -18,8 +18,9 @@ tools and its machine/billing infrastructure are excluded.
 
 python 3.12+. `pyproject.toml` and `uv.lock` name exact immutable provider-runtime
 and llm-tools revisions. install the frozen lock. no sibling-source import is an
-installed qualification. the qualified native binary is stock codex 0.160.0;
-consumer manifests pin that version.
+installed qualification. contained execution requires stock codex 0.165.0 and
+provider-runtime's exact startup catalog; consumer manifests pin that version.
+host activation still requires real account/worker qualification.
 
 any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.

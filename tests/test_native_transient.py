@@ -177,7 +177,7 @@ class Peer:
                     "data": [
                         {
                             "id": "peer",
-                            "model": "peer-model",
+                            "model": "gpt-6.1-sol",
                             "displayName": "Peer",
                             "hidden": False,
                             "inputModalities": ["text"],
