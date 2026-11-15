@@ -304,7 +304,7 @@ def test_dependency_web_search_operation_deadline_api_is_revisioned() -> None:
         WEB_SEARCH_SPEC.tool_contract_revision
         == "c46877ad7f12d672c2717fd0895f5bd95983dd5f6ffb6e6c9c4a2c22c573b78e"
     )
-    assert default.implementation_revision == "llm-tools-web-search-v2"
+    assert default.implementation_revision == "llm-tools-web-search-v3"
     assert default.policy_epoch == PolicyEpoch("web-search-v2")
     assert (
         default.policy_revision

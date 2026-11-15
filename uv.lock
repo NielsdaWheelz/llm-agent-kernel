@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -621,7 +621,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=5a37102bc73c1af0c23e63c5b70df320661f63ed" },
+    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=8989f3afdcc640f775bd0cc9e7a0b4c246f10e57" },
     { name = "provider-runtime", git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=98ea2f2a8646bf42aec943596f88135512f612bd" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
@@ -640,7 +640,7 @@ dev = [
 [[package]]
 name = "llm-tools"
 version = "0.1.0"
-source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=5a37102bc73c1af0c23e63c5b70df320661f63ed#5a37102bc73c1af0c23e63c5b70df320661f63ed" }
+source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=8989f3afdcc640f775bd0cc9e7a0b4c246f10e57#8989f3afdcc640f775bd0cc9e7a0b4c246f10e57" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },

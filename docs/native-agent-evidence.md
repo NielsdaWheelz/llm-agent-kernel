@@ -355,3 +355,16 @@ and private at `/private/tmp/native-metadata-cutover-gu65429d/stock-rollouts/`, 
 path/hash mapping and scope in `host-release.receipt.json`. metadata evidence copies,
 databases, unrelated hosts and global socket parent remain untouched. no provider
 calls or production writes accompanied release; historical production remains BLOCKED.
+
+## 2026-11-14 memory dependency composition
+
+the memory delivery aligns llm-tools at `8989f3afdcc640f775bd0cc9e7a0b4c246f10e57`
+while retaining provider-runtime `98ea2f2a8646bf42aec943596f88135512f612bd` and the
+stock 0.160.0 contract. kernel runtime source is unchanged. the existing web
+dependency assertion now expects that dependency's declared implementation v3;
+its policy epoch, deadline and contract assertions remain unchanged.
+
+frozen formatting, lint, types and non-live conformance pass: 176 tests, two live
+tests deselected. source/wheel build passes with hatchling 1.33.0. these checks
+qualify the dependency composition, not installed/live application acceptance;
+jarvis owns that separate proof before deployment.
