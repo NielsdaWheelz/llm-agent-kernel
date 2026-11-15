@@ -24,7 +24,7 @@ consumer manifests pin that version.
 | dependency | exact candidate revision |
 | --- | --- |
 | llm-tools | `8989f3afdcc640f775bd0cc9e7a0b4c246f10e57` |
-| provider-runtime | `adf1b714dec6b2517ba468085674665923c237fc` |
+| provider-runtime | `70178ec8bb5b54304367ad60c0732447084a37c7` |
 
 any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.

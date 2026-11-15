@@ -405,3 +405,20 @@ unchanged. all 176 non-live tests pass, with two live tests deselected; format,
 lint, types, the ci-pinned lock check, build and index audit pass. provider evidence
 includes actual no-model restricted threads with inherited http/stdio servers
 disabled. installed application proof remains jarvis's separate responsibility.
+
+## 2026-11-15 pending-baseline dependency composition
+
+the immutable `jarvis-memory-partial-baselines-2026-11-15` artifact starts from
+`419e5fe3e251e9ffdf506ae88fb7149fac6e1549` and pins provider-runtime
+`70178ec8bb5b54304367ad60c0732447084a37c7`. provider archive v3 permits healthy
+capture beside explicitly pending unreadable baselines. kernel implementation,
+tests, llm-tools, all 66 registry package records and the stock 0.160.0 containment
+contract remain unchanged. this artifact is a fixed consumer composition, not a
+second maintained runtime branch.
+
+the ci-pinned uv 0.11.28 lock check and frozen installation, formatting, lint,
+typing, all 176 non-live tests (two live tests deselected), source/wheel builds
+and index audit pass. the installed provider receipt matches the exact git pin.
+the index audit excludes the three private/git packages. independent review
+verified the pin-only composition; installed application proof remains jarvis's
+separate responsibility. no model call or runtime upgrade is claimed here.
