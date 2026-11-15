@@ -371,3 +371,25 @@ frozen formatting, lint, types and non-live conformance pass: 176 tests, two liv
 tests deselected. source/wheel build passes with hatchling 1.33.0. these checks
 qualify the dependency composition, not installed/live application acceptance;
 jarvis owns that separate proof before deployment.
+
+## 2026-11-14 memory archive maintenance
+
+this maintenance branch starts from kernel
+`8524c8c737bbe56a0993da1421084d0122d08f49` and adopts provider-runtime
+`97c0475fdd99679c813b12b23b89ea12c9819dff`. the provider repairs archive discovery,
+native provenance and bounded history paging. kernel source/tests, llm-tools
+`8989f3afdcc640f775bd0cc9e7a0b4c246f10e57`, stock 0.160.0 and its containment
+catalog remain unchanged; this does not adopt the separate current host runtime.
+
+the lock also matches jarvis's qualified security revisions: certifi 2026.10.19,
+filelock 4.2.4, msgpack 1.2.3, opentelemetry-api 1.45.2 and pyasn1 0.6.5. no other
+registry version changes. the certificate bundle loads through the real ssl
+context and excludes the compromised emsign ecc root ca-g3. the index audit has
+zero findings; kernel, llm-tools and provider-runtime are private/git packages
+that the index audit cannot assess.
+
+the exact frozen composition passes the ci-pinned uv 0.11.28 lock check,
+formatting, lint, types, all 176 non-live tests (two live tests deselected), and
+source/wheel build. the installed provider receipt matches the exact git pin;
+its stock version and catalog digest match the predecessor. no model call or
+installed application acceptance is claimed here; jarvis owns that rollout.
