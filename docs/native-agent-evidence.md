@@ -381,3 +381,18 @@ source integration preserves current main's stock0.165 runtime and adopts the
 merged provider archive fixes without reverting its host-incarnation contract.
 jarvis deployment retains its separately qualified stock0.160 pins; this merge
 does not upgrade that application runtime.
+
+## 2026-11-15 pending-baseline provider composition
+
+current main adopts provider-runtime `5ef4f66f2128377d0a0cf3ac338d8064fdb2254f`,
+the merged `native-archive.v3` per-conversation baseline contract. unreadable
+heads remain explicit while complete identity inventories can activate healthy
+conversations. the provider owns that archive behavior; kernel source and its
+stock 0.165.0 cognition contract are unchanged. all other dependency revisions
+and registry versions remain frozen. jarvis keeps its separate qualified 0.160.0
+artifact; this change does not upgrade an installed application.
+
+lock validation, frozen formatting/lint/types, all 176 non-live conformance cases,
+source/wheel builds and dependency audit pass. two live cases remain excluded;
+no new native execution behavior requires a model probe. consumer capture and
+installed acceptance remain separate.
