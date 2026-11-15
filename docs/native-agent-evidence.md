@@ -393,3 +393,15 @@ formatting, lint, types, all 176 non-live tests (two live tests deselected), and
 source/wheel build. the installed provider receipt matches the exact git pin;
 its stock version and catalog digest match the predecessor. no model call or
 installed application acceptance is claimed here; jarvis owns that rollout.
+
+the same maintenance line now pins provider
+`adf1b714dec6b2517ba468085674665923c237fc` for inherited http mcp containment.
+its existing preflight reads effective configuration at the exact cwd and
+explicitly disables all inherited servers before opening a restricted thread;
+an empty table alone did not erase native registrations. the kernel's existing
+protocol fixture now includes the real native empty `mcp_servers` object.
+kernel implementation, registry versions, stock binary and catalogue remain
+unchanged. all 176 non-live tests pass, with two live tests deselected; format,
+lint, types, the ci-pinned lock check, build and index audit pass. provider evidence
+includes actual no-model restricted threads with inherited http/stdio servers
+disabled. installed application proof remains jarvis's separate responsibility.
