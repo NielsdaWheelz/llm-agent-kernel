@@ -14,8 +14,9 @@ this repository contains `llm-agent-kernel`, imported as `llm_agent_kernel`.
 - exact unsupported requests fail before arm/send; no fallback or compatibility.
 - effective authority is provider containment intersected with the host frozen
   plan; prove plan/catalog consistency and tightening before rendering or I/O.
-- native shell/files/web/network/MCP/unsolicited permissions and inherited
-  authority are disabled. cwd is private, empty and read-only.
+- isolated definitions retain disabled native tools/network/MCP and private empty
+  read-only cwd. native definitions use explicit frozen authority and may borrow
+  an existing cwd under adr 0013; never modify or remove borrowed directories.
 - accept immutable invocation before effect; commit result and immutable reply
   before wire send. one dispatch lane, independent live transport/control.
 - preserve original native seal/raw/usage before product validation or cleanup.

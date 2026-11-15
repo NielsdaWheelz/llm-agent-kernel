@@ -3,7 +3,9 @@
 this is the current reusable contract. [native supervision](docs/native-agent-spec.md)
 is normative detail; [adr 0010](docs/decisions/0010-native-agent-supervision.md)
 supersedes the former conversational step loop, session cache and capacity
-admission. [evidence](docs/native-agent-evidence.md) distinguishes implemented
+admission. [adr 0013](docs/decisions/0013-borrowed-native-workspaces.md)
+adds explicit native authority and borrowed workspaces while retaining isolated
+containment. [evidence](docs/native-agent-evidence.md) distinguishes implemented
 behavior, controlled proof and installed live qualification.
 
 ## 1. goals
@@ -11,8 +13,8 @@ behavior, controlled proof and installed live qualification.
 one shared supervisor for jarvis and nexus; truthful provider evidence, durable
 (or explicitly transient) acceptance before actions, responsive control and useful
 work after cold restart. keep application authority and canonical state in the
-application. codapt supplies native supervision semantics; byte parity, workspace
-tools and its machine/billing infrastructure are excluded.
+application. codapt supplies native supervision semantics; byte parity and its machine/billing infrastructure are excluded. native workspace
+authority is an explicit provider configuration under adr 0013.
 
 ## 2. dependencies and implementation gate
 
@@ -43,7 +45,7 @@ the kernel must use these public mechanisms rather than copy their internals.
 | llm-tools | schemas/plans and one executor/recorder/accounting contract |
 | kernel | validate effective authority; supervise callback/input/control ordering; enforce host journal boundaries |
 | application | requests/context, owner permits, transactions, action identity/consent/reconciliation, publication/outbox |
-| native host | account state, persistent stock server, private socket and private read-only cwd |
+| native host | account state, persistent stock server, private socket and configured workspace access |
 
 the kernel owns no application table, migration, queue, scheduler, credential
 store, memory service, delivery transport, approval policy or action ledger.
@@ -83,21 +85,39 @@ provider evidence and prepare before the journal arms them. immutable
 accepted native session/turn. unsupported schema/model/callback composition is a
 preflight refusal, not a route fallback.
 
-native codex built-ins, web, MCP, inherited environment, network and unsolicited
-permissions are disabled. cwd is private, empty and read-only. host callbacks
-are the only application tools. a native tool/permission event is a containment
-defect: fence callbacks and discard only that session. a model's call to a function
-the plan never published, which the stock host refuses itself and runs nothing for,
-is a model error, not such an event: provider-runtime reports nothing and the turn
-continues ([provider decision](https://github.com/NielsdaWheelz/llm-calling/blob/e0c30b31b0d507f77f676c2b9e4f18a7c7331815/docs/decisions/2026-10-13-codex-refused-unpublished-calls.md)).
+isolated definitions require disabled native tools/web/network/MCP and the
+existing complete containment policy. their cwd is private, empty and read-only;
+a native tool/permission event fences that session. a stock refusal of an
+unpublished function that executes nothing remains a model error, not native
+authority ([provider decision](https://github.com/NielsdaWheelz/llm-calling/blob/e0c30b31b0d507f77f676c2b9e4f18a7c7331815/docs/decisions/2026-10-13-codex-refused-unpublished-calls.md)).
+
+native definitions carry explicit frozen `PermissionPolicy` and `CodexNativeOptions`.
+provider-runtime validates requested and effective authority. declared native tool
+observations stay separate from host callback receipts; only denied permission
+outcomes under `approval=deny` and enabled built-ins are accepted. unknown or
+undeclared activity still fails. native commands have no callback/action replay
+contract. the native base instruction requires inspection of available evidence
+before continuing interrupted native effects.
+
+`ProviderConfiguration.cwd=None` creates a disposable directory. a configured
+normalized non-root absolute cwd borrows an existing readable/traversable directory;
+`additional_dirs` is an immutable tuple of normalized absolute provider roots.
+the kernel never creates, chmods, empties or removes a borrowed cwd. one internal
+lease ownership fact governs cleanup on every path. application uid write access
+is not required: actual native host access is a separate qualification boundary.
+isolated `AgentDefinition` rejects borrowed cwd, additional directories or widened
+policy/native options. definition identities include configured paths and complete
+policy/native/instructions, excluding generated directories and mutable files.
+`cwd_scope` is removed without a compatibility alias.
+
 the account host retains
 credentials; worker state is empty and accountless. native host network for model
 authentication is distinct from model/tool network authority.
 
 the host may select `CodexNativeOptions.archive_internal` to keep disposable
 cognition outside native memory capture. this selection changes the definition
-fingerprint. all remaining native options keep the exact containment posture;
-the provider owns internal marking and persistence exclusion.
+fingerprint. the provider owns internal marking and persistence exclusion;
+isolated native options keep their exact containment posture.
 
 ## 6. structured model protocol
 
@@ -249,8 +269,9 @@ existing applicable conformance stays. static checks do not prove live behavior.
 ## 15. explicitly deferred
 
 program execution, parallel tools, delegation graph, application workflow engines,
-memory redesign, native shell/files/web/network, compatibility lanes and new
-multi-user infrastructure. do not add abstractions for hypothetical consumers.
+memory redesign, native workspace orchestration, compatibility lanes and new
+multi-user infrastructure. ordinary native authority and borrowed directories
+are admitted explicitly under adr 0013. do not add abstractions for hypothetical consumers.
 
 ## 16. shared generation protocol
 

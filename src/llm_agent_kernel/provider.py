@@ -1,4 +1,4 @@
-"""Contained Codex session lifecycle over the public AgentRuntime API."""
+"""Codex session leases with explicit ownership of disposable directories."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import os
 import shutil
 import stat
 import tempfile
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -27,8 +27,6 @@ from provider_runtime.agent_runtime import (
 from provider_runtime.types import CancelSignal, TokenUsage
 
 from .definitions import (
-    CODEX_NATIVE_OPTIONS,
-    CONTAINMENT_POLICY,
     KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
     OwnerPermit,
@@ -89,6 +87,7 @@ class ProviderSessionLease:
     session: AgentSession = field(repr=False)
     cwd: Path
     definition_fingerprint: str
+    _owns_cwd: bool = field(repr=False)
     owner_token: OwnerToken | None = None
     _usage: _Usage = field(default_factory=_Usage, repr=False, compare=False)
     _diagnostics: list[str] = field(default_factory=list, repr=False, compare=False)
@@ -152,7 +151,7 @@ class ProviderSessionPort(Protocol):
 
 
 class CodexProvider:
-    """Contained native sessions; live reuse requires exact plan and owner."""
+    """Native sessions; live reuse requires exact plan and owner."""
 
     def __init__(
         self,
@@ -185,7 +184,7 @@ class CodexProvider:
             except BaseException:
                 self._remove_cwd(cwd)
                 raise
-            return self._lease(session, cwd, definition.fingerprint)
+            return self._lease(session, cwd, definition.fingerprint, owns_cwd=True)
 
     def prepare_observed_turn(
         self,
@@ -235,8 +234,16 @@ class CodexProvider:
             await self.discard(previous)
         async with self._lock:
             self._require_open()
-            cwd = self._create_cwd()
             provider = definition.provider
+            owns_cwd = provider.cwd is None
+            if provider.cwd is None:
+                cwd = self._create_cwd()
+            else:
+                cwd = Path(provider.cwd)
+                if not cwd.is_dir() or not os.access(cwd, os.R_OK | os.X_OK):
+                    raise ProviderConfigurationError(
+                        "borrowed provider cwd must be readable and traversable"
+                    )
             try:
                 session = await self._runtime.open_session(
                     CodexCatalogSessionRequest(
@@ -254,7 +261,7 @@ class CodexProvider:
                             TextContent(render_prompt(definition.role.instructions)),
                         ),
                         developer=provider.developer,
-                        additional_dirs=(),
+                        additional_dirs=provider.additional_dirs,
                         mcp_servers=(),
                         output=definition.output,
                         native=provider.native,
@@ -262,9 +269,12 @@ class CodexProvider:
                     )
                 )
             except BaseException:
-                self._remove_cwd(cwd)
+                if owns_cwd:
+                    self._remove_cwd(cwd)
                 raise
-            return self._lease(session, cwd, fingerprint, permit.owner_token)
+            return self._lease(
+                session, cwd, fingerprint, owns_cwd=owns_cwd, owner_token=permit.owner_token
+            )
 
     def prepare_native_turn(
         self,
@@ -296,7 +306,8 @@ class CodexProvider:
         try:
             await self._runtime.close_session(lease.session)
         finally:
-            self._remove_cwd(lease.cwd)
+            if lease._owns_cwd:
+                self._remove_cwd(lease.cwd)
 
     async def close(self, lease: ProviderSessionLease) -> None:
         await self.discard(lease)
@@ -321,12 +332,15 @@ class CodexProvider:
         session: AgentSession,
         cwd: Path,
         definition_fingerprint: str,
+        *,
+        owns_cwd: bool,
         owner_token: OwnerToken | None = None,
     ) -> ProviderSessionLease:
         lease = ProviderSessionLease(
             session=session,
             cwd=cwd,
             definition_fingerprint=definition_fingerprint,
+            _owns_cwd=owns_cwd,
             owner_token=owner_token,
         )
         self._leases.add(lease)
@@ -338,13 +352,6 @@ class CodexProvider:
         cwd: Path,
     ) -> CodexCatalogSessionRequest:
         provider = definition.provider
-        if (
-            provider.policy != CONTAINMENT_POLICY
-            or replace(provider.native, archive_internal=False) != CODEX_NATIVE_OPTIONS
-        ):
-            raise ProviderConfigurationError("definition does not use the v1 containment posture")
-        if provider.additional_dirs or provider.mcp_servers or provider.policy.environment:
-            raise ProviderConfigurationError("definition exposes forbidden provider resources")
         return CodexCatalogSessionRequest(
             auth=provider.auth,
             open=NewSession(),

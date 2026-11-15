@@ -26,7 +26,9 @@ truth commits before product work. the application can repeat product resolution
 without repeating inference or an action. canonical context makes native history
 disposable; restarting reasoning retains unresolved effect references.
 
-private persistent codex hosts expose a uid-restricted socket and read-only cwd.
+private persistent codex hosts expose a uid-restricted socket. isolated roles use
+a disposable read-only cwd; explicit native configurations may borrow an application
+workspace. lease ownership controls cleanup; provider-runtime controls authority.
 workers retain no account credentials. no remote HTTP shell relay or second
 registry/executor exists. an owned handle's cancellation cannot stop its sibling.
 

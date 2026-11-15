@@ -3,6 +3,9 @@
 status: accepted contract, 2026-10-02; implementation status and exact target
 qualification are recorded in [evidence](native-agent-evidence.md). [SPEC section 18](../SPEC.md#18-native-agent-target-requirements)
 and [adr 0010](decisions/0010-native-agent-supervision.md) adopt this contract.
+[adr 0013](decisions/0013-borrowed-native-workspaces.md) supersedes this
+baseline's blanket disabled-native/workspace exclusions for explicitly configured
+native definitions; isolated roles retain the baseline containment.
 the [delivery plan](native-agent-plan.md) owns files, sequencing, tests and cutovers.
 the [review](native-agent-review.md) owns baseline evidence; the
 [metadata handoff](integrations/nexus-metadata.md) owns concurrent integration status.
@@ -16,7 +19,7 @@ responsive control and understandable ownership are.
 
 | target behavior | requirement |
 | --- | --- |
-| tools | both apps use declared native callbacks and the existing llm-tools executor; no native shell/files/web/network, mcp or unsolicited approvals |
+| tools | declared callbacks use the existing llm-tools executor; native tools require explicit frozen provider authority under adr 0013, while isolated roles stay contained |
 | autonomy | no task-wide model usage/call quota; no arbitrary jarvis main cutoff; finite operation and buffer bounds remain |
 | recovery | jarvis automatically restarts reasoning after fencing old callback authority; external effects retain reconciliation barriers |
 | metadata | exact frozen generation contract; with a journal, an uncertain step blocks redispatch and a valid terminal supports local product recovery; `TransientNative` work fails or reruns from scratch (adr 0012) |
@@ -638,7 +641,7 @@ uses the existing final-only JarvisTerminal contract; Progress cannot become a f
 settlement. no plaintext fallback or extraction of old final-shaped commentary.
 nexus keeps its own output schemas and citation/publication owners.
 
-native base instruction, owned/revisioned centrally:
+historical native base instruction v3, superseded by adr 0013's v4 native/callback distinction (current exact text is kernel-owned source):
 
 > use only the declared host tools for actions and observations. tool arguments
 > request work; only host results establish what happened. public messages may

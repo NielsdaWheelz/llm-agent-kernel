@@ -474,11 +474,21 @@ async def run_native(
                         _require_terminal(terminal, turn.attempt, submission)
                     await journal.record_outcome(request.attempt_id, terminal)
                     return terminal
-                if isinstance(event, AgentToolUse | AgentPermissionRequest):
-                    raise ProviderContainmentViolation(
-                        "native provider emitted undeclared authority activity"
-                    )
-                if isinstance(event, AgentToolCall):
+                if isinstance(event, AgentToolUse):
+                    if definition.provider.native.builtin_tools == "disabled":
+                        raise ProviderContainmentViolation(
+                            "native provider emitted undeclared tool activity"
+                        )
+                elif isinstance(event, AgentPermissionRequest):
+                    if (
+                        definition.provider.native.builtin_tools == "disabled"
+                        or definition.provider.policy.approval != "deny"
+                        or event.decision != "deny"
+                    ):
+                        raise ProviderContainmentViolation(
+                            "native provider emitted undeclared permission authority"
+                        )
+                elif isinstance(event, AgentToolCall):
                     if event.turn != submission.turn:
                         raise NativeDefect("native callback changed its submitted turn")
                     if stop_reason is None:

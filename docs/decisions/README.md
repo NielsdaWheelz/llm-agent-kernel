@@ -14,3 +14,4 @@
 | [0010](0010-native-agent-supervision.md) | supervise native agents with explicit submission and invocation evidence | accepted; implemented, see current evidence |
 | [0011](0011-contained-native-host.md) | require a restricted stock host and separate jarvis endpoint | accepted; host qualified, deployment not run |
 | [0012](0012-transient-native-attempts.md) | run disposable native attempts without a host journal | accepted; implemented with controlled proof only, no consumer adopted |
+| [0013](0013-borrowed-native-workspaces.md) | explicit native authority and borrowed workspaces | accepted; source and controlled proof, consumer live qualification separate |
