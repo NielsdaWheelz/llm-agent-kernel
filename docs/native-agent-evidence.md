@@ -359,8 +359,11 @@ calls or production writes accompanied release; historical production remains BL
 ## 2026-11-14 memory dependency composition
 
 the memory delivery aligns llm-tools at `8989f3afdcc640f775bd0cc9e7a0b4c246f10e57`
-while retaining provider-runtime `98ea2f2a8646bf42aec943596f88135512f612bd` and the
-stock 0.160.0 contract. kernel runtime source is unchanged. the existing web
+and adopts provider-runtime `22aee34c698caa16d51393471e58b615bf808829`, preserving
+the stock 0.160.0 contract. that provider delta recognizes three current claude
+bookkeeping rows and reads authoritative codex internal/fork metadata before
+archive classification. no inference or session API changes. kernel runtime
+source is unchanged. the existing web
 dependency assertion now expects that dependency's declared implementation v3;
 its policy epoch, deadline and contract assertions remain unchanged.
 
