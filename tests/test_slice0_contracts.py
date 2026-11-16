@@ -570,19 +570,11 @@ def test_session_compatibility_revision_is_required_and_rotates_the_fingerprint(
     assert rotated.fingerprint != first.fingerprint
 
 
-def test_provider_configuration_rejects_authority_widening() -> None:
-    with pytest.raises(ValueError, match="containment"):
-        ProviderConfiguration(
-            auth=CredentialRef("local_account", "personal"),
-            model_key="gpt-5",
-            reasoning="low",
-            agent_definition_revision="test-catalog-v1",
-            row_fingerprint="a" * 64,
-            policy=PermissionPolicy(
-                filesystem="read_only",
-                network="disabled",
-                approval="deny",
-            ),
+def test_isolated_definition_rejects_changed_authority() -> None:
+    with pytest.raises(ValueError, match="contained authority"):
+        replace(
+            _definition(),
+            provider=replace(_definition().provider, policy=PermissionPolicy()),
         )
 
 

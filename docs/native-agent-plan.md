@@ -272,3 +272,29 @@ finish by updating the owning specs/ADRs, deleting resolved issue records and
 removing task-owned temporary resources. retain open issues only for evidence not
 yet established. implementation and paid qualification calls were subsequently authorized.
 no deployment or edit to the metadata worktree is included.
+
+## native workspace amendment: current-main qualification
+
+2026-11-16 utc: kernel source `6770041d8b321669a54b31efbd184847848b2e42`
+and provider `11f6ffe7a42cef81ded798c0b4d56f8112d75dec` passed the bounded
+actual stock-0.165.0 linux unix-endpoint proof on offered `gpt-6.1-sol` / `high`.
+see the provider's [immutable wire/host evidence](https://github.com/NielsdaWheelz/llm-calling/blob/a1ed72f3a94e527a9255988215207c07d7b74a14/docs/native-agent-evidence.md#native-workspace-and-callbacks-on-current-stock).
+
+real `run_native` used the existing transient journal and llm-tools executor:
+one native file/git/mask command, one validated read callback at ordinal one,
+useful progress and an original sealed final. external inspection confirmed exact
+file bytes, commit `7ec4ac18524dfb5d13fe11edc99f12f7165e9a89` and clean state;
+borrowed files/modes survived discard. strict isolated `run_one_shot` returned its
+structured result with no tools/network and removed its owned cwd. this qualifies
+library interfaces, not durable application actions, gateway delivery or restart.
+
+the temporary runner was invoked under separate application/native identities and
+service namespaces. native account state was separate, existing auth was a read-only
+alias, and refresh was deliberately unavailable through stock's closed-loopback
+refresh-url override; no guarded refresh error occurred. the first unoffered-model
+request was rejected before acquisition; the new fixed offered-model request had
+no fallback. original consumer/runtime selection and production were untouched.
+probes and temporary host/account/runtime/checkout resources were removed after
+independent review. all 176 standing conformance cases and required checks pass;
+the wider paid matrix remains separate. jarvis's qualified `9f5f951` / `ea9f820`
+ancestors remain immutable pins; this merge does not upgrade that consumer.

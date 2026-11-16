@@ -194,7 +194,16 @@ class Peer:
                 }
             elif method == "thread/start":
                 self.tool_name = request["params"]["dynamicTools"][0]["name"]
-                result = {"thread": {"id": "thread"}}
+                result = {
+                    "thread": {"id": "thread"},
+                    "model": request["params"]["model"],
+                    "modelProvider": "openai",
+                    "cwd": request["params"]["cwd"],
+                    "approvalPolicy": "never",
+                    "approvalsReviewer": "user",
+                    "reasoningEffort": "high",
+                    "sandbox": {"type": "readOnly", "networkAccess": False},
+                }
             elif method == "turn/start":
                 self.starts += 1
                 result = {"turn": {"id": "turn"}}

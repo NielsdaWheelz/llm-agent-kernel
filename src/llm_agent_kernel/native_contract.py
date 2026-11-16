@@ -17,8 +17,6 @@ from llm_tools import (
     render_prompt,
 )
 from provider_runtime.agent_runtime import (
-    CODEX_CONTAINMENT_CATALOG_REVISION,
-    CODEX_CONTAINMENT_VERSION,
     AgentAttempt,
     AgentControlReceipt,
     AgentInputRecorded,
@@ -42,12 +40,17 @@ from .definitions import (
     InputId,
     OwnerPermit,
     ProviderConfiguration,
+    _provider_identity,
 )
 
-NATIVE_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-native-agent-v3"
+NATIVE_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-native-agent-v4"
 NATIVE_BASE_INSTRUCTION = (
-    "use only the declared host tools for actions and observations. tool arguments "
-    "request work; only host results establish what happened. public messages may "
+    "use the native tools permitted by the frozen provider policy and the declared "
+    "host callbacks. host callback arguments request work; only their original host "
+    "results establish the recorded outcome. native tool observations are not durable "
+    "host callback receipts. after interruption inspect files, git and available "
+    "evidence before continuing; never automatically replay a native command or effect. "
+    "public messages may "
     "report useful findings or partial answers while you continue. public commentary "
     "contains brief useful prose in the application's required message format; it "
     "cannot authorize actions, settle inputs, or mark work complete. request "
@@ -115,38 +118,7 @@ class NativeDefinition:
         provider = self.provider
         identity = {
             "protocol": NATIVE_BASE_INSTRUCTION_IDENTITY,
-            "provider": {
-                "auth": {
-                    "kind": provider.auth.kind,
-                    "name": provider.auth.name,
-                    "profile_key": provider.auth.profile_key,
-                },
-                "model_key": provider.model_key,
-                "reasoning": provider.reasoning,
-                "agent_definition_revision": provider.agent_definition_revision,
-                "row_fingerprint": provider.row_fingerprint,
-                "system": [part.text for part in provider.system],
-                "developer": [part.text for part in provider.developer],
-                "policy": {
-                    "filesystem": provider.policy.filesystem,
-                    "network": provider.policy.network,
-                    "approval": provider.policy.approval,
-                    "allowed_tools": list(provider.policy.allowed_tools),
-                    "denied_tools": list(provider.policy.denied_tools),
-                    "environment": list(provider.policy.environment),
-                    "network_allowlist": list(provider.policy.network_allowlist),
-                },
-                "native": {
-                    "archive_internal": provider.native.archive_internal,
-                    "builtin_tools": provider.native.builtin_tools,
-                    "web_search": provider.native.web_search,
-                    "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
-                    "containment_version": CODEX_CONTAINMENT_VERSION,
-                },
-                "cwd_scope": provider.cwd_scope,
-                "additional_dirs": [],
-                "mcp_servers": [],
-            },
+            "provider": _provider_identity(provider),
             "role": {
                 "id": self.role.role_id,
                 "instructions": render_prompt(self.role.instructions),

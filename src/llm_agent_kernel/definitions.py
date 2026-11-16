@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import os
 import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -233,12 +234,10 @@ class ProviderConfiguration:
     developer: tuple[TextContent, ...] = ()
     policy: PermissionPolicy = CONTAINMENT_POLICY
     native: CodexNativeOptions = CODEX_NATIVE_OPTIONS
+    cwd: str | None = None
+    additional_dirs: tuple[str, ...] = ()
     backend: Literal["codex"] = field(default="codex", init=False)
     transport: Literal["sdk"] = field(default="sdk", init=False)
-    cwd_scope: Literal["private_empty_read_only"] = field(
-        default="private_empty_read_only", init=False
-    )
-    additional_dirs: tuple[()] = field(default=(), init=False)
     mcp_servers: tuple[()] = field(default=(), init=False)
 
     def __post_init__(self) -> None:
@@ -264,10 +263,18 @@ class ProviderConfiguration:
             not isinstance(part, TextContent) for part in self.developer
         ):
             raise TypeError("provider developer material must be a tuple of TextContent")
-        if self.policy != CONTAINMENT_POLICY:
-            raise ValueError("provider policy must use the complete v1 containment posture")
-        if replace(self.native, archive_internal=False) != CODEX_NATIVE_OPTIONS:
-            raise ValueError("Codex native built-ins and Web must be disabled")
+        if not isinstance(self.policy, PermissionPolicy):
+            raise TypeError("provider policy must be PermissionPolicy")
+        if not isinstance(self.native, CodexNativeOptions):
+            raise TypeError("provider native options must be CodexNativeOptions")
+        if self.cwd is not None:
+            _require_absolute_path(self.cwd)
+            if self.cwd == "/":
+                raise ValueError("a borrowed cwd must not be the filesystem root")
+        if type(self.additional_dirs) is not tuple:
+            raise TypeError("provider additional_dirs must be a tuple")
+        for path in self.additional_dirs:
+            _require_absolute_path(path)
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,6 +320,13 @@ class AgentDefinition:
             raise ValueError("maximum profile is internally inconsistent")
         if not isinstance(self.provider, ProviderConfiguration):
             raise TypeError("definition provider configuration is invalid")
+        if (
+            self.provider.cwd is not None
+            or self.provider.additional_dirs
+            or self.provider.policy != CONTAINMENT_POLICY
+            or replace(self.provider.native, archive_internal=False) != CODEX_NATIVE_OPTIONS
+        ):
+            raise ValueError("isolated definitions require disposable cwd and contained authority")
         if (
             type(self.session_compatibility_revision) is not str
             or not self.session_compatibility_revision.strip()
@@ -578,6 +592,17 @@ def _require_aware(value: datetime, field_name: str) -> None:
         raise ValueError(f"{field_name} must be timezone-aware")
 
 
+def _require_absolute_path(value: str) -> None:
+    if (
+        type(value) is not str
+        or "\0" in value
+        or not os.path.isabs(value)
+        or os.path.normpath(value) != value
+        or value.startswith("//")
+    ):
+        raise ValueError("provider directories must be normalized absolute paths")
+
+
 def _require_ordinal(value: int) -> None:
     if type(value) is not int or value <= 0:
         raise ValueError("model step ordinal must be a positive integer")
@@ -617,6 +642,49 @@ def _require_closed_objects(value: object) -> None:
             _require_closed_objects(child)
 
 
+def _provider_identity(provider: ProviderConfiguration) -> dict[str, object]:
+    """Freeze the same provider authority in native and isolated definitions."""
+    return {
+        "additional_dirs": list(provider.additional_dirs),
+        "auth": {
+            "kind": provider.auth.kind,
+            "name": provider.auth.name,
+            "profile_key": provider.auth.profile_key,
+        },
+        "backend": provider.backend,
+        "cwd": provider.cwd,
+        "developer": [part.text for part in provider.developer],
+        "mcp_servers": [],
+        "model_key": provider.model_key,
+        "agent_definition_revision": provider.agent_definition_revision,
+        "row_fingerprint": provider.row_fingerprint,
+        "native": {
+            "archive_internal": provider.native.archive_internal,
+            "builtin_tools": provider.native.builtin_tools,
+            "web_search": provider.native.web_search,
+            "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
+            "containment_version": CODEX_CONTAINMENT_VERSION,
+        },
+        "policy": {
+            "approval": provider.policy.approval,
+            "allowed_tools": list(provider.policy.allowed_tools),
+            "denied_tools": list(provider.policy.denied_tools),
+            "environment": list(provider.policy.environment),
+            "filesystem": provider.policy.filesystem,
+            "network": provider.policy.network,
+            "network_allowlist": list(provider.policy.network_allowlist),
+            "unsafe_confirmation": (
+                list(provider.policy.unsafe_confirmation.acknowledged)
+                if provider.policy.unsafe_confirmation is not None
+                else None
+            ),
+        },
+        "reasoning": provider.reasoning,
+        "system": [part.text for part in provider.system],
+        "transport": provider.transport,
+    }
+
+
 def _definition_fingerprint(definition: AgentDefinition) -> str:
     from .protocol import MODEL_STEP_OUTPUT_NAME, provider_wire_schema
 
@@ -650,40 +718,7 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
             "name": MODEL_STEP_OUTPUT_NAME,
             "schema": provider_wire_schema(definition.output_contract),
         },
-        "provider": {
-            "additional_dirs": [],
-            "auth": {
-                "kind": provider.auth.kind,
-                "name": provider.auth.name,
-                "profile_key": provider.auth.profile_key,
-            },
-            "backend": provider.backend,
-            "cwd_scope": provider.cwd_scope,
-            "developer": [part.text for part in provider.developer],
-            "mcp_servers": [],
-            "model_key": provider.model_key,
-            "agent_definition_revision": provider.agent_definition_revision,
-            "row_fingerprint": provider.row_fingerprint,
-            "native": {
-                "archive_internal": provider.native.archive_internal,
-                "builtin_tools": provider.native.builtin_tools,
-                "web_search": provider.native.web_search,
-                "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
-                "containment_version": CODEX_CONTAINMENT_VERSION,
-            },
-            "policy": {
-                "approval": provider.policy.approval,
-                "allowed_tools": list(provider.policy.allowed_tools),
-                "denied_tools": list(provider.policy.denied_tools),
-                "environment": list(provider.policy.environment),
-                "filesystem": provider.policy.filesystem,
-                "network": provider.policy.network,
-                "network_allowlist": list(provider.policy.network_allowlist),
-            },
-            "reasoning": provider.reasoning,
-            "system": [part.text for part in provider.system],
-            "transport": provider.transport,
-        },
+        "provider": _provider_identity(provider),
         "role": {
             "id": definition.role.role_id,
             "instructions": render_prompt(definition.role.instructions),
