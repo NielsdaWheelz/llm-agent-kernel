@@ -291,7 +291,7 @@ library interfaces, not durable application actions, gateway delivery or restart
 the temporary runner was invoked under separate application/native identities and
 service namespaces. native account state was separate, existing auth was a read-only
 alias, and refresh was deliberately unavailable through stock's closed-loopback
-refresh-url override; no guarded refresh error occurred. the first retired-model
+refresh-url override; no guarded refresh error occurred. the first unoffered-model
 request was rejected before acquisition; the new fixed offered-model request had
 no fallback. original consumer/runtime selection and production were untouched.
 probes and temporary host/account/runtime/checkout resources were removed after
