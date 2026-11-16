@@ -44,6 +44,7 @@ from provider_runtime.agent_runtime import (
     AgentRuntime,
     AgentRuntimeConfig,
     AgentTerminal,
+    CodexUnixEndpoint,
     CredentialRef,
     JsonSchemaAgentOutput,
     NativeTerminalEvidence,
@@ -179,7 +180,7 @@ class Peer:
                     "data": [
                         {
                             "id": "peer",
-                            "model": "peer-model",
+                            "model": "gpt-6.1-sol",
                             "displayName": "Peer",
                             "hidden": False,
                             "inputModalities": ["text"],
@@ -195,7 +196,7 @@ class Peer:
                 self.tool_name = request["params"]["dynamicTools"][0]["name"]
                 result = {
                     "thread": {"id": "thread"},
-                    "model": "peer-model",
+                    "model": request["params"]["model"],
                     "modelProvider": "openai",
                     "cwd": request["params"]["cwd"],
                     "approvalPolicy": "never",
@@ -317,7 +318,7 @@ async def native(
         ProfileId("native"), (ToolGrant(spec.id, None),), RunLimits(None, None, None, None, 1, None)
     ).freeze(catalog)
     plan = ToolPlan(maximum.id, Native()).freeze(catalog, maximum)
-    runtime = AgentRuntime(AgentRuntimeConfig(tmp_path, {"test": peer.socket}))
+    runtime = AgentRuntime(AgentRuntimeConfig(tmp_path, {"test": CodexUnixEndpoint(peer.socket)}))
     auth = CredentialRef("local_account", "test")
     models = await runtime.model_catalog(backend="codex", transport="sdk", auth=auth)
     row = models.models[0]
