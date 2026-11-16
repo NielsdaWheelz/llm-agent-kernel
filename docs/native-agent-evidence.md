@@ -6,6 +6,11 @@ controlled conformance only; no consumer has adopted it yet. current-main
 delivery is recorded below. unrelated checkout state and metadata ownership are
 preserved. controlled peers establish their boundary; they are never research.
 
+owner waiver, 2026-10-13: paid live runs (native model qualification, the
+provider-runtime raw and agent matrices, the containment probe) gate no kernel or
+provider-runtime change and no nexus pin bump. deterministic conformance and
+controlled proofs qualify a change; record paid runs not made as `NOT_RUN`.
+
 ## unpublished-call refusal, 2026-10-13 utc
 
 owner decision 2026-10-13: a model's call to an unpublished function that stock
@@ -358,7 +363,7 @@ calls or production writes accompanied release; historical production remains BL
 
 ## 2026-11-14 memory dependency composition
 
-the memory delivery aligns llm-tools at `8989f3afdcc640f775bd0cc9e7a0b4c246f10e57`
+the separately pinned stock0.160 memory delivery branch aligns llm-tools at `8989f3afdcc640f775bd0cc9e7a0b4c246f10e57`
 and adopts provider-runtime `7a2493e5f4da34f6d9a32e2504d8fc6333482385`, preserving
 the stock 0.160.0 contract. that provider delta recognizes four current claude
 bookkeeping rows and reads authoritative codex internal/fork metadata before
@@ -372,53 +377,22 @@ tests deselected. source/wheel build passes with hatchling 1.33.0. these checks
 qualify the dependency composition, not installed/live application acceptance;
 jarvis owns that separate proof before deployment.
 
-## 2026-11-14 memory archive maintenance
+source integration preserves current main's stock0.165 runtime and adopts the
+merged provider archive fixes without reverting its host-incarnation contract.
+jarvis deployment retains its separately qualified stock0.160 pins; this merge
+does not upgrade that application runtime.
 
-this maintenance branch starts from kernel
-`8524c8c737bbe56a0993da1421084d0122d08f49` and adopts provider-runtime
-`97c0475fdd99679c813b12b23b89ea12c9819dff`. the provider repairs archive discovery,
-native provenance and bounded history paging. kernel source/tests, llm-tools
-`8989f3afdcc640f775bd0cc9e7a0b4c246f10e57`, stock 0.160.0 and its containment
-catalog remain unchanged; this does not adopt the separate current host runtime.
+## 2026-11-15 pending-baseline provider composition
 
-the lock also matches jarvis's qualified security revisions: certifi 2026.10.19,
-filelock 4.2.4, msgpack 1.2.3, opentelemetry-api 1.45.2 and pyasn1 0.6.5. no other
-registry version changes. the certificate bundle loads through the real ssl
-context and excludes the compromised emsign ecc root ca-g3. the index audit has
-zero findings; kernel, llm-tools and provider-runtime are private/git packages
-that the index audit cannot assess.
+current main adopts provider-runtime `5ef4f66f2128377d0a0cf3ac338d8064fdb2254f`,
+the merged `native-archive.v3` per-conversation baseline contract. unreadable
+heads remain explicit while complete identity inventories can activate healthy
+conversations. the provider owns that archive behavior; kernel source and its
+stock 0.165.0 cognition contract are unchanged. all other dependency revisions
+and registry versions remain frozen. jarvis keeps its separate qualified 0.160.0
+artifact; this change does not upgrade an installed application.
 
-the exact frozen composition passes the ci-pinned uv 0.11.28 lock check,
-formatting, lint, types, all 176 non-live tests (two live tests deselected), and
-source/wheel build. the installed provider receipt matches the exact git pin;
-its stock version and catalog digest match the predecessor. no model call or
-installed application acceptance is claimed here; jarvis owns that rollout.
-
-the same maintenance line now pins provider
-`adf1b714dec6b2517ba468085674665923c237fc` for inherited http mcp containment.
-its existing preflight reads effective configuration at the exact cwd and
-explicitly disables all inherited servers before opening a restricted thread;
-an empty table alone did not erase native registrations. the kernel's existing
-protocol fixture now includes the real native empty `mcp_servers` object.
-kernel implementation, registry versions, stock binary and catalogue remain
-unchanged. all 176 non-live tests pass, with two live tests deselected; format,
-lint, types, the ci-pinned lock check, build and index audit pass. provider evidence
-includes actual no-model restricted threads with inherited http/stdio servers
-disabled. installed application proof remains jarvis's separate responsibility.
-
-## 2026-11-15 pending-baseline dependency composition
-
-the immutable `jarvis-memory-partial-baselines-2026-11-15` artifact starts from
-`419e5fe3e251e9ffdf506ae88fb7149fac6e1549` and pins provider-runtime
-`70178ec8bb5b54304367ad60c0732447084a37c7`. provider archive v3 permits healthy
-capture beside explicitly pending unreadable baselines. kernel implementation,
-tests, llm-tools, all 66 registry package records and the stock 0.160.0 containment
-contract remain unchanged. this artifact is a fixed consumer composition, not a
-second maintained runtime branch.
-
-the ci-pinned uv 0.11.28 lock check and frozen installation, formatting, lint,
-typing, all 176 non-live tests (two live tests deselected), source/wheel builds
-and index audit pass. the installed provider receipt matches the exact git pin.
-the index audit excludes the three private/git packages. independent review
-verified the pin-only composition; installed application proof remains jarvis's
-separate responsibility. no model call or runtime upgrade is claimed here.
+lock validation, frozen formatting/lint/types, all 176 non-live conformance cases,
+source/wheel builds and dependency audit pass. two live cases remain excluded;
+no new native execution behavior requires a model probe. consumer capture and
+installed acceptance remain separate.

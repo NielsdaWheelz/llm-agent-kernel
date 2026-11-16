@@ -20,13 +20,9 @@ authority is an explicit provider configuration under adr 0013.
 
 python 3.12+. `pyproject.toml` and `uv.lock` name exact immutable provider-runtime
 and llm-tools revisions. install the frozen lock. no sibling-source import is an
-installed qualification. the qualified native binary is stock codex 0.160.0;
-consumer manifests pin that version.
-
-| dependency | exact candidate revision |
-| --- | --- |
-| llm-tools | `662a63a863bfefbc9c4f16025bd82f47262d99d6` |
-| provider-runtime | `ea9f82025632926a7c7e47d6333fb9346f6ee86c` |
+installed qualification. contained execution requires stock codex 0.165.0 and
+provider-runtime's exact startup catalog; consumer manifests pin that version.
+host activation still requires real account/worker qualification.
 
 any unsupported exact capability fails
 before arm/submission; never substitute another model, effort, tool or route.
@@ -268,7 +264,7 @@ existing applicable conformance stays. static checks do not prove live behavior.
 
 ## 15. explicitly deferred
 
-program execution, parallel tools, delegation graph, application workflow engines,
+host-owned program execution, parallel tools, delegation graph, application workflow engines,
 memory redesign, native workspace orchestration, compatibility lanes and new
 multi-user infrastructure. ordinary native authority and borrowed directories
 are admitted explicitly under adr 0013. do not add abstractions for hypothetical consumers.

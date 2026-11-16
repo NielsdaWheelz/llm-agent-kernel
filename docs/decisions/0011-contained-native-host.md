@@ -34,3 +34,8 @@ model discovery and needs explicit update/requalification. direct tool mode also
 removes vendor CodeMode convenience, clock and native user-input on that endpoint.
 other coding endpoints retain their behavior. this is configuration of the stock
 server, not a fork, a different model or an application executor.
+
+2026-10-28 contract update: stock 0.165.0 also publishes native `apply_patch`
+from model metadata independently of feature flags. provider-runtime containment
+v2 additionally sets `apply_patch_tool_type=null`; the complete vendor source
+and every unrelated field remain intact. host/version checks remain exact.
