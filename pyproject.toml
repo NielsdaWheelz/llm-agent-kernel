@@ -17,7 +17,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@d097b2a357e8c728f5b095ec8821885dc0edb31e",
+    "llm-tools @ git+https://github.com/NielsdaWheelz/llm-tools.git@c3ac6b03fa65dcc08679e85255345094f85d5a06",
     "provider-runtime @ git+https://github.com/NielsdaWheelz/llm-calling.git@ea9f82025632926a7c7e47d6333fb9346f6ee86c",
     "pydantic>=2.11,<3",
 ]
