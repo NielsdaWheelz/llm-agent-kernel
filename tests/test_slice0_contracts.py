@@ -38,6 +38,7 @@ from llm_tools import (
     ToolLimits,
     ToolPlan,
     ToolSpec,
+    WebSearchPolicy,
     WebSearchProvider,
     WebSearchRequest,
     WebSearchResponse,
@@ -148,6 +149,8 @@ def test_dependency_provider_event_contracts_are_exact() -> None:
 
 
 class CompatibleWebSearchProvider:
+    policy = WebSearchPolicy()
+
     async def search(
         self,
         request: WebSearchRequest,
@@ -302,19 +305,25 @@ def test_dependency_web_search_operation_deadline_api_is_revisioned() -> None:
     assert WEB_SEARCH_SPEC.limits.deadline_seconds == 15.0
     assert (
         WEB_SEARCH_SPEC.tool_contract_revision
-        == "c46877ad7f12d672c2717fd0895f5bd95983dd5f6ffb6e6c9c4a2c22c573b78e"
+        == "b49482683138311b877a9280a5bfc70d6e1fdfc1524646042f732436857ced45"
     )
-    assert default.implementation_revision == "llm-tools-web-search-v3"
-    assert default.policy_epoch == PolicyEpoch("web-search-v2")
+    assert default.implementation_revision == "llm-tools-web-search-v4"
+    assert default.policy_epoch == PolicyEpoch("web-search-v3")
     assert (
         default.policy_revision
-        == "5717aea83625adff48bf1c870a46eb3086c0f166e6ad2088abe9efbe21445933"
+        == "feb046d9ac2c8bf18d19a6f8f36c22f54cfd6db53d92335dc8685b13bb5857d7"
     )
     assert default.policy_inputs == {
-        "locale": "US/en",
-        "max_results": 10,
+        "country": "us",
+        "cursor_version": 1,
+        "endpoint": "https://api.search.brave.com/res/v1/web/search",
+        "extra_snippets": True,
         "operation_deadline_seconds": 12.0,
+        "provider_count": 20,
+        "result_filter": None,
         "safe_search": "moderate",
+        "search_lang": "en",
+        "spellcheck": True,
     }
     assert unavailable.policy_revision == default.policy_revision
     assert tightened.policy_inputs["operation_deadline_seconds"] == 11.5
@@ -329,25 +338,26 @@ def test_dependency_web_read_revision_refreezes_exact_host_table_plan() -> None:
 
     assert (
         WEB_READ_SPEC.tool_contract_revision
-        == "a5de4258e043dd25f47cad2768ff1f5d9db4b93ac4a90347022d030a916bad1b"
+        == "b0d0577bff37d04fd01dedcf98daeee021b2925114e26a60a4735eca7a8bbfed"
     )
     assert WEB_READ_SPEC.limits.max_attempts == 8
     assert WEB_READ_SPEC.limits.deadline_seconds == 20.0
-    assert available.implementation_revision == "llm-tools-web-read-v3"
-    assert unavailable.implementation_revision == "llm-tools-web-read-v3"
-    assert available.policy_epoch == PolicyEpoch("web-read-v1")
+    assert available.implementation_revision == "llm-tools-web-read-v4"
+    assert unavailable.implementation_revision == "llm-tools-web-read-v4"
+    assert available.policy_epoch == PolicyEpoch("web-read-v2")
     assert available.policy_inputs == {
-        "accepted_media": (
-            "application/json",
-            "application/xhtml+xml",
-            "text/html",
-            "text/plain",
-        ),
+        "cursor_version": 1,
         "mode": "direct",
+        "projections": {
+            "application/json": "web-json-source-v2",
+            "application/xhtml+xml": "html-visible-text-v2",
+            "text/html": "html-visible-text-v2",
+            "text/plain": "web-plain-source-v3",
+        },
     }
     assert (
         available.policy_revision
-        == "587bfe6151dc8ad6880aea5414edb974fdf159da4148cdd1c9ffa2420dd74084"
+        == "24ec8a691621e518c8b97b50b90e91a15c2bbd1ba4cc00d97186afa29889a851"
     )
     assert unavailable.policy_revision == available.policy_revision
 
@@ -361,10 +371,10 @@ def test_dependency_web_read_revision_refreezes_exact_host_table_plan() -> None:
     published = render_prompt(publish_host_table(plan))
 
     assert maximum.profile_revision == (
-        "a61bd565a025cd8486da86dda7b5c3b5b3adf832f7b0aabaf6ab29f1076d5121"
+        "7310d40f62163c142946c64c52ba417ab12bd04e56bf3c600fab049b93aaa3df"
     )
-    assert plan.plan_revision == "50cdc80db794194219ea1460647d3bfd8be6cc08f39b67014bc548f46407e7c5"
-    assert '"implementation_revision":"llm-tools-web-read-v3"' in published
+    assert plan.plan_revision == "7ef8edc4dafb343eb9ae92ad83bcff2f95ace411289d3d138c30105432fecbbe"
+    assert '"implementation_revision":"llm-tools-web-read-v4"' in published
 
 
 @pytest.mark.asyncio
@@ -375,7 +385,7 @@ def test_dependency_web_read_revision_refreezes_exact_host_table_plan() -> None:
             b"literal &amp; <b>plain</b>",
             "text/plain",
             "literal &amp; <b>plain</b>",
-            "plain-text-v2",
+            "web-plain-source-v3",
         ),
         (
             b"<p>nested &amp;amp; encoded &amp;lt;script&amp;gt;</p>",
