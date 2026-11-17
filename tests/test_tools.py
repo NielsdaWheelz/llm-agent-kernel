@@ -315,6 +315,9 @@ class _Budget:
             assert self.reservation == reservation
         return True
 
+    async def release_capacity(self, position: InvocationPosition) -> None:
+        assert position == InvocationPosition("effect-1")
+
     async def settle(
         self,
         position: InvocationPosition,

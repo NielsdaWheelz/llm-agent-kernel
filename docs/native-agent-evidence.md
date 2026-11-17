@@ -433,7 +433,10 @@ unresolved. original references, waiting actors, no-repeat guidance and recorded
 reply bytes remain unchanged. no richer state or application recovery API is added.
 
 the isolated repair starts at the installed `fcb6ecfb` pin, retaining its exact
-provider/tools dependencies and stock 0.160.0 contract. a temporary actual
+provider dependency and stock 0.160.0 contract. its initial wording proof uses the
+original tools pin; the final graph adopts qualified tools
+`b25bd5f08bc82eb47eb4384139cfb2623ad12a68`, whose executor releases active capacity
+without settling unresolved cost or effects. a temporary actual
 `run_native`/public Codex client integration over the existing local Unix WebSocket
 peer first fails for both system and user suspension. after the wording repair,
 all three cases pass: new unresolved replies preserve their references/actors,
@@ -450,3 +453,13 @@ probe and only its compiled artifact are removed after retaining hashes and conc
 red/green/wheel/conformance receipts. the 176 existing tests remain. installed
 consumer qualification belongs to jarvis. no account, model or production call
 was made.
+
+the final tools-pin composition passes all 176 retained non-live tests (two live
+cases deselected), frozen-lock, formatting/lint, typing, build and index audit.
+the retained budget conformance double implements the new asynchronous capacity
+release method; no other kernel runtime behavior changes. two focused external
+system/user suspension and duplicate-reply cases also pass through the actual
+supervisor/public client on the freshly installed final wheel. its runtime bytes
+match the independently reviewed wording source. final graph review and external
+probe cleanup remain recorded separately; hosted ci and installed jarvis acceptance
+are not inferred from these local checks.

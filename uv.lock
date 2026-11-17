@@ -621,7 +621,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=662a63a863bfefbc9c4f16025bd82f47262d99d6" },
+    { name = "llm-tools", git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=b25bd5f08bc82eb47eb4384139cfb2623ad12a68" },
     { name = "provider-runtime", git = "https://github.com/NielsdaWheelz/llm-calling.git?rev=ea9f82025632926a7c7e47d6333fb9346f6ee86c" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
@@ -640,7 +640,7 @@ dev = [
 [[package]]
 name = "llm-tools"
 version = "0.1.0"
-source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=662a63a863bfefbc9c4f16025bd82f47262d99d6#662a63a863bfefbc9c4f16025bd82f47262d99d6" }
+source = { git = "https://github.com/NielsdaWheelz/llm-tools.git?rev=b25bd5f08bc82eb47eb4384139cfb2623ad12a68#b25bd5f08bc82eb47eb4384139cfb2623ad12a68" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
