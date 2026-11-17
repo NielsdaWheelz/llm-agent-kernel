@@ -70,6 +70,9 @@ identifies host acceptance and immutable `NativeReply`. `DispatchCompleted`
 contains the original llm-tools result, required host-rendered `model_text` and
 optional host receipt reference. the kernel submits that text unchanged;
 `DispatchSuspended` is an existing durable host wait, not execution success.
+its unresolved outcome does not establish whether execution has begun or an
+effect occurred. retain the original reference and await host resolution without
+proposing the action again.
 
 `run_native` takes a host `NativeJournal` or the explicit `TransientNative`
 marker ([adr 0012](docs/decisions/0012-transient-native-attempts.md)). the marker

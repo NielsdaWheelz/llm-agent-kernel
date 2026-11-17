@@ -422,3 +422,31 @@ and index audit pass. the installed provider receipt matches the exact git pin.
 the index audit excludes the three private/git packages. independent review
 verified the pin-only composition; installed application proof remains jarvis's
 separate responsibility. no model call or runtime upgrade is claimed here.
+
+## 2026-11-17 unresolved pending-action wording
+
+jarvis's installed f2 journey returned a system suspension for an entered
+calendar action, while the kernel described it as not executed. the generic
+`DispatchSuspended` contract proves only a durable host wait, not execution state.
+native base instruction v5 and new pending replies now describe the outcome as
+unresolved. original references, waiting actors, no-repeat guidance and recorded
+reply bytes remain unchanged. no richer state or application recovery API is added.
+
+the isolated repair starts at the installed `fcb6ecfb` pin, retaining its exact
+provider/tools dependencies and stock 0.160.0 contract. a temporary actual
+`run_native`/public Codex client integration over the existing local Unix WebSocket
+peer first fails for both system and user suspension. after the wording repair,
+all three cases pass: new unresolved replies preserve their references/actors,
+duplicate callbacks dispatch once and replay byte-identically, and a previously
+recorded old-wording reply is replayed unchanged without dispatch. the control
+peer proves transport/supervisor behavior, not a model or production effect.
+
+frozen-lock, formatting/lint, typing, all 179 non-live tests including the three
+temporary cases (two live cases deselected), source/wheel build and index audit
+pass. the same three cases also pass from the freshly installed wheel, whose
+runtime bytes match the reviewed source. the three owned Git packages are outside
+the index audit's coverage. independent review approves the repair; the temporary
+probe and only its compiled artifact are removed after retaining hashes and concise
+red/green/wheel/conformance receipts. the 176 existing tests remain. installed
+consumer qualification belongs to jarvis. no account, model or production call
+was made.

@@ -426,6 +426,12 @@ numbered citations. native reply journaling commits those exact bytes; duplicate
 delivery reuses them rather than rerendering with current state. isolated tool
 observations use the same projection. no kernel copy of an application renderer.
 
+`DispatchSuspended` retains its original action reference and `waiting_for` actor.
+it reports an unresolved outcome, without asserting that execution has not begun
+or no effect occurred. native base instruction v5 preserves independent work,
+no-repeat guidance and later host resolution. already recorded reply bytes remain
+immutable, including historical replies with the former wording.
+
 known-tool invalid input returns a bounded typed rejection recorded before reply,
 without executor reservation or effect. keep its proposal digest and rejection,
 never label invalid arguments validated. undeclared/native tool, changed correlation,
@@ -641,7 +647,9 @@ uses the existing final-only JarvisTerminal contract; Progress cannot become a f
 settlement. no plaintext fallback or extraction of old final-shaped commentary.
 nexus keeps its own output schemas and citation/publication owners.
 
-historical native base instruction v3, superseded by adr 0013's v4 native/callback distinction (current exact text is kernel-owned source):
+historical native base instruction v3, superseded by adr 0013's v4 native/callback
+distinction and v5's unresolved pending-outcome wording above (current exact text
+is kernel-owned source):
 
 > use only the declared host tools for actions and observations. tool arguments
 > request work; only host results establish what happened. public messages may
