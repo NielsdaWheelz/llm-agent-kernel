@@ -142,6 +142,15 @@ class KernelConfigurationDefect(RuntimeError):
     """A host or dependency invariant prevents safe progress."""
 
 
+type _BudgetLimit = Literal[
+    "provider_turns",
+    "cooperative_seconds",
+    "provider_input_tokens",
+    "provider_output_tokens",
+    "native_turn_timeout",
+]
+
+
 _PROVIDER_CONFIGURATION_ERRORS = (
     ConcurrentTurn,
     CredentialRejected,
@@ -345,7 +354,11 @@ async def run_one_shot(
             return
         emit_event(event_sink, value)
 
-    def stopped(kind: OneShotStopKind) -> OneShotStopped:
+    def stopped(
+        kind: OneShotStopKind, *, budget_limit: _BudgetLimit | None = None
+    ) -> OneShotStopped:
+        if budget_limit is not None:
+            event(EventKind.outcome, budget_limit=budget_limit)
         if kind is OneShotStopKind.cancelled:
             event(EventKind.cancellation, cancellation_type="cancelled")
         state.outcome_type = kind.value
@@ -504,10 +517,12 @@ async def run_one_shot(
                 if cancellation.cancelled:
                     return stopped(OneShotStopKind.cancelled)
                 if state.model_step_ordinal + repairs >= definition.limits.max_provider_turns:
-                    return stopped(OneShotStopKind.budget_exhausted)
+                    return stopped(OneShotStopKind.budget_exhausted, budget_limit="provider_turns")
                 remaining = definition.limits.max_cooperative_seconds - state.elapsed()
                 if remaining <= 0:
-                    return stopped(OneShotStopKind.budget_exhausted)
+                    return stopped(
+                        OneShotStopKind.budget_exhausted, budget_limit="cooperative_seconds"
+                    )
                 replayed = replay is not None
                 if replay is not None:
                     terminal = replay.terminal
@@ -605,11 +620,19 @@ async def run_one_shot(
                     return stopped(OneShotStopKind.cancelled)
                 if terminal.status == "failed":
                     kind = _failed_terminal_stop(terminal)
-                    return stopped(kind)
+                    return stopped(
+                        kind,
+                        budget_limit=(
+                            "native_turn_timeout"
+                            if kind is OneShotStopKind.budget_exhausted
+                            else None
+                        ),
+                    )
                 if terminal.status != "succeeded":
                     raise KernelConfigurationDefect("provider returned an unknown terminal status")
-                if _kernel_budget_exhausted(definition, state):
-                    return stopped(OneShotStopKind.budget_exhausted)
+                budget_limit = _kernel_budget_limit(definition, state)
+                if budget_limit is not None:
+                    return stopped(OneShotStopKind.budget_exhausted, budget_limit=budget_limit)
 
                 state.model_step_ordinal += 1
                 try:
@@ -645,8 +668,9 @@ async def run_one_shot(
                 if isinstance(step, ValidatedToolCall):
                     if cancellation.cancelled:
                         return stopped(OneShotStopKind.cancelled)
-                    if _kernel_budget_exhausted(definition, state):
-                        return stopped(OneShotStopKind.budget_exhausted)
+                    budget_limit = _kernel_budget_limit(definition, state)
+                    if budget_limit is not None:
+                        return stopped(OneShotStopKind.budget_exhausted, budget_limit=budget_limit)
                     event(
                         EventKind.tool_dispatch,
                         tool_id=str(step.tool_id),
@@ -906,18 +930,15 @@ def _add_delta(total: int | None, current: int | None, previous: int | None) -> 
     return (total or 0) + delta
 
 
-def _kernel_budget_exhausted(definition: AgentDefinition, state: _RunState) -> bool:
+def _kernel_budget_limit(definition: AgentDefinition, state: _RunState) -> _BudgetLimit | None:
     limits = definition.limits
-    return (
-        state.elapsed() >= limits.max_cooperative_seconds
-        or (
-            state.input_tokens is not None and state.input_tokens > limits.max_provider_input_tokens
-        )
-        or (
-            state.output_tokens is not None
-            and state.output_tokens > limits.max_provider_output_tokens
-        )
-    )
+    if state.elapsed() >= limits.max_cooperative_seconds:
+        return "cooperative_seconds"
+    if state.input_tokens is not None and state.input_tokens > limits.max_provider_input_tokens:
+        return "provider_input_tokens"
+    if state.output_tokens is not None and state.output_tokens > limits.max_provider_output_tokens:
+        return "provider_output_tokens"
+    return None
 
 
 def _create_tool_budget(

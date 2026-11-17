@@ -264,6 +264,14 @@ before accounting or cleanup: fixed catch site, allowlisted caught kind/code and
 at most two installed-owned coordinates from at most four explicit causes.
 cause coordinates never replace the caught failure's classification.
 
+isolated budget stops emit a closed `budget_limit` on the existing outcome event
+at the decision, before later accounting or cleanup: `provider_turns`,
+`cooperative_seconds`, `provider_input_tokens`, `provider_output_tokens`, or
+`native_turn_timeout`. preserve original predicate order and boundaries, public
+outcomes and metrics. the timeout tag identifies the existing typed failed-terminal
+`turn_timeout` mapping; it does not prove a remote native server reported it.
+quota failures remain distinct. no private provider prose is included.
+
 ## 14. required conformance
 
 [native acceptance](docs/native-agent-spec.md#9-delivery-and-acceptance) assigns
