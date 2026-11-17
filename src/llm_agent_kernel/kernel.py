@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Never
+from typing import Literal, Never
 
 from llm_tools import (
     BudgetState,
@@ -44,6 +46,7 @@ from provider_runtime.agent_runtime import (
     McpUnavailable,
     NativeTerminalEvidence,
     OutputSchemaMismatch,
+    ProtocolDefect,
     SdkUnavailable,
     TextContent,
     UnsupportedCapability,
@@ -108,6 +111,7 @@ from .events import (
     EventAttribute,
     EventKind,
     EventSink,
+    EventValue,
     KernelEvent,
     emit_diagnostic,
     emit_event,
@@ -149,6 +153,92 @@ _PROVIDER_CONFIGURATION_ERRORS = (
     SdkUnavailable,
     UnsupportedCapability,
 )
+
+
+_FAILURE_KINDS = {
+    ContextLimitExceeded: "ContextLimitExceeded",
+    ContextSourceDefect: "ContextSourceDefect",
+    ExecutorConfigurationDefect: "ExecutorConfigurationDefect",
+    KernelConfigurationDefect: "KernelConfigurationDefect",
+    ModelDecisionDefect: "ModelDecisionDefect",
+    PlanValidationError: "PlanValidationError",
+    PositionConflictDefect: "PositionConflictDefect",
+    ProviderDefect: "ProviderDefect",
+    ProviderContainmentViolation: "ProviderContainmentViolation",
+    ProviderStreamDefect: "ProviderStreamDefect",
+    RecoveryRequired: "RecoveryRequired",
+    ToolDispatchDefect: "ToolDispatchDefect",
+    AgentRuntimeDefect: "AgentRuntimeDefect",
+    ProtocolDefect: "ProtocolDefect",
+    ConcurrentTurn: "ConcurrentTurn",
+    CredentialRejected: "CredentialRejected",
+    CredentialUnavailable: "CredentialUnavailable",
+    ExecutableUnavailable: "ExecutableUnavailable",
+    InvalidAgentRequest: "InvalidAgentRequest",
+    McpConfigurationError: "McpConfigurationError",
+    McpUnavailable: "McpUnavailable",
+    SdkUnavailable: "SdkUnavailable",
+    UnsupportedCapability: "UnsupportedCapability",
+    TypeError: "TypeError",
+    ValueError: "ValueError",
+}
+_FAILURE_CODES = frozenset(
+    {
+        "concurrent_turn",
+        "credential_rejected",
+        "credential_unavailable",
+        "executable_unavailable",
+        "invalid_agent_request",
+        "mcp_configuration_error",
+        "mcp_unavailable",
+        "sdk_unavailable",
+        "unsupported_capability",
+        "protocol_defect",
+        "missing_terminal_event",
+        "event_after_terminal",
+        "unknown_event_kind",
+        "sdk_teardown_failed",
+    }
+)
+
+
+def _failure_attributes(
+    site: Literal["bootstrap_context", "provider_configuration", "kernel_configuration"],
+    error: BaseException,
+) -> dict[str, EventValue]:
+    """Retain the caught kind/code and bounded installed cause coordinates only."""
+    code: object = getattr(error, "code", None)
+    attributes: dict[str, EventValue] = {
+        "failure_site": site,
+        "failure_kind": _FAILURE_KINDS.get(type(error), "other"),
+        "failure_code": code if isinstance(code, str) and code in _FAILURE_CODES else None,
+    }
+    frames: deque[tuple[str, str, int]] = deque(maxlen=2)
+    current = error
+    for _ in range(4):
+        traceback = current.__traceback__
+        while traceback is not None:
+            frame = traceback.tb_frame
+            name = frame.f_globals.get("__name__")
+            module = sys.modules.get(name) if isinstance(name, str) else None
+            if (
+                isinstance(name, str)
+                and name.partition(".")[0] in {"llm_agent_kernel", "provider_runtime", "llm_tools"}
+                and module is not None
+                and vars(module) is frame.f_globals
+                and getattr(module, "__file__", None) == frame.f_code.co_filename
+            ):
+                frames.append((name, frame.f_code.co_name, traceback.tb_lineno))
+            traceback = traceback.tb_next
+        if current.__cause__ is None:
+            break
+        current = current.__cause__
+    attributes["failure_frame_count"] = len(frames)
+    for index, (module, function, line) in enumerate(frames):
+        attributes[f"failure_module_{index}"] = module
+        attributes[f"failure_function_{index}"] = function
+        attributes[f"failure_line_{index}"] = line
+    return attributes
 
 
 class _RunState:
@@ -310,8 +400,12 @@ async def run_one_shot(
                 prior_visible_bytes=state.visible_bytes,
                 input_projection=input_projection,
             )
-        except ContextLimitExceeded:
-            event(EventKind.outcome, outcome_type="configuration_error")
+        except ContextLimitExceeded as error:
+            event(
+                EventKind.outcome,
+                outcome_type="configuration_error",
+                **_failure_attributes("bootstrap_context", error),
+            )
             return stopped(OneShotStopKind.configuration_error)
         state.visible_bytes = projection.cumulative_visible_bytes
 
@@ -604,7 +698,8 @@ async def run_one_shot(
                         return stopped(OneShotStopKind.cancelled)
                     return completed(step.result)
                 raise KernelConfigurationDefect("isolated structured run ended without a result")
-        except _PROVIDER_CONFIGURATION_ERRORS:
+        except _PROVIDER_CONFIGURATION_ERRORS as error:
+            event(EventKind.outcome, **_failure_attributes("provider_configuration", error))
             await account_lease_usage()
             if armed_request is not None:
                 return stopped(OneShotStopKind.model_decision_uncertain)
@@ -633,7 +728,8 @@ async def run_one_shot(
             ToolDispatchDefect,
             TypeError,
             ValueError,
-        ):
+        ) as error:
+            event(EventKind.outcome, **_failure_attributes("kernel_configuration", error))
             await account_lease_usage()
             return stopped(OneShotStopKind.configuration_error)
     finally:

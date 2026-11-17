@@ -259,6 +259,11 @@ transient work only to the returned terminal; product text is its separately
 derived projection. XML-like prompt structure establishes provenance, not a
 security boundary.
 
+isolated configuration catches emit best-effort payload-free outcome metadata
+before accounting or cleanup: fixed catch site, allowlisted caught kind/code and
+at most two installed-owned coordinates from at most four explicit causes.
+cause coordinates never replace the caught failure's classification.
+
 ## 14. required conformance
 
 [native acceptance](docs/native-agent-spec.md#9-delivery-and-acceptance) assigns
