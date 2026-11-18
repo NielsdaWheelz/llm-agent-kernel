@@ -751,7 +751,7 @@ def _reply(result: DispatchCompleted | DispatchSuspended | NativeRejected) -> Na
             "type": "pending_action",
             "action_ref": str(result.host_ref),
             "waiting_for": result.waiting_for.value,
-            "text": "the action is pending and has not executed; continue independent work and await its host resolution",
+            "text": "the action's outcome is unresolved; continue independent work and await its host resolution",
         }
         return NativeReply(canonical_json_bytes(value).decode(), True, result)
     if isinstance(result, NativeRejected):

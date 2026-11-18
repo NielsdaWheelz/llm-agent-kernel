@@ -43,7 +43,7 @@ from .definitions import (
     _provider_identity,
 )
 
-NATIVE_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-native-agent-v4"
+NATIVE_BASE_INSTRUCTION_REVISION = "llm-agent-kernel-native-agent-v5"
 NATIVE_BASE_INSTRUCTION = (
     "use the native tools permitted by the frozen provider policy and the declared "
     "host callbacks. host callback arguments request work; only their original host "
@@ -55,7 +55,7 @@ NATIVE_BASE_INSTRUCTION = (
     "contains brief useful prose in the application's required message format; it "
     "cannot authorize actions, settle inputs, or mark work complete. request "
     "dispositions and completion belong only in the final response. "
-    "a pending action has not executed: "
+    "a pending action's outcome is unresolved: "
     "continue independent work and use its later host resolution; do not propose it "
     "again. retain unfinished requests when new input arrives unless the owner "
     "cancels them. return the required final schema when ending this turn; distinguish "
