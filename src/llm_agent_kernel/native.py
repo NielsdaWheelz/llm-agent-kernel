@@ -535,6 +535,15 @@ async def run_native(
                         "native stream ended without terminal evidence"
                     ) from error
                 if isinstance(event, AgentTerminal):
+                    # A completed callback or control can already disqualify this seal.
+                    if steer_task is not None and steer_task.done():
+                        await finish_steer()
+                    if (
+                        callback_task is not None
+                        and callback_task.done()
+                        and not callback_task.cancelled()
+                    ):
+                        callback_task.result()
                     terminal = event
                     if isinstance(terminal.evidence, NativeTerminalEvidence):
                         _require_terminal(terminal, turn.attempt, submission)
