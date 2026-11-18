@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from llm_tools import BudgetState, FrozenToolPlan, ToolBinding
-from provider_runtime.agent_runtime import AgentNotSubmitted, AgentTerminal
+from provider_runtime.agent_runtime import AgentNotSubmitted, AgentSubmissionRejected, AgentTerminal
 
 from .cancellation import CancellationToken
 from .coordination import ToolDispatchPort
@@ -23,6 +23,7 @@ from .decisions import (
     ModelDecisionDefect,
     ModelDecisionJournal,
     ModelDecisionRecord,
+    ModelDecisionRejected,
     ModelDecisionRequest,
 )
 from .definitions import (
@@ -106,6 +107,14 @@ class InMemoryModelDecisionJournal(ModelDecisionJournal):
         result = ModelDecisionCompleted(request, terminal)
         records[-1] = result
         return result
+
+    async def rejected(
+        self, request: ModelDecisionRequest, evidence: AgentSubmissionRejected
+    ) -> None:
+        records = self.records.get(request.scope, [])
+        if not records or records[-1] != ModelDecisionArmed(request):
+            raise ModelDecisionDefect("rejection does not match the armed decision")
+        records[-1] = ModelDecisionRejected(request, evidence)
 
     async def not_submitted(
         self, request: ModelDecisionRequest, evidence: AgentNotSubmitted

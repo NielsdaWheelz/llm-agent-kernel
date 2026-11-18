@@ -9,7 +9,7 @@ from collections import deque
 from collections.abc import Awaitable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from llm_tools import (
     PromptSections,
@@ -29,6 +29,7 @@ from provider_runtime.agent_runtime import (
     AgentNotSubmitted,
     AgentPermissionRequest,
     AgentSubmission,
+    AgentSubmissionRejected,
     AgentTerminal,
     AgentText,
     AgentToolCall,
@@ -38,10 +39,15 @@ from provider_runtime.agent_runtime import (
     AgentTurnRef,
     AgentUncertain,
     AgentUsage,
+    CodexConnectionUnavailable,
+    ConflictingSubmissionEvidence,
     LocalStopEvidence,
+    NativeRequestFit,
     NativeTerminalEvidence,
+    ProtocolDefect,
+    SessionUnavailable,
     TextContent,
-    codex_native_request_fits,
+    codex_native_request_fit,
     thaw_json_value,
 )
 from provider_runtime.tool_adapter import (
@@ -84,10 +90,16 @@ from .native_contract import (
     NativeRejected,
     NativeReply,
     NativeRequest,
+    NativeSubmissionConflict,
     NativeUncertain,
     TransientNative,
 )
-from .provider import ProviderContainmentViolation, ProviderSessionLease, ProviderSessionPort
+from .provider import (
+    ProviderContainmentViolation,
+    ProviderDefect,
+    ProviderSessionLease,
+    ProviderSessionPort,
+)
 from .tools import require_native_plan
 
 
@@ -142,17 +154,26 @@ class _TransientJournal:
     ) -> None:
         return None
 
+    async def record_submission_conflict(self, attempt_id: str, seal: AgentTerminal | None) -> None:
+        return None
+
     async def fence(self, attempt_id: str, reason: str) -> None:
         return None
 
 
-def native_request_fits(definition: NativeDefinition, sections: PromptSections) -> bool:
+def native_request_fit(
+    definition: NativeDefinition,
+    sections: PromptSections,
+    *,
+    operation: Literal["start", "steer"] = "start",
+) -> NativeRequestFit:
     """Measure actual kernel framing against the provider's contained request bound."""
-    return codex_native_request_fits(
+    return codex_native_request_fit(
         render_prompt(sections),
         output=definition.output,
         reasoning=definition.provider.reasoning,
         input_id=_delivery_id("request-fit", ()),
+        operation=operation,
     )
 
 
@@ -169,7 +190,7 @@ async def run_native(
     budgets: ToolBudgetFactoryPort,
     messages: NativeMessagePort,
     cancellation: CancellationToken,
-) -> AgentNotSubmitted | AgentTerminal:
+) -> AgentNotSubmitted | AgentSubmissionRejected | AgentTerminal:
     """Supervise one native attempt; host policy owns task continuation/recovery.
 
     `TransientNative` keeps every ordering guarantee in this call's memory and
@@ -271,6 +292,7 @@ async def run_native(
 
     async def execute(callback: _Callback) -> NativeReply:
         await owner.require_current(request.permit)
+        await turn.check_submission()
         record = await journal.record_invocation(callback.proposal)
         if (
             replace(
@@ -291,6 +313,7 @@ async def run_native(
                 result = callback.proposal.validation_error
             else:
                 await owner.require_current(request.permit)
+                await turn.check_submission()
                 result = await dispatch.dispatch(
                     binding=callback.binding,
                     validated_input=callback.validated_input,
@@ -315,6 +338,35 @@ async def run_native(
             return receipt
         await turn.reply(callback.call, AgentToolReply(receipt.text, receipt.success))
         return receipt
+
+    async def finish_steer() -> str | None:
+        nonlocal steer_task, steering_delivery
+        if steer_task is None or steering_delivery is None:
+            return None
+        task, delivery = steer_task, steering_delivery
+        steer_task = steering_delivery = None
+        control = await task
+        if (
+            not isinstance(submission, AgentAccepted)
+            or control.operation != "steer"
+            or control.input_id != delivery.delivery_id
+            or control.turn != submission.turn
+            and not (control.turn is None and control.disposition in ("not_sent", "unknown"))
+        ):
+            raise NativeDefect("native steer receipt changed its delivery or turn")
+        await journal.record_outcome(request.attempt_id, control)
+        if deliveries[delivery.delivery_id].state == "recorded":
+            return None
+        state = (
+            "queued"
+            if control.disposition == "accepted"
+            else "sent"
+            if control.disposition == "unknown"
+            else "rejected"
+        )
+        deliveries[delivery.delivery_id] = replace(delivery, state=state, evidence=control)
+        await journal.record_delivery(deliveries[delivery.delivery_id])
+        return control.disposition
 
     async def observe_poll(result: PollResult) -> None:
         nonlocal pending_input
@@ -400,6 +452,12 @@ async def run_native(
                 await journal.record_outcome(request.attempt_id, control)
                 interrupt_task = None
         submission = await submit_task
+        if isinstance(submission, AgentSubmissionRejected):
+            if submission.attempt != turn.attempt:
+                raise NativeDefect("submission rejection changed its prepared attempt")
+            await journal.record_outcome(request.attempt_id, submission)
+            await journal.fence(request.attempt_id, submission.code)
+            return submission
         if isinstance(submission, AgentNotSubmitted):
             await journal.record_outcome(request.attempt_id, submission)
             await journal.fence(request.attempt_id, submission.reason)
@@ -434,7 +492,8 @@ async def run_native(
                 waiters, timeout=remaining_grace, return_when=asyncio.FIRST_COMPLETED
             )
             if not done:
-                # Reader-latched native truth wins an expired local stop grace.
+                # Check the correlated start reply before settling a latched seal.
+                await turn.check_submission()
                 if turn.terminal is not None and isinstance(
                     turn.terminal.evidence, NativeTerminalEvidence
                 ):
@@ -472,6 +531,8 @@ async def run_native(
                     terminal = event
                     if isinstance(terminal.evidence, NativeTerminalEvidence):
                         _require_terminal(terminal, turn.attempt, submission)
+                    else:
+                        await journal.fence(request.attempt_id, stop_reason or "native_loss")
                     await journal.record_outcome(request.attempt_id, terminal)
                     return terminal
                 if isinstance(event, AgentToolUse):
@@ -555,36 +616,8 @@ async def run_native(
                 await observe_poll(poll_task.result())
                 poll_task = asyncio.create_task(poll())
             if steer_task is not None and steer_task in done:
-                control = steer_task.result()
-                if (
-                    steering_delivery is None
-                    or control.operation != "steer"
-                    or (
-                        control.turn != submission.turn
-                        and not (
-                            control.turn is None and control.disposition in ("not_sent", "unknown")
-                        )
-                    )
-                    or control.input_id != steering_delivery.delivery_id
-                ):
-                    raise NativeDefect("native steer receipt changed its delivery or turn")
-                await journal.record_outcome(request.attempt_id, control)
-                if deliveries[steering_delivery.delivery_id].state != "recorded":
-                    state = (
-                        "queued"
-                        if control.disposition == "accepted"
-                        else "rejected"
-                        if control.disposition in ("not_sent", "rejected")
-                        else "sent"
-                    )
-                    deliveries[steering_delivery.delivery_id] = replace(
-                        steering_delivery, state=state, evidence=control
-                    )
-                    await journal.record_delivery(deliveries[steering_delivery.delivery_id])
-                    if control.disposition == "unknown" and stop_reason is None:
-                        raise NativeUncertain("native input steering has unresolved delivery")
-                steer_task = None
-                steering_delivery = None
+                if await finish_steer() == "unknown" and stop_reason is None:
+                    raise NativeUncertain("native input steering has unresolved delivery")
             if pending_input is not None and stop_reason is None and steer_task is None:
                 new_ids = tuple(item.input_id for item in pending_input.inputs)
                 if set(new_ids).intersection(delivered_ids):
@@ -624,6 +657,18 @@ async def run_native(
         turn.revoke()
         if armed:
             try:
+                await turn.check_submission()
+            except ConflictingSubmissionEvidence as conflict:
+                seal = turn.terminal
+                if seal is not None and isinstance(seal.evidence, NativeTerminalEvidence):
+                    _require_terminal(seal, turn.attempt, turn.submission)
+                else:
+                    seal = None
+                await journal.record_submission_conflict(request.attempt_id, seal)
+                raise NativeSubmissionConflict(
+                    "stock both accepted and refused this submission"
+                ) from conflict
+            try:
                 if turn.terminal is not None and isinstance(
                     turn.terminal.evidence, NativeTerminalEvidence
                 ):
@@ -631,13 +676,26 @@ async def run_native(
                     await journal.record_outcome(request.attempt_id, turn.terminal)
                 elif turn.submission is not None:
                     await journal.record_outcome(request.attempt_id, turn.submission)
-                await journal.fence(request.attempt_id, type(error).__name__)
+                fault = isinstance(error, NativeDefect | ProviderDefect | ProtocolDefect)
+                reason = (
+                    "native_protocol_fault"
+                    if fault and not isinstance(error, NativeUncertain)
+                    else "native_loss"
+                )
+                await journal.fence(request.attempt_id, reason)
             except BaseException as retention_error:
                 error.add_note(
                     f"{type(retention_error).__name__}: native evidence retention or fencing failed"
                 )
+        if isinstance(error, CodexConnectionUnavailable | SessionUnavailable):
+            raise NativeUncertain("native connection lost after arm") from error
+        if isinstance(error, ProviderDefect | ProtocolDefect):
+            raise NativeDefect("native provider protocol requires repair") from error
         raise
     finally:
+        # Revoking before the bounded steer settles allows the original writer
+        # to prove non-entry or return its actual (possibly unknown) receipt.
+        turn.revoke()
         tasks = tuple(
             task
             for task in (
@@ -647,7 +705,6 @@ async def run_native(
                 poll_task,
                 cancel_wait,
                 interrupt_task,
-                steer_task,
             )
             if task is not None
         )
@@ -657,9 +714,19 @@ async def run_native(
         await asyncio.gather(
             *(cast(Awaitable[object], task) for task in tasks), return_exceptions=True
         )
+        steer_error = None
+        try:
+            await finish_steer()
+        except BaseException as receipt_error:
+            if primary_error is None:
+                steer_error = primary_error = receipt_error
+            else:
+                primary_error.add_note(
+                    f"{type(receipt_error).__name__}: pending steer receipt failed"
+                )
         if terminal is not None and isinstance(terminal.usage, Present):
             observed_usage = terminal.usage.value
-        if not isinstance(turn.submission, AgentNotSubmitted):
+        if not isinstance(turn.submission, AgentNotSubmitted | AgentSubmissionRejected):
             session.record_usage(observed_usage)
         try:
             close = await turn.close()
@@ -675,8 +742,12 @@ async def run_native(
             session.record_diagnostics((f"{type(cleanup_error).__name__}: native cleanup failed",))
             if primary_error is not None:
                 primary_error.add_note("native cleanup also failed")
-            elif terminal is None and not isinstance(submission, AgentNotSubmitted):
+            elif terminal is None and not isinstance(
+                submission, AgentNotSubmitted | AgentSubmissionRejected
+            ):
                 raise
+        if steer_error is not None:
+            raise steer_error
 
 
 def _delivery_id(attempt_id: str, input_ids: tuple[InputId, ...]) -> str:
@@ -775,4 +846,4 @@ def _require_terminal(
         raise NativeDefect("native terminal changed its accepted native identity")
 
 
-__all__ = ["run_native"]
+__all__ = ["native_request_fit", "run_native"]

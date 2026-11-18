@@ -11,6 +11,7 @@ from llm_tools import canonical_json_bytes
 from provider_runtime.agent_runtime import (
     AgentAttempt,
     AgentNotSubmitted,
+    AgentSubmissionRejected,
     AgentTerminal,
     NativeTerminalEvidence,
 )
@@ -161,7 +162,19 @@ class ModelDecisionNotSubmitted:
             raise ModelDecisionDefect("non-submission proof changed its prepared attempt")
 
 
-type ModelDecisionRecord = ModelDecisionArmed | ModelDecisionCompleted | ModelDecisionNotSubmitted
+@dataclass(frozen=True, slots=True)
+class ModelDecisionRejected:
+    request: ModelDecisionRequest
+    evidence: AgentSubmissionRejected
+
+    def __post_init__(self) -> None:
+        if self.evidence.attempt != self.request.provider_attempt:
+            raise ModelDecisionDefect("rejection proof changed its prepared attempt")
+
+
+type ModelDecisionRecord = (
+    ModelDecisionArmed | ModelDecisionCompleted | ModelDecisionNotSubmitted | ModelDecisionRejected
+)
 
 
 class ModelDecisionJournal(Protocol):
@@ -189,6 +202,12 @@ class ModelDecisionJournal(Protocol):
         This result is original provider evidence, never reconstructed success.
         A successful completion cannot change either request or terminal.
         """
+        ...
+
+    async def rejected(
+        self, request: ModelDecisionRequest, evidence: AgentSubmissionRejected
+    ) -> None:
+        """Persist the correlated refusal. A repeated opening requires host correction."""
         ...
 
     async def not_submitted(
@@ -239,6 +258,7 @@ __all__ = [
     "ModelDecisionArmed",
     "ModelDecisionCompleted",
     "ModelDecisionNotSubmitted",
+    "ModelDecisionRejected",
     "ModelDecisionDefect",
     "ModelDecisionJournal",
     "ModelDecisionRecord",

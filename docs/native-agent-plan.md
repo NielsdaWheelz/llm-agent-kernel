@@ -272,3 +272,15 @@ finish by updating the owning specs/ADRs, deleting resolved issue records and
 removing task-owned temporary resources. retain open issues only for evidence not
 yet established. implementation and paid qualification calls were subsequently authorized.
 no deployment or edit to the metadata worktree is included.
+
+
+## 2026-11-18 stock admission and refusal
+
+temporary integration probes on the prepared and isolated entry points exercised the
+rendered start/steer fit, receiver-confirmed refusal, conflicting acceptance with zero
+callback dispatch, and recovery of a refused isolated decision with no second model
+entry. a paused steer writer plus task cancellation retained its original `not_sent`
+receipt. a post-arm protocol fault reached the same stable classification live and in
+the journal. on the predecessor, the refusal carried uncertainty, the fit api lacked
+the character budget, and the latter two fault probes failed. the provider contract
+records the stock binary and exact rejection boundaries.

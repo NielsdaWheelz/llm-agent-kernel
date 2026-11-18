@@ -1,5 +1,7 @@
 """Single export inventory for the package's contained structured-agent API."""
 
+from provider_runtime.agent_runtime import NativeRequestFit
+
 from ._schema import UnsupportedStructuredOutputError
 from .cancellation import CancellationToken
 from .context import (
@@ -33,6 +35,7 @@ from .decisions import (
     ModelDecisionJournal,
     ModelDecisionNotSubmitted,
     ModelDecisionRecord,
+    ModelDecisionRejected,
     ModelDecisionRequest,
     ModelDecisionUncertain,
     TransientModelDecisions,
@@ -105,7 +108,7 @@ from .fakes import (
     ScriptedToolDispatchPort,
 )
 from .kernel import KernelConfigurationDefect, run_one_shot
-from .native import native_request_fits, run_native
+from .native import native_request_fit, run_native
 from .native_contract import (
     NATIVE_BASE_INSTRUCTION,
     NATIVE_BASE_INSTRUCTION_IDENTITY,
@@ -123,6 +126,7 @@ from .native_contract import (
     NativeRejected,
     NativeReply,
     NativeRequest,
+    NativeSubmissionConflict,
     NativeUncertain,
     TransientNative,
 )
@@ -180,7 +184,10 @@ __all__ = [
     "model_decision_id",
     "ModelDecisionNotSubmitted",
     "run_native",
-    "native_request_fits",
+    "native_request_fit",
+    "NativeRequestFit",
+    "NativeSubmissionConflict",
+    "ModelDecisionRejected",
     "input_batch",
     "DecisionScope",
     "DurableIsolatedDecisions",

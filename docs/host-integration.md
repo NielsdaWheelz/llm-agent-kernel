@@ -18,8 +18,8 @@ acceptance, duplicate-callback replay and reply-before-send order in per-call
 memory; the durable facts below are not kept. the host still checks ownership,
 polls input, dispatches tools and records whatever tool/effect rows it needs,
 commits public messages and acquires the session. use a fresh `attempt_id` per
-call. on return, persist what the product needs from the returned terminal or
-`AgentNotSubmitted`; an exception or process loss leaves no kernel evidence (not
+call. on return, persist what the product needs from the returned terminal,
+`AgentNotSubmitted` or `AgentSubmissionRejected`; an exception or process loss leaves no kernel evidence (not
 even a latched seal; observed usage stays on the lease), so the host settles the
 work as failed or reruns it from scratch, accepting that the lost attempt may
 have been charged. `recovery_policy` is inert in this mode.

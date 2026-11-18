@@ -22,7 +22,6 @@ from provider_runtime.agent_runtime import (
     AgentEvent,
     AgentFailure,
     AgentNative,
-    AgentNotSubmitted,
     AgentPermissionRequest,
     AgentQuotaExhausted,
     AgentRuntime,
@@ -259,7 +258,7 @@ async def _observed(provider, lease, content, cancellation, *, timeout_seconds=N
     except BaseException:
         await provider.discard(lease)
         raise
-    if not isinstance(result, AgentNotSubmitted) and result.status != "succeeded":
+    if isinstance(result, AgentTerminal) and result.status != "succeeded":
         await provider.discard(lease)
     assert isinstance(result, AgentTerminal)
     return result

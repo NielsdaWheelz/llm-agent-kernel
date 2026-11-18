@@ -30,6 +30,7 @@ from provider_runtime.agent_runtime import (
     AgentQuotaExhausted,
     AgentRuntimeDefect,
     AgentRuntimeError,
+    AgentSubmissionRejected,
     AgentTerminal,
     AgentText,
     AgentToolCall,
@@ -78,6 +79,7 @@ from .decisions import (
     ModelDecisionDefect,
     ModelDecisionJournal,
     ModelDecisionNotSubmitted,
+    ModelDecisionRejected,
     ModelDecisionRequest,
     ModelDecisionUncertain,
     TransientModelDecisions,
@@ -375,6 +377,8 @@ async def run_one_shot(
     retry: ModelDecisionNotSubmitted | None = None
     if isinstance(decisions, DurableIsolatedDecisions):
         recorded = await decisions.journal.latest(decisions.scope)
+        if isinstance(recorded, ModelDecisionRejected):
+            return stopped(OneShotStopKind.configuration_error)
         if isinstance(recorded, ModelDecisionArmed):
             return stopped(OneShotStopKind.model_decision_uncertain)
         if recorded is not None:
@@ -590,6 +594,9 @@ async def run_one_shot(
                         lease, turn, cancellation, current_request, journal
                     )
                     armed_request = None
+                    if isinstance(result, AgentSubmissionRejected):
+                        state.provider_turns -= 1
+                        return stopped(OneShotStopKind.configuration_error)
                     if isinstance(result, AgentNotSubmitted):
                         state.provider_turns -= 1
                         return stopped(
@@ -788,7 +795,7 @@ async def _record_observed_turn(
     cancellation: CancellationToken,
     request: ModelDecisionRequest,
     journal: ModelDecisionJournal | None,
-) -> AgentTerminal | AgentNotSubmitted:
+) -> AgentTerminal | AgentNotSubmitted | AgentSubmissionRejected:
     """Arm the prepared request and retain submission truth before product work."""
     if journal is not None:
         try:
@@ -808,6 +815,8 @@ async def _record_observed_turn(
                 raise ModelDecisionDefect("journal substituted a completed model decision")
 
     result = await _consume_observed_turn(lease, turn, cancellation, accept)
+    if isinstance(result, AgentSubmissionRejected) and journal is not None:
+        await journal.rejected(request, result)
     if isinstance(result, AgentNotSubmitted) and journal is not None:
         await journal.not_submitted(request, result)
     return result
@@ -818,7 +827,7 @@ async def _consume_observed_turn(
     turn: AgentTurn,
     cancellation: CancellationToken,
     accept: Callable[[AgentTerminal], Awaitable[None]],
-) -> AgentTerminal | AgentNotSubmitted:
+) -> AgentTerminal | AgentNotSubmitted | AgentSubmissionRejected:
     """Inspect all contained events and commit native truth before cleanup."""
     stream = turn.events()
     terminal: AgentTerminal | None = None
@@ -830,7 +839,7 @@ async def _consume_observed_turn(
         if cancellation.cancelled:
             turn.revoke()
         submission = await turn.submit()
-        if isinstance(submission, AgentNotSubmitted):
+        if isinstance(submission, AgentNotSubmitted | AgentSubmissionRejected):
             return submission
         if not isinstance(submission, AgentAccepted):
             raise ModelDecisionUncertain("prepared provider submission remains unresolved")
@@ -892,7 +901,7 @@ async def _consume_observed_turn(
         )
         if terminal is not None and isinstance(terminal.usage, Present):
             observed_usage = terminal.usage.value
-        if not isinstance(turn.submission, AgentNotSubmitted):
+        if not isinstance(turn.submission, AgentNotSubmitted | AgentSubmissionRejected):
             lease.record_usage(observed_usage)
         try:
             close = await turn.close()

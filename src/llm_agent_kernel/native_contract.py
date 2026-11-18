@@ -73,6 +73,10 @@ class NativeDefect(RuntimeError):
     """Native evidence or host authority disagrees with the frozen contract."""
 
 
+class NativeSubmissionConflict(NativeDefect):
+    """Positive native evidence contradicts a correlated submission refusal."""
+
+
 class NativeUncertain(NativeDefect):
     """An armed native attempt has no authoritative terminal."""
 
@@ -309,6 +313,10 @@ class NativeJournal(Protocol):
         """Retain submission, native/local terminal and control facts separately."""
         ...
 
+    async def record_submission_conflict(self, attempt_id: str, seal: AgentTerminal | None) -> None:
+        """Atomically fence the contradiction and retain any original native seal."""
+        ...
+
     async def fence(self, attempt_id: str, reason: str) -> None: ...
 
 
@@ -334,6 +342,7 @@ __all__ = [
     "NativeControl",
     "NativeDefinition",
     "NativeDefect",
+    "NativeSubmissionConflict",
     "NativeDelivery",
     "NativeInputPort",
     "NativeInvocationProposal",

@@ -111,7 +111,7 @@ async def run_native(
     budgets: ToolBudgetFactoryPort,
     messages: NativeMessagePort,
     cancellation: CancellationToken,
-) -> AgentNotSubmitted | AgentTerminal: ...
+) -> AgentNotSubmitted | AgentSubmissionRejected | AgentTerminal: ...
 ~~~
 
 NativeRequest contains host attempt id, OwnerPermit, thread/job scope, ordered
@@ -213,9 +213,10 @@ before submission. their existing stream APIs retain their separate roles.
 AgentAttempt(attempt_id: str, request_digest: str)
 AgentTurnRef(session_ref: AgentSessionRef, native_turn_id: str)
 AgentNotSubmitted(attempt: AgentAttempt, reason: str)
+AgentSubmissionRejected(attempt, code, rpc_code, actual_chars, max_chars)
 AgentAccepted(attempt: AgentAttempt, turn: AgentTurnRef)
 AgentUncertain(attempt: AgentAttempt, turn: AgentTurnRef | None, reason: str)
-AgentSubmission = AgentNotSubmitted | AgentAccepted | AgentUncertain
+AgentSubmission = AgentNotSubmitted | AgentSubmissionRejected | AgentAccepted | AgentUncertain
 
 AgentTurnControls(rpc_seconds, pending_calls, pending_call_bytes)
 AgentRuntime.prepare_turn(session, request: TurnRequest, *,
@@ -228,6 +229,7 @@ AgentRuntime.prepare_observed_turn(session, request: TurnRequest, *,
 class AgentTurn:
     attempt: AgentAttempt
     submission: AgentSubmission | None
+    async def check_submission(self) -> None: ...
     def events(self) -> AsyncIterator[AgentEvent]: ...
     async def submit(self) -> AgentSubmission: ...
     async def reply(self, call: AgentToolCall, result: AgentToolReply) -> None: ...
@@ -384,6 +386,7 @@ class NativeJournal(Protocol):
     async def record_reply(self, invocation_id, receipt) -> None: ...
     async def record_delivery(self, delivery) -> None: ...
     async def record_outcome(self, attempt_id, evidence) -> None: ...
+    async def record_submission_conflict(self, attempt_id, seal) -> None: ...
     async def fence(self, attempt_id, reason) -> None: ...
 ~~~
 
