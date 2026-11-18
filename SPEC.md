@@ -66,6 +66,9 @@ identifies host acceptance and immutable `NativeReply`. `DispatchCompleted`
 contains the original llm-tools result, required host-rendered `model_text` and
 optional host receipt reference. the kernel submits that text unchanged;
 `DispatchSuspended` is an existing durable host wait, not execution success.
+its unresolved outcome does not establish whether execution has begun or an
+effect occurred. retain the original reference and await host resolution without
+proposing the action again.
 
 `run_native` takes a host `NativeJournal` or the explicit `TransientNative`
 marker ([adr 0012](docs/decisions/0012-transient-native-attempts.md)). the marker
@@ -251,6 +254,19 @@ receipts. raw provider evidence belongs to the host's durable journal, or for
 transient work only to the returned terminal; product text is its separately
 derived projection. XML-like prompt structure establishes provenance, not a
 security boundary.
+
+isolated configuration catches emit best-effort payload-free outcome metadata
+before accounting or cleanup: fixed catch site, allowlisted caught kind/code and
+at most two installed-owned coordinates from at most four explicit causes.
+cause coordinates never replace the caught failure's classification.
+
+isolated budget stops emit a closed `budget_limit` on the existing outcome event
+at the decision, before later accounting or cleanup: `provider_turns`,
+`cooperative_seconds`, `provider_input_tokens`, `provider_output_tokens`, or
+`native_turn_timeout`. preserve original predicate order and boundaries, public
+outcomes and metrics. the timeout tag identifies the existing typed failed-terminal
+`turn_timeout` mapping; it does not prove a remote native server reported it.
+quota failures remain distinct. no private provider prose is included.
 
 ## 14. required conformance
 
