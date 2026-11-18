@@ -313,8 +313,13 @@ class NativeJournal(Protocol):
         """Retain submission, native/local terminal and control facts separately."""
         ...
 
-    async def record_submission_conflict(self, attempt_id: str, seal: AgentTerminal | None) -> None:
-        """Atomically fence the contradiction and retain any original native seal."""
+    async def record_protocol_fault(
+        self,
+        attempt_id: str,
+        reason: Literal["native_protocol_fault", "NativeSubmissionConflict"],
+        seal: AgentTerminal | None,
+    ) -> None:
+        """Atomically fence publication for the fault and retain any validated native seal."""
         ...
 
     async def fence(self, attempt_id: str, reason: str) -> None: ...

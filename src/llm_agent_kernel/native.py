@@ -154,7 +154,12 @@ class _TransientJournal:
     ) -> None:
         return None
 
-    async def record_submission_conflict(self, attempt_id: str, seal: AgentTerminal | None) -> None:
+    async def record_protocol_fault(
+        self,
+        attempt_id: str,
+        reason: Literal["native_protocol_fault", "NativeSubmissionConflict"],
+        seal: AgentTerminal | None,
+    ) -> None:
         return None
 
     async def fence(self, attempt_id: str, reason: str) -> None:
@@ -661,34 +666,42 @@ async def run_native(
             try:
                 await turn.check_submission()
             except ConflictingSubmissionEvidence as conflict:
-                seal = turn.terminal
-                if seal is not None and isinstance(seal.evidence, NativeTerminalEvidence):
+                error = conflict
+            seal = turn.terminal
+            if seal is not None and isinstance(seal.evidence, NativeTerminalEvidence):
+                try:
                     _require_terminal(seal, turn.attempt, turn.submission)
-                else:
-                    seal = None
-                await journal.record_submission_conflict(request.attempt_id, seal)
+                except NativeDefect:
+                    await journal.record_protocol_fault(
+                        request.attempt_id, "native_protocol_fault", None
+                    )
+                    raise
+            else:
+                seal = None
+            if isinstance(error, ConflictingSubmissionEvidence):
+                await journal.record_protocol_fault(
+                    request.attempt_id, "NativeSubmissionConflict", seal
+                )
                 raise NativeSubmissionConflict(
                     "stock both accepted and refused this submission"
-                ) from conflict
-            try:
-                if turn.terminal is not None and isinstance(
-                    turn.terminal.evidence, NativeTerminalEvidence
-                ):
-                    _require_terminal(turn.terminal, turn.attempt, turn.submission)
-                    await journal.record_outcome(request.attempt_id, turn.terminal)
-                elif turn.submission is not None:
-                    await journal.record_outcome(request.attempt_id, turn.submission)
-                fault = isinstance(error, NativeDefect | ProviderDefect | ProtocolDefect)
-                reason = (
-                    "native_protocol_fault"
-                    if fault and not isinstance(error, NativeUncertain)
-                    else "native_loss"
+                ) from error
+            if isinstance(error, NativeDefect | ProviderDefect | ProtocolDefect) and not isinstance(
+                error, NativeUncertain
+            ):
+                await journal.record_protocol_fault(
+                    request.attempt_id, "native_protocol_fault", seal
                 )
-                await journal.fence(request.attempt_id, reason)
-            except BaseException as retention_error:
-                error.add_note(
-                    f"{type(retention_error).__name__}: native evidence retention or fencing failed"
-                )
+            else:
+                try:
+                    if seal is not None:
+                        await journal.record_outcome(request.attempt_id, seal)
+                    elif turn.submission is not None:
+                        await journal.record_outcome(request.attempt_id, turn.submission)
+                    await journal.fence(request.attempt_id, "native_loss")
+                except BaseException as retention_error:
+                    error.add_note(
+                        f"{type(retention_error).__name__}: native evidence retention or fencing failed"
+                    )
         if isinstance(error, CodexConnectionUnavailable | SessionUnavailable):
             raise NativeUncertain("native connection lost after arm") from error
         if isinstance(error, ProviderDefect | ProtocolDefect):

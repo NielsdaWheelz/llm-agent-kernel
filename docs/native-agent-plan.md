@@ -280,7 +280,9 @@ temporary integration probes on the prepared and isolated entry points exercised
 rendered start/steer fit, receiver-confirmed refusal, conflicting acceptance with zero
 callback dispatch, and recovery of a refused isolated decision with no second model
 entry. both native and durable isolated conflict journals retained the original seal.
-a refusal latched during stop grace stayed definitive. a paused steer writer plus task
+for a containment violation concurrent with a genuine terminal, interrupted journal
+commits either left no seal or retained it already fenced. a refusal latched during
+stop grace stayed definitive. a paused steer writer plus task
 cancellation retained its original `not_sent`
 receipt. a post-arm protocol fault reached the same stable classification live and in
 the journal. on the predecessor, the refusal carried uncertainty, the fit api lacked
