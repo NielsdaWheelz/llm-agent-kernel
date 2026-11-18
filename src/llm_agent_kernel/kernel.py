@@ -38,6 +38,7 @@ from provider_runtime.agent_runtime import (
     AgentTurn,
     AgentUsage,
     ConcurrentTurn,
+    ConflictingSubmissionEvidence,
     CredentialRejected,
     CredentialUnavailable,
     ExecutableUnavailable,
@@ -76,6 +77,7 @@ from .decisions import (
     IsolatedModelDecisions,
     ModelDecisionArmed,
     ModelDecisionCompleted,
+    ModelDecisionConflict,
     ModelDecisionDefect,
     ModelDecisionJournal,
     ModelDecisionNotSubmitted,
@@ -377,7 +379,7 @@ async def run_one_shot(
     retry: ModelDecisionNotSubmitted | None = None
     if isinstance(decisions, DurableIsolatedDecisions):
         recorded = await decisions.journal.latest(decisions.scope)
-        if isinstance(recorded, ModelDecisionRejected):
+        if isinstance(recorded, ModelDecisionRejected | ModelDecisionConflict):
             return stopped(OneShotStopKind.configuration_error)
         if isinstance(recorded, ModelDecisionArmed):
             return stopped(OneShotStopKind.model_decision_uncertain)
@@ -814,7 +816,11 @@ async def _record_observed_turn(
             if committed != ModelDecisionCompleted(request, terminal):
                 raise ModelDecisionDefect("journal substituted a completed model decision")
 
-    result = await _consume_observed_turn(lease, turn, cancellation, accept)
+    async def conflict(seal: AgentTerminal | None) -> None:
+        if journal is not None:
+            await journal.record_submission_conflict(ModelDecisionConflict(request, seal))
+
+    result = await _consume_observed_turn(lease, turn, cancellation, accept, conflict)
     if isinstance(result, AgentSubmissionRejected) and journal is not None:
         await journal.rejected(request, result)
     if isinstance(result, AgentNotSubmitted) and journal is not None:
@@ -827,6 +833,7 @@ async def _consume_observed_turn(
     turn: AgentTurn,
     cancellation: CancellationToken,
     accept: Callable[[AgentTerminal], Awaitable[None]],
+    conflict: Callable[[AgentTerminal | None], Awaitable[None]],
 ) -> AgentTerminal | AgentNotSubmitted | AgentSubmissionRejected:
     """Inspect all contained events and commit native truth before cleanup."""
     stream = turn.events()
@@ -889,6 +896,22 @@ async def _consume_observed_turn(
                 )
             await accept(terminal)
             return terminal
+    except ConflictingSubmissionEvidence as error:
+        primary_error = error
+        seal = turn.terminal
+        if seal is not None and isinstance(seal.evidence, NativeTerminalEvidence):
+            accepted = turn.submission
+            if (
+                not isinstance(accepted, AgentAccepted)
+                or seal.evidence.attempt != turn.attempt
+                or seal.evidence.native_ref != accepted.turn
+            ):
+                raise ProviderStreamDefect(
+                    "conflicting seal changed its prepared attempt or turn"
+                ) from error
+            terminal = seal
+        await conflict(terminal)
+        raise
     except BaseException as error:
         primary_error = error
         raise

@@ -426,7 +426,9 @@ async def run_native(
             )
             if not done:
                 submission = turn.submission
-                if isinstance(submission, AgentAccepted):
+                if isinstance(
+                    submission, AgentAccepted | AgentNotSubmitted | AgentSubmissionRejected
+                ):
                     break
                 if not isinstance(submission, AgentUncertain):
                     raise NativeUncertain("native submission has no authoritative outcome")

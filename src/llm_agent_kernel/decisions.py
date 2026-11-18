@@ -172,8 +172,27 @@ class ModelDecisionRejected:
             raise ModelDecisionDefect("rejection proof changed its prepared attempt")
 
 
+@dataclass(frozen=True, slots=True)
+class ModelDecisionConflict:
+    request: ModelDecisionRequest
+    seal: AgentTerminal | None = field(repr=False)
+
+    def __post_init__(self) -> None:
+        if self.seal is not None:
+            evidence = self.seal.evidence
+            if (
+                not isinstance(evidence, NativeTerminalEvidence)
+                or evidence.attempt != self.request.provider_attempt
+            ):
+                raise ModelDecisionDefect("conflicting seal changed its prepared attempt")
+
+
 type ModelDecisionRecord = (
-    ModelDecisionArmed | ModelDecisionCompleted | ModelDecisionNotSubmitted | ModelDecisionRejected
+    ModelDecisionArmed
+    | ModelDecisionCompleted
+    | ModelDecisionNotSubmitted
+    | ModelDecisionRejected
+    | ModelDecisionConflict
 )
 
 
@@ -202,6 +221,10 @@ class ModelDecisionJournal(Protocol):
         This result is original provider evidence, never reconstructed success.
         A successful completion cannot change either request or terminal.
         """
+        ...
+
+    async def record_submission_conflict(self, record: ModelDecisionConflict) -> None:
+        """Preserve any original seal while fencing this decision from replay."""
         ...
 
     async def rejected(
@@ -257,6 +280,7 @@ __all__ = [
     "IsolatedModelDecisions",
     "ModelDecisionArmed",
     "ModelDecisionCompleted",
+    "ModelDecisionConflict",
     "ModelDecisionNotSubmitted",
     "ModelDecisionRejected",
     "ModelDecisionDefect",

@@ -20,6 +20,7 @@ from .decisions import (
     DecisionScope,
     ModelDecisionArmed,
     ModelDecisionCompleted,
+    ModelDecisionConflict,
     ModelDecisionDefect,
     ModelDecisionJournal,
     ModelDecisionRecord,
@@ -107,6 +108,12 @@ class InMemoryModelDecisionJournal(ModelDecisionJournal):
         result = ModelDecisionCompleted(request, terminal)
         records[-1] = result
         return result
+
+    async def record_submission_conflict(self, record: ModelDecisionConflict) -> None:
+        records = self.records.get(record.request.scope, [])
+        if not records or records[-1] != ModelDecisionArmed(record.request):
+            raise ModelDecisionDefect("conflict does not match the armed decision")
+        records[-1] = record
 
     async def rejected(
         self, request: ModelDecisionRequest, evidence: AgentSubmissionRejected

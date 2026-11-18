@@ -254,7 +254,7 @@ async def _observed(provider, lease, content, cancellation, *, timeout_seconds=N
         pass
 
     try:
-        result = await _consume_observed_turn(lease, turn, cancellation, accept)
+        result = await _consume_observed_turn(lease, turn, cancellation, accept, accept)
     except BaseException:
         await provider.discard(lease)
         raise

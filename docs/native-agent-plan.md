@@ -279,7 +279,9 @@ no deployment or edit to the metadata worktree is included.
 temporary integration probes on the prepared and isolated entry points exercised the
 rendered start/steer fit, receiver-confirmed refusal, conflicting acceptance with zero
 callback dispatch, and recovery of a refused isolated decision with no second model
-entry. a paused steer writer plus task cancellation retained its original `not_sent`
+entry. both native and durable isolated conflict journals retained the original seal.
+a refusal latched during stop grace stayed definitive. a paused steer writer plus task
+cancellation retained its original `not_sent`
 receipt. a post-arm protocol fault reached the same stable classification live and in
 the journal. on the predecessor, the refusal carried uncertainty, the fit api lacked
 the character budget, and the latter two fault probes failed. the provider contract
