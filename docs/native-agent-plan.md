@@ -315,8 +315,9 @@ the journal. on the predecessor, the refusal carried uncertainty, the fit api la
 the character budget, and the latter two fault probes failed. the provider contract
 records the stock binary and exact rejection boundaries.
 
-kernel main `892815e` integrated this source against provider
-`baa3cb71ff000b6ea9484e3965bb399df1760e59`. the provider verified the
+kernel merge `7b5e50c` combined main `892815e` with `eae7b86` against
+provider `baa3cb71ff000b6ea9484e3965bb399df1760e59`. the temporary kernel
+fault probes above ran on stock 0.160.0 only. the provider verified the
 refusal boundaries on stock 0.165.0 in [pr 59](https://github.com/NielsdaWheelz/llm-calling/pull/59).
 the frozen kernel build passed all 176 standing conformance cases. the two
 opt-in paid cases were deselected. deployed consumer pins retain their original
