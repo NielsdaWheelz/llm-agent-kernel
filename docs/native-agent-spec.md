@@ -111,7 +111,7 @@ async def run_native(
     budgets: ToolBudgetFactoryPort,
     messages: NativeMessagePort,
     cancellation: CancellationToken,
-) -> AgentNotSubmitted | AgentTerminal: ...
+) -> AgentNotSubmitted | AgentSubmissionRejected | AgentTerminal: ...
 ~~~
 
 NativeRequest contains host attempt id, OwnerPermit, thread/job scope, ordered
@@ -213,9 +213,10 @@ before submission. their existing stream APIs retain their separate roles.
 AgentAttempt(attempt_id: str, request_digest: str)
 AgentTurnRef(session_ref: AgentSessionRef, native_turn_id: str)
 AgentNotSubmitted(attempt: AgentAttempt, reason: str)
+AgentSubmissionRejected(attempt, code, rpc_code, actual_chars, max_chars)
 AgentAccepted(attempt: AgentAttempt, turn: AgentTurnRef)
 AgentUncertain(attempt: AgentAttempt, turn: AgentTurnRef | None, reason: str)
-AgentSubmission = AgentNotSubmitted | AgentAccepted | AgentUncertain
+AgentSubmission = AgentNotSubmitted | AgentSubmissionRejected | AgentAccepted | AgentUncertain
 
 AgentTurnControls(rpc_seconds, pending_calls, pending_call_bytes)
 AgentRuntime.prepare_turn(session, request: TurnRequest, *,
@@ -228,6 +229,7 @@ AgentRuntime.prepare_observed_turn(session, request: TurnRequest, *,
 class AgentTurn:
     attempt: AgentAttempt
     submission: AgentSubmission | None
+    async def check_submission(self) -> None: ...
     def events(self) -> AsyncIterator[AgentEvent]: ...
     async def submit(self) -> AgentSubmission: ...
     async def reply(self, call: AgentToolCall, result: AgentToolReply) -> None: ...
@@ -243,18 +245,19 @@ one local session turn slot. order: prepare -> host arm commit -> submit -> host
 native-binding commit -> executable callbacks. submit is single-use, with no
 automatic turn/start retry. reader/control continue while host storage waits.
 
-submission is latched before exceptions escape. entering a possible writer means
-uncertain. correlated start acknowledgment OR qualified started/callback evidence
+submission is latched before exceptions escape. possible writer entry alone leaves
+submission uncertain. correlated start acknowledgment or qualified started/callback evidence
 establishes acceptance; submit resolves on the earliest such evidence, avoiding
 callback-before-ack deadlock. buffer that callback until the host binding commits.
 a busy/abandoned thread cannot be used for a new attempt: upstream turn/start can
 steer an already active turn.
 
-initial positive non-submission is deliberately narrow: the provider proves no
-writer entered and quiesces every deferred send. exceptions after possible writer
-entry, missing ids/usage, timeouts and generic rpc rejection remain uncertain.
-a later audited remote rejection may add a proof variant; it is not needed now.
-retain the original error and any armed record; never delete evidence as cleanup.
+`AgentNotSubmitted` requires writer non-entry and quiescence of every deferred send.
+stock's correlated input-size refusal produces `AgentSubmissionRejected` with the
+actual and allowed character counts. conflicting acceptance and refusal fence the
+attempt together with any original seal. exceptions after possible writer entry,
+missing ids/usage, timeouts and generic rpc rejection remain uncertain without
+positive evidence. retain the original evidence and armed record.
 
 revoke prevents new handle replies/steering; host fencing independently prevents
 effects. close returns bounded secondary diagnostics and local_closed; neither
@@ -384,6 +387,7 @@ class NativeJournal(Protocol):
     async def record_reply(self, invocation_id, receipt) -> None: ...
     async def record_delivery(self, delivery) -> None: ...
     async def record_outcome(self, attempt_id, evidence) -> None: ...
+    async def record_protocol_fault(self, attempt_id, reason, seal) -> None: ...
     async def fence(self, attempt_id, reason) -> None: ...
 ~~~
 

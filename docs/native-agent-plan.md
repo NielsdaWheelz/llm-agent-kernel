@@ -298,3 +298,27 @@ probes and temporary host/account/runtime/checkout resources were removed after
 independent review. all 176 standing conformance cases and required checks pass;
 the wider paid matrix remains separate. jarvis's qualified `9f5f951` / `ea9f820`
 ancestors remain immutable pins; this merge does not upgrade that consumer.
+
+## 2026-11-18 stock admission and refusal
+
+kernel `eae7b86` and provider `f42d6cf` were qualified with stock 0.160.0.
+temporary integration probes on the prepared and isolated entry points exercised the
+rendered start/steer fit, receiver-confirmed refusal, conflicting acceptance with zero
+callback dispatch, and recovery of a refused isolated decision with no second model
+entry. both native and durable isolated conflict journals retained the original seal.
+for a containment violation concurrent with a genuine terminal, interrupted journal
+commits either left no seal or retained it already fenced. a refusal latched during
+stop grace stayed definitive. a paused steer writer plus task
+cancellation retained its original `not_sent`
+receipt. a post-arm protocol fault reached the same stable classification live and in
+the journal. on the predecessor, the refusal carried uncertainty, the fit api lacked
+the character budget, and the latter two fault probes failed. the provider contract
+records the stock binary and exact rejection boundaries.
+
+kernel merge `7b5e50c` combined main `892815e` with `eae7b86` against
+provider `baa3cb71ff000b6ea9484e3965bb399df1760e59`. the temporary kernel
+fault probes above ran on stock 0.160.0 only. the provider verified the
+refusal boundaries on stock 0.165.0 in [pr 59](https://github.com/NielsdaWheelz/llm-calling/pull/59).
+the frozen kernel build passed all 176 standing conformance cases. the two
+opt-in paid cases were deselected. deployed consumer pins retain their original
+qualification.
