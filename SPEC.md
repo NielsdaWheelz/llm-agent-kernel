@@ -164,10 +164,11 @@ callback reply bytes remain unchanged. the isolated base instruction names this
 presentation and includes its revision in definition fingerprints.
 `input_batch` exposes the same timestamp/as_of frame used for steering, so a
 host renders an initial native batch without copying kernel presentation.
-`native_request_fits(definition, sections)` uses the actual kernel renderer and
-the provider-owned contained request serializer/byte bound before provider i/o.
-hosts select whole records or block; this pure check is not a token estimate or
-an inference permit.
+`native_request_fit(definition, sections, *, operation="start"|"steer")` renders the
+actual prompt and returns the provider's `NativeRequestFit`. `actual_chars` counts
+the lowered text. `wire_bytes` measures the full envelope with fixed-width native
+identities and the largest legal rpc id. `fits` requires
+both inclusive limits. hosts own selection and admission.
 new input is polled while reasoning and callbacks wait. `NativeDelivery` retains
 prepared/sent/queued/recorded/rejected facts. queued acknowledgment does not prove
 recorded input or model attention. later steer cannot reattribute an accepted
@@ -179,10 +180,15 @@ request settlement keeps earlier unfinished work when another topic arrives.
 
 ## 9. checkpoint, settlement, and recovery
 
-native arm precedes provider submission. retained evidence has three distinct
-forms: authoritative non-submission, exact sealed native terminal, and unresolved
-submission. a timeout, `TurnNotStarted`, RPC error, missing id or absent usage is
-not negative submission proof.
+native arm precedes provider submission. preserve writer non-entry, correlated
+stock size refusal, acceptance and uncertain submission distinctly. an exact
+native terminal seals the outcome. contradictory acceptance and refusal revoke
+authority. the journal atomically fences the conflict with any validated seal
+before the host quarantines the attempt. protocol faults use the stable
+`native_protocol_fault` fence, and transport loss uses `native_loss`.
+a solicited interruption retains its own fence. on exit, revoke and settle any
+already prepared steer through its bounded original rpc to retain proof of
+writer non-entry or possible transmission.
 
 native terminal/usage/raw payload commit before cleanup or application decoding,
 resolution and publication. local stop/fence/cancel acknowledgment is separate
@@ -237,7 +243,8 @@ disposable inference explicitly selects `TransientModelDecisions`.
 native execution returns provider `AgentTerminal` with mandatory
 `NativeTerminalEvidence` or `LocalStopEvidence`. only exact own native seal can
 produce `NativeRecovery`; local stop and transient work never supply it.
-`AgentNotSubmitted` is a separate authoritative provider submission fact.
+`AgentNotSubmitted` proves writer non-entry. `AgentSubmissionRejected` retains
+the typed stock size refusal and its measurements. neither incurs a model turn.
 the kernel never redispatches. with a `NativeJournal`, `NativeUncertain` preserves
 the armed unresolved attempt and is never redispatch permission. under
 `TransientNative` it preserves nothing: failing or rerunning from scratch is
@@ -309,8 +316,9 @@ do not nest journals or a second generation loop around its native inner loop.
 
 ## 17. durable paid decisions
 
-host-backed `ModelDecisionJournal` stores exact request, arm, authoritative
-non-submission or original terminal before interpreting a model choice. recover
+host-backed `ModelDecisionJournal` stores the exact request and arm. it records
+writer non-entry, a typed refusal, a submission conflict with any original seal,
+or the original terminal before interpreting a model choice. recover
 paid decisions from their original record, never by regenerating a similar choice.
 
 ### 17.1 explicit recovery contract
@@ -325,6 +333,8 @@ records, original arguments/revisions and effect identity remain host authority.
 
 own native seal permits local product replay with zero provider/catalog calls.
 exact original-attempt non-submission proof permits local failure settlement.
+reopening a refused or conflicting isolated decision returns a configuration
+error without provider entry. a conflicting seal stays fenced from replay.
 missing proof, local stop, parent outcome or exception naming stays uncertain.
 jarvis may restart reasoning in a fresh thread only after fencing the old attempt;
 original action barriers survive. journal-backed nexus generation never redispatches
