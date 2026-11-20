@@ -20,8 +20,8 @@ authority is an explicit provider configuration under adr 0013.
 
 python 3.12+. `pyproject.toml` and `uv.lock` name exact immutable provider-runtime
 and llm-tools revisions. install the frozen lock. no sibling-source import is an
-installed qualification. contained execution requires stock codex 0.165.0 and
-provider-runtime's exact startup catalog; consumer manifests pin that version.
+installed qualification. contained execution requires the stock codex version and startup catalog
+declared by the pinned provider-runtime. consumer manifests pin that binary.
 host activation still requires real account/worker qualification.
 
 any unsupported exact capability fails
