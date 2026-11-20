@@ -39,3 +39,8 @@ server, not a fork, a different model or an application executor.
 from model metadata independently of feature flags. provider-runtime containment
 v2 additionally sets `apply_patch_tool_type=null`; the complete vendor source
 and every unrelated field remain intact. host/version checks remain exact.
+
+2026-11-20 contract update. stock 0.171.0 implements `ultra` through automatic
+delegation. the provider's v3 contained catalog omits this preset and strips
+the stock literature-search and delegation selectors. single-model choices
+retain their exact effort and declared callbacks.
