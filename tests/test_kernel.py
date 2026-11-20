@@ -60,6 +60,7 @@ from provider_runtime.agent_runtime import (
     NativeTerminalEvidence,
     RawAgentOutput,
     ResumeSession,
+    SessionUnavailable,
     TextContent,
     TurnRequest,
     freeze_json_object,
@@ -363,8 +364,9 @@ class _PreparedTurn:
         )
         return self.submission
 
-    async def check_submission(self):
-        pass
+    async def check_submission(self, *, for_effect: bool = False):
+        if for_effect and self.revoked:
+            raise SessionUnavailable("turn authority revoked")
 
     async def events(self):
         self.native_stream = self.runtime.stream_turn(self.session, self.request)
