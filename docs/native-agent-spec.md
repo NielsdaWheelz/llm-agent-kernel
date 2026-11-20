@@ -229,7 +229,7 @@ AgentRuntime.prepare_observed_turn(session, request: TurnRequest, *,
 class AgentTurn:
     attempt: AgentAttempt
     submission: AgentSubmission | None
-    async def check_submission(self) -> None: ...
+    async def check_submission(self, *, for_effect: bool = False) -> None: ...
     def events(self) -> AsyncIterator[AgentEvent]: ...
     async def submit(self) -> AgentSubmission: ...
     async def reply(self, call: AgentToolCall, result: AgentToolReply) -> None: ...
@@ -445,6 +445,10 @@ produce a local no_progress stop/fence, not a provider protocol defect. duplicat
 delivery of one native call only replays its receipt. neither is a task-call budget.
 
 one callback dispatch runs at a time; queued callbacks keep transport arrival order.
+check live submission authority before journaling a proposal and again immediately
+before executor entry. a fence can fall during either wait. terminal adjudication
+still examines the original seal after a fence. a rejected raw frame leaves a
+protocol fault with any validated seal retained for inspection.
 overflow of the finite count/byte queue fails explicitly. transport reader,
 steering and stop remain responsive while a callback or nested gate waits.
 replies lower to native inputText content items. success is true for a tool success

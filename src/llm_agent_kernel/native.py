@@ -297,7 +297,7 @@ async def run_native(
 
     async def execute(callback: _Callback) -> NativeReply:
         await owner.require_current(request.permit)
-        await turn.check_submission()
+        await turn.check_submission(for_effect=True)
         record = await journal.record_invocation(callback.proposal)
         if (
             replace(
@@ -318,7 +318,7 @@ async def run_native(
                 result = callback.proposal.validation_error
             else:
                 await owner.require_current(request.permit)
-                await turn.check_submission()
+                await turn.check_submission(for_effect=True)
                 result = await dispatch.dispatch(
                     binding=callback.binding,
                     validated_input=callback.validated_input,
@@ -674,8 +674,8 @@ async def run_native(
         if armed:
             try:
                 await turn.check_submission()
-            except ConflictingSubmissionEvidence as conflict:
-                error = conflict
+            except ProtocolDefect as submission_fault:
+                error = submission_fault
             seal = turn.terminal
             if seal is not None and isinstance(seal.evidence, NativeTerminalEvidence):
                 try:
