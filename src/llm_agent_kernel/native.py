@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import uuid
 from collections import deque
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
@@ -195,11 +195,14 @@ async def run_native(
     budgets: ToolBudgetFactoryPort,
     messages: NativeMessagePort,
     cancellation: CancellationToken,
+    on_stock_tool: Callable[[AgentToolUse], None] | None = None,
 ) -> AgentNotSubmitted | AgentSubmissionRejected | AgentTerminal:
     """Supervise one native attempt; host policy owns task continuation/recovery.
 
     `TransientNative` keeps every ordering guarantee in this call's memory and
     makes no durable or recovery claim: process loss loses the attempt.
+    The optional root stock observer receives unredacted phase data after native
+    containment. It must return synchronously and must never log that data.
     """
     if isinstance(journal, TransientNative):
         journal = _TransientJournal()
@@ -556,6 +559,8 @@ async def run_native(
                         raise ProviderContainmentViolation(
                             "native provider emitted undeclared tool activity"
                         )
+                    if on_stock_tool is not None and event.stock is not None:
+                        on_stock_tool(event)
                 elif isinstance(event, AgentPermissionRequest):
                     if (
                         definition.provider.native.builtin_tools == "disabled"
