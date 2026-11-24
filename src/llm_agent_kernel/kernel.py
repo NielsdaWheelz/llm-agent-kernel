@@ -47,12 +47,10 @@ from provider_runtime.agent_runtime import (
     McpConfigurationError,
     McpUnavailable,
     NativeTerminalEvidence,
-    OutputSchemaMismatch,
     ProtocolDefect,
     SdkUnavailable,
     TextContent,
     UnsupportedCapability,
-    decode_agent_output,
 )
 from provider_runtime.types import Present, TokenUsage
 
@@ -124,8 +122,8 @@ from .protocol import (
     MODEL_STEP_OUTPUT_NAME,
     ProtocolValidationError,
     ValidatedToolCall,
+    _validate_terminal_step,
     provider_wire_schema,
-    validate_provider_step,
 )
 from .provider import (
     ProviderContainmentViolation,
@@ -321,10 +319,15 @@ async def run_one_shot(
     input_projection: InputProjectionRequest | None = None,
     cancellation: CancellationToken | None = None,
     event_sink: EventSink | None = None,
+    field_diagnostics: bool = False,
     diagnostics: DiagnosticTranscript | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> OneShotOutcome:
-    """Run a fresh isolated structured session with no canonical thread state."""
+    """Run a fresh isolated structured session.
+
+    Field diagnostics add a failure stage and, when available, indexed field codes
+    to rejected validation events. Indexes follow the closed result schema.
+    """
 
     if definition.session_mode is not SessionMode.isolated:
         raise ValueError("one-shot requires an isolated definition")
@@ -449,10 +452,21 @@ async def run_one_shot(
         state.add_usage(current, previous_lease_usage)
         previous_lease_usage = current
 
+    def remember_terminal_for_continuation(terminal: AgentTerminal, *, replayed: bool) -> None:
+        nonlocal canonical_pending_prefix
+        canonical_content.append(recorded_model_context(terminal))
+        if replayed:
+            pending_content[:] = [TextContent(text) for text in canonical_content]
+            canonical_pending_prefix = len(pending_content)
+
     try:
         try:
             if cancellation.cancelled:
                 return stopped(OneShotStopKind.cancelled)
+            output_contract = definition.output_contract
+            output = JsonSchemaAgentOutput(
+                name=MODEL_STEP_OUTPUT_NAME, schema=provider_wire_schema(output_contract)
+            )
             if validated_initial_read is not None and saved_request is None:
                 budgets = _create_tool_budget(budget_factory, plan)
                 if cancellation.cancelled:
@@ -609,10 +623,6 @@ async def run_one_shot(
                     terminal = result
                     pending_content.clear()
                     await account_lease_usage()
-                canonical_content.append(recorded_model_context(terminal))
-                if replayed:
-                    pending_content[:] = [TextContent(text) for text in canonical_content]
-                    canonical_pending_prefix = len(pending_content)
                 event(
                     EventKind.provider_turn,
                     provider_turn=state.provider_turns,
@@ -639,28 +649,31 @@ async def run_one_shot(
                     )
                 if terminal.status != "succeeded":
                     raise KernelConfigurationDefect("provider returned an unknown terminal status")
+                if cancellation.cancelled:
+                    return stopped(OneShotStopKind.cancelled)
                 budget_limit = _kernel_budget_limit(definition, state)
                 if budget_limit is not None:
                     return stopped(OneShotStopKind.budget_exhausted, budget_limit=budget_limit)
 
-                state.model_step_ordinal += 1
                 try:
-                    step = validate_provider_step(
-                        decode_agent_output(
-                            JsonSchemaAgentOutput(
-                                name=MODEL_STEP_OUTPUT_NAME,
-                                schema=provider_wire_schema(definition.output_contract),
-                            ),
-                            terminal,
-                        ),
-                        definition.output_contract,
+                    step = _validate_terminal_step(
+                        output,
+                        terminal,
+                        output_contract,
                         plan,
+                        field_diagnostics=field_diagnostics,
                     )
-                except (OutputSchemaMismatch, ProtocolValidationError, TypeError, ValueError):
-                    state.model_step_ordinal -= 1
-                    event(EventKind.validation, valid=False)
+                except ProtocolValidationError as error:
+                    event(
+                        EventKind.validation,
+                        valid=False,
+                        **(error.attributes if field_diagnostics else {}),
+                    )
+                    if cancellation.cancelled:
+                        return stopped(OneShotStopKind.cancelled)
                     if repairs >= definition.limits.max_protocol_repairs:
                         return stopped(OneShotStopKind.protocol_error)
+                    remember_terminal_for_continuation(terminal, replayed=replayed)
                     repairs += 1
                     projection = continuation_context(
                         definition,
@@ -672,6 +685,7 @@ async def run_one_shot(
                     state.visible_bytes = projection.cumulative_visible_bytes
                     pending_content.append(TextContent(projection.rendered))
                     continue
+                state.model_step_ordinal += 1
                 event(EventKind.validation, valid=True)
 
                 if isinstance(step, ValidatedToolCall):
@@ -680,6 +694,7 @@ async def run_one_shot(
                     budget_limit = _kernel_budget_limit(definition, state)
                     if budget_limit is not None:
                         return stopped(OneShotStopKind.budget_exhausted, budget_limit=budget_limit)
+                    remember_terminal_for_continuation(terminal, replayed=replayed)
                     event(
                         EventKind.tool_dispatch,
                         tool_id=str(step.tool_id),
