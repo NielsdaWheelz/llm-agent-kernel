@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
 from functools import lru_cache
 from typing import Annotated, Any, Literal, cast
 
@@ -128,7 +127,7 @@ def _validate_terminal_step(
     output_contract: StructuredOutput,
     plan: FrozenToolPlan,
     *,
-    field_diagnostics: bool,
+    diagnostic_fields: tuple[str, ...] | None,
 ) -> ValidatedStep:
     try:
         value = decode_agent_output(output, terminal)
@@ -136,7 +135,7 @@ def _validate_terminal_step(
         raise ProtocolValidationError(
             "provider output is not strict JSON", "strict_decode"
         ) from None
-    return validate_provider_step(value, output_contract, plan, field_diagnostics=field_diagnostics)
+    return validate_provider_step(value, output_contract, plan, diagnostic_fields=diagnostic_fields)
 
 
 def validate_provider_step(
@@ -144,13 +143,13 @@ def validate_provider_step(
     output_contract: StructuredOutput,
     plan: FrozenToolPlan,
     *,
-    field_diagnostics: bool = False,
+    diagnostic_fields: tuple[str, ...] | None = None,
 ) -> ValidatedStep:
     """Decode the provider wire envelope, then validate the logical model step."""
 
     logical_value = _decode_provider_step(value)
     return validate_model_step(
-        logical_value, output_contract, plan, field_diagnostics=field_diagnostics
+        logical_value, output_contract, plan, diagnostic_fields=diagnostic_fields
     )
 
 
@@ -159,7 +158,7 @@ def validate_model_step(
     output_contract: StructuredOutput,
     plan: FrozenToolPlan,
     *,
-    field_diagnostics: bool = False,
+    diagnostic_fields: tuple[str, ...] | None = None,
 ) -> ValidatedStep:
     """Validate a whole step before returning text or a dispatchable proposal."""
 
@@ -176,11 +175,11 @@ def validate_model_step(
             raise ProtocolValidationError(
                 "model step violates its branch", "branch_or_tool"
             ) from None
-        if not field_diagnostics:
+        if diagnostic_fields is None:
             raise ProtocolValidationError(
                 "model step violates the closed output contract", "result_validation"
             ) from None
-        raise _finish_validation_error(error, output_contract) from None
+        raise _finish_validation_error(error, diagnostic_fields) from None
 
     if isinstance(step, _CallToolStep):
         public_step = CallToolStep(ToolId(step.tool_id), dict(step.arguments))
@@ -195,12 +194,9 @@ def validate_model_step(
 
 
 def _finish_validation_error(
-    error: ValidationError, output_contract: StructuredOutput
+    error: ValidationError, fields: tuple[str, ...]
 ) -> ProtocolValidationError:
-    properties = output_contract.wire_schema["properties"]
-    if not isinstance(properties, Mapping):
-        raise TypeError("isolated result properties must be an object")
-    field_indexes = {field: index for index, field in enumerate(properties)}
+    field_indexes = {field: index for index, field in enumerate(fields)}
     attributes: dict[str, str | int] = {}
     extra_fields = 0
     result_failed = False

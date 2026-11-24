@@ -6,7 +6,7 @@ import asyncio
 import sys
 import time
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import Literal, Never
 
@@ -108,6 +108,7 @@ from .definitions import (
     StructuredOutput,
 )
 from .events import (
+    _MAX_ATTRIBUTES,
     DiagnosticKind,
     DiagnosticTranscript,
     EventAttribute,
@@ -301,6 +302,23 @@ class _RunState:
         )
 
 
+def _prepare_isolated_output(
+    output_contract: StructuredOutput, *, field_diagnostics: bool
+) -> tuple[JsonSchemaAgentOutput, tuple[str, ...] | None]:
+    output = JsonSchemaAgentOutput(
+        name=MODEL_STEP_OUTPUT_NAME, schema=provider_wire_schema(output_contract)
+    )
+    if not field_diagnostics:
+        return output, None
+    properties = output_contract.wire_schema["properties"]
+    if not isinstance(properties, Mapping):
+        raise KernelConfigurationDefect("isolated result properties must be an object")
+    # Reserve attributes for validity, stage, extra fields and unmapped errors.
+    if len(properties) > _MAX_ATTRIBUTES - 4:
+        raise KernelConfigurationDefect("isolated result has too many fields for diagnostics")
+    return output, tuple(properties)
+
+
 async def run_one_shot(
     *,
     run_id: RunId,
@@ -325,8 +343,10 @@ async def run_one_shot(
 ) -> OneShotOutcome:
     """Run a fresh isolated structured session.
 
-    Field diagnostics add a failure stage and, when available, indexed field codes
-    to rejected validation events. Indexes follow the closed result schema.
+    Field diagnostics add a failure stage and indexed codes to rejected validation
+    events. Indexes follow the closed wire schema, which must fit one event.
+    Host text validators use `PydanticCustomError("invalid_text", ...)`. A lone
+    surrogate fails strict decoding before validation can identify its field.
     """
 
     if definition.session_mode is not SessionMode.isolated:
@@ -464,8 +484,8 @@ async def run_one_shot(
             if cancellation.cancelled:
                 return stopped(OneShotStopKind.cancelled)
             output_contract = definition.output_contract
-            output = JsonSchemaAgentOutput(
-                name=MODEL_STEP_OUTPUT_NAME, schema=provider_wire_schema(output_contract)
+            output, diagnostic_fields = _prepare_isolated_output(
+                output_contract, field_diagnostics=field_diagnostics
             )
             if validated_initial_read is not None and saved_request is None:
                 budgets = _create_tool_budget(budget_factory, plan)
@@ -661,7 +681,7 @@ async def run_one_shot(
                         terminal,
                         output_contract,
                         plan,
-                        field_diagnostics=field_diagnostics,
+                        diagnostic_fields=diagnostic_fields,
                     )
                 except ProtocolValidationError as error:
                     event(
