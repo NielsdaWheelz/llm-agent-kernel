@@ -7,13 +7,20 @@ from functools import lru_cache
 from typing import Annotated, Any, Literal, cast
 
 from llm_tools import FrozenToolPlan, ToolId, canonical_json_bytes
-from provider_runtime.agent_runtime import thaw_json_value
+from provider_runtime.agent_runtime import (
+    AgentTerminal,
+    JsonSchemaAgentOutput,
+    OutputSchemaMismatch,
+    decode_agent_output,
+    thaw_json_value,
+)
 from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
     TypeAdapter,
+    ValidationError,
     create_model,
     field_validator,
 )
@@ -59,6 +66,10 @@ class _StructuredFinishStep(_ClosedStep):
 
 class ProtocolValidationError(ValueError):
     """A complete model value violates the grammar or output contract."""
+
+    def __init__(self, message: str, stage: str, /, **attributes: str | int) -> None:
+        super().__init__(message)
+        self.attributes = {"failure_stage": stage, **attributes}
 
 
 type ValidatedStep = ValidatedToolCall | FinishStep
@@ -110,41 +121,122 @@ def provider_wire_schema(output_contract: StructuredOutput) -> dict[str, object]
     return schema
 
 
+def _validate_terminal_step(
+    output: JsonSchemaAgentOutput,
+    terminal: AgentTerminal,
+    output_contract: StructuredOutput,
+    plan: FrozenToolPlan,
+    *,
+    diagnostic_fields: tuple[str, ...] | None,
+) -> ValidatedStep:
+    try:
+        value = decode_agent_output(output, terminal)
+    except OutputSchemaMismatch:
+        raise ProtocolValidationError(
+            "provider output is not strict JSON", "strict_decode"
+        ) from None
+    return validate_provider_step(value, output_contract, plan, diagnostic_fields=diagnostic_fields)
+
+
 def validate_provider_step(
     value: object,
     output_contract: StructuredOutput,
     plan: FrozenToolPlan,
+    *,
+    diagnostic_fields: tuple[str, ...] | None = None,
 ) -> ValidatedStep:
     """Decode the provider wire envelope, then validate the logical model step."""
 
-    logical_value = _decode_provider_step(value, output_contract)
-    return validate_model_step(logical_value, output_contract, plan)
+    logical_value = _decode_provider_step(value)
+    return validate_model_step(
+        logical_value, output_contract, plan, diagnostic_fields=diagnostic_fields
+    )
 
 
 def validate_model_step(
     value: object,
     output_contract: StructuredOutput,
     plan: FrozenToolPlan,
+    *,
+    diagnostic_fields: tuple[str, ...] | None = None,
 ) -> ValidatedStep:
     """Validate a whole step before returning text or a dispatchable proposal."""
 
+    logical = thaw_json_value(value)
     try:
-        step = _step_adapter(output_contract).validate_json(
-            canonical_json_bytes(thaw_json_value(value)),
-            strict=True,
-        )
-    except (TypeError, ValueError):
-        raise ProtocolValidationError("model step violates the closed output contract") from None
+        encoded = canonical_json_bytes(logical)
+    except ValueError:
+        raise ProtocolValidationError("model step is not canonical JSON", "strict_decode") from None
+    adapter = _step_adapter(output_contract)
+    try:
+        step = adapter.validate_json(encoded, strict=True)
+    except ValidationError as error:
+        if not isinstance(logical, dict) or logical.get("type") != "finish":
+            raise ProtocolValidationError(
+                "model step violates its branch", "branch_or_tool"
+            ) from None
+        if diagnostic_fields is None:
+            raise ProtocolValidationError(
+                "model step violates the closed output contract", "result_validation"
+            ) from None
+        raise _finish_validation_error(error, diagnostic_fields) from None
 
     if isinstance(step, _CallToolStep):
         public_step = CallToolStep(ToolId(step.tool_id), dict(step.arguments))
         try:
             return validate_tool_call(public_step, plan)
         except ToolProposalError:
-            raise ProtocolValidationError("model step proposes an invalid tool call") from None
-    adapter = TypeAdapter(output_contract.result_type)
-    result = adapter.dump_python(step.result, mode="json")
+            raise ProtocolValidationError(
+                "model step proposes an invalid tool call", "branch_or_tool"
+            ) from None
+    result = TypeAdapter(output_contract.result_type).dump_python(step.result, mode="json")
     return FinishStep(reason=step.reason, result=result)
+
+
+def _finish_validation_error(
+    error: ValidationError, fields: tuple[str, ...]
+) -> ProtocolValidationError:
+    field_indexes = {field: index for index, field in enumerate(fields)}
+    attributes: dict[str, str | int] = {}
+    extra_fields = 0
+    result_failed = False
+    for detail in error.errors(include_url=False, include_context=False, include_input=False):
+        location = detail["loc"]
+        if location[:2] != ("finish", "result"):
+            attributes["unmapped"] = "invalid_value"
+            continue
+        result_failed = True
+        field = location[2] if len(location) >= 3 else None
+        if (
+            len(location) == 3
+            and detail["type"] == "extra_forbidden"
+            and field not in field_indexes
+        ):
+            extra_fields += 1
+            continue
+        if isinstance(field, str) and field in field_indexes:
+            code = "invalid_value"
+            if len(location) == 3:
+                code = _FIELD_VALIDATION_CODES.get(detail["type"], code)
+            attributes.setdefault(f"field_{field_indexes[field]}", code)
+        else:
+            attributes["unmapped"] = "invalid_value"
+    if extra_fields:
+        attributes["extra_fields"] = extra_fields
+    return ProtocolValidationError(
+        "model step violates the closed output contract",
+        "result_validation" if result_failed else "wire_envelope",
+        **attributes,
+    )
+
+
+_FIELD_VALIDATION_CODES = {
+    "invalid_text": "invalid_text",
+    "missing": "missing",
+    "string_too_long": "invalid_text",
+    "string_too_short": "invalid_text",
+    "string_type": "wrong_type",
+}
 
 
 @lru_cache
@@ -168,13 +260,17 @@ class _InvalidArgumentsJson(ValueError):
     pass
 
 
-def _decode_provider_step(value: object, output_contract: StructuredOutput) -> dict[str, object]:
+def _decode_provider_step(value: object) -> dict[str, object]:
     thawed = thaw_json_value(value)
     if type(thawed) is not dict or set(thawed) != {"type", "call_tool", "finish"}:
-        raise ProtocolValidationError("provider step violates the closed wire envelope")
+        raise ProtocolValidationError(
+            "provider step violates the closed wire envelope", "wire_envelope"
+        )
     step_type = thawed["type"]
     if type(step_type) is not str:
-        raise ProtocolValidationError("provider step violates the closed wire envelope")
+        raise ProtocolValidationError(
+            "provider step violates the closed wire envelope", "wire_envelope"
+        )
 
     if step_type == "call_tool":
         payload = _selected_payload(thawed, "call_tool")
@@ -183,7 +279,7 @@ def _decode_provider_step(value: object, output_contract: StructuredOutput) -> d
             or type(payload["tool_id"]) is not str
             or type(payload["arguments"]) is not str
         ):
-            raise ProtocolValidationError("provider tool payload is malformed")
+            raise ProtocolValidationError("provider tool payload is malformed", "wire_envelope")
         arguments = _decode_arguments_json(payload["arguments"])
         return {
             "type": "call_tool",
@@ -195,15 +291,15 @@ def _decode_provider_step(value: object, output_contract: StructuredOutput) -> d
         payload = _selected_payload(thawed, "finish")
         expected = {"reason", "result"}
         if set(payload) != expected:
-            raise ProtocolValidationError("provider finish payload is malformed")
+            raise ProtocolValidationError("provider finish payload is malformed", "wire_envelope")
         reason = payload["reason"]
         if reason is not None and type(reason) is not str:
-            raise ProtocolValidationError("provider finish reason is malformed")
+            raise ProtocolValidationError("provider finish reason is malformed", "wire_envelope")
         if type(payload["result"]) is not dict:
-            raise ProtocolValidationError("provider finish result is malformed")
+            raise ProtocolValidationError("provider finish result is malformed", "wire_envelope")
         return {"type": "finish", "reason": reason, "result": payload["result"]}
 
-    raise ProtocolValidationError("provider step type is unknown")
+    raise ProtocolValidationError("provider step type is unknown", "branch_or_tool")
 
 
 def _selected_payload(value: dict[str, object], selected: str) -> dict[str, object]:
@@ -211,9 +307,13 @@ def _selected_payload(value: dict[str, object], selected: str) -> dict[str, obje
         payload = value[name]
         if name == selected:
             if type(payload) is not dict:
-                raise ProtocolValidationError("selected provider step payload is absent")
+                raise ProtocolValidationError(
+                    "selected provider step payload is absent", "branch_or_tool"
+                )
         elif payload is not None:
-            raise ProtocolValidationError("provider step selected multiple branch payloads")
+            raise ProtocolValidationError(
+                "provider step selected multiple branch payloads", "branch_or_tool"
+            )
     return cast(dict[str, object], value[selected])
 
 
@@ -236,21 +336,25 @@ def _decode_arguments_json(value: str) -> dict[str, object]:
             parse_constant=reject_constant,
         )
     except (_InvalidArgumentsJson, ValueError, RecursionError):
-        raise ProtocolValidationError("provider tool arguments are not strict JSON") from None
+        raise ProtocolValidationError(
+            "provider tool arguments are not strict JSON", "branch_or_tool"
+        ) from None
     if type(decoded) is not dict:
-        raise ProtocolValidationError("provider tool arguments must encode one JSON object")
+        raise ProtocolValidationError(
+            "provider tool arguments must encode one JSON object", "branch_or_tool"
+        )
     return decoded
 
 
 def _audit_provider_wire_schema(schema: dict[str, object]) -> None:
     if schema.get("type") != "object" or "anyOf" in schema or "oneOf" in schema:
-        raise RuntimeError("provider wire schema root must be one object")
+        raise ValueError("provider wire schema root must be one object")
 
     def walk(node: object) -> None:
         if isinstance(node, dict):
             additional = node.get("additionalProperties")
             if isinstance(additional, dict):
-                raise RuntimeError("provider wire schema contains a map-shaped object")
+                raise ValueError("provider wire schema contains a map-shaped object")
             schema_type = node.get("type")
             types = schema_type if isinstance(schema_type, list) else [schema_type]
             if "object" in types or "properties" in node:
@@ -262,7 +366,7 @@ def _audit_provider_wire_schema(schema: dict[str, object]) -> None:
                     or not isinstance(required, list)
                     or required != list(properties)
                 ):
-                    raise RuntimeError("provider wire schema contains a non-strict object")
+                    raise ValueError("provider wire schema contains a non-strict object")
             for child in node.values():
                 walk(child)
         elif isinstance(node, list):
