@@ -109,9 +109,10 @@ policy/native options. definition identities include configured paths and comple
 policy/native/instructions, excluding generated directories and mutable files.
 `cwd_scope` is removed without a compatibility alias.
 
-the account host retains
-credentials; worker state is empty and accountless. native host network for model
-authentication is distinct from model/tool network authority.
+the contained host retains credentials. native definitions can select a local
+account reference or a managed host reference validated by the pinned provider.
+isolated definitions require local account references. worker state is empty
+and accountless. tool network authority remains an independent policy.
 
 the host may select `CodexNativeOptions.archive_internal` to keep disposable
 cognition outside native memory capture. this selection changes the definition
