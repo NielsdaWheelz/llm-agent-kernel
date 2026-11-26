@@ -21,6 +21,8 @@ from llm_tools import (
     render_prompt,
 )
 from provider_runtime.agent_runtime import (
+    AGY_CAPABILITY_REVISION,
+    AGY_WORKSPACE_POLICY,
     CODEX_CONTAINMENT_CATALOG_REVISION,
     CODEX_CONTAINMENT_VERSION,
     CodexNativeOptions,
@@ -258,26 +260,61 @@ class ProviderConfiguration:
             or re.fullmatch(r"[0-9a-f]{64}", self.row_fingerprint) is None
         ):
             raise ValueError("provider row_fingerprint must be a SHA-256 hex digest")
-        if type(self.system) is not tuple or any(
-            not isinstance(part, TextContent) for part in self.system
-        ):
-            raise TypeError("provider system material must be a tuple of TextContent")
-        if type(self.developer) is not tuple or any(
-            not isinstance(part, TextContent) for part in self.developer
-        ):
-            raise TypeError("provider developer material must be a tuple of TextContent")
-        if not isinstance(self.policy, PermissionPolicy):
-            raise TypeError("provider policy must be PermissionPolicy")
         if not isinstance(self.native, CodexNativeOptions):
             raise TypeError("provider native options must be CodexNativeOptions")
-        if self.cwd is not None:
-            _require_absolute_path(self.cwd)
-            if self.cwd == "/":
-                raise ValueError("a borrowed cwd must not be the filesystem root")
-        if type(self.additional_dirs) is not tuple:
-            raise TypeError("provider additional_dirs must be a tuple")
-        for path in self.additional_dirs:
-            _require_absolute_path(path)
+        _validate_provider_context(self)
+
+
+@dataclass(frozen=True, slots=True)
+class AntigravityProviderConfiguration:
+    """Exact native-only SDK configuration."""
+
+    auth: CredentialRef
+    model_key: str
+    reasoning: Literal["high"]
+    agent_definition_revision: str
+    workspace_tools: bool
+    system: tuple[TextContent, ...] = ()
+    developer: tuple[TextContent, ...] = ()
+    policy: PermissionPolicy = PermissionPolicy()
+    cwd: str | None = None
+    additional_dirs: tuple[str, ...] = ()
+    backend: Literal["antigravity"] = field(default="antigravity", init=False)
+    transport: Literal["antigravity_sdk"] = field(default="antigravity_sdk", init=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.auth, CredentialRef) or self.auth.kind != "host_managed":
+            raise ValueError("Antigravity requires a managed host reference")
+        if self.agent_definition_revision != AGY_CAPABILITY_REVISION:
+            raise ValueError("Antigravity capability revision differs from the provider pin")
+        if type(self.workspace_tools) is not bool:
+            raise TypeError("Antigravity workspace_tools must be a bool")
+        _validate_provider_context(self)
+        if self.policy != (AGY_WORKSPACE_POLICY if self.workspace_tools else PermissionPolicy()):
+            raise ValueError("Antigravity policy differs from its declared workspace authority")
+
+
+def _validate_provider_context(
+    provider: ProviderConfiguration | AntigravityProviderConfiguration,
+) -> None:
+    if type(provider.system) is not tuple or any(
+        not isinstance(part, TextContent) for part in provider.system
+    ):
+        raise TypeError("provider system material must be a tuple of TextContent")
+    if type(provider.developer) is not tuple or any(
+        not isinstance(part, TextContent) for part in provider.developer
+    ):
+        raise TypeError("provider developer material must be a tuple of TextContent")
+    if not isinstance(provider.policy, PermissionPolicy):
+        raise TypeError("provider policy must be PermissionPolicy")
+    if provider.cwd is not None:
+        _require_absolute_path(provider.cwd)
+        if provider.cwd == "/":
+            raise ValueError("a borrowed cwd must not be the filesystem root")
+    if type(provider.additional_dirs) is not tuple:
+        raise TypeError("provider additional_dirs must be a tuple")
+    for path in provider.additional_dirs:
+        _require_absolute_path(path)
 
 
 @dataclass(frozen=True, slots=True)
@@ -647,9 +684,11 @@ def _require_closed_objects(value: object) -> None:
             _require_closed_objects(child)
 
 
-def _provider_identity(provider: ProviderConfiguration) -> dict[str, object]:
+def _provider_identity(
+    provider: ProviderConfiguration | AntigravityProviderConfiguration,
+) -> dict[str, object]:
     """Freeze the same provider authority in native and isolated definitions."""
-    return {
+    identity = {
         "additional_dirs": list(provider.additional_dirs),
         "auth": {
             "kind": provider.auth.kind,
@@ -662,14 +701,6 @@ def _provider_identity(provider: ProviderConfiguration) -> dict[str, object]:
         "mcp_servers": [],
         "model_key": provider.model_key,
         "agent_definition_revision": provider.agent_definition_revision,
-        "row_fingerprint": provider.row_fingerprint,
-        "native": {
-            "archive_internal": provider.native.archive_internal,
-            "builtin_tools": provider.native.builtin_tools,
-            "web_search": provider.native.web_search,
-            "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
-            "containment_version": CODEX_CONTAINMENT_VERSION,
-        },
         "policy": {
             "approval": provider.policy.approval,
             "allowed_tools": list(provider.policy.allowed_tools),
@@ -688,6 +719,22 @@ def _provider_identity(provider: ProviderConfiguration) -> dict[str, object]:
         "system": [part.text for part in provider.system],
         "transport": provider.transport,
     }
+    if isinstance(provider, ProviderConfiguration):
+        identity.update(
+            {
+                "row_fingerprint": provider.row_fingerprint,
+                "native": {
+                    "archive_internal": provider.native.archive_internal,
+                    "builtin_tools": provider.native.builtin_tools,
+                    "web_search": provider.native.web_search,
+                    "containment_catalog_revision": CODEX_CONTAINMENT_CATALOG_REVISION,
+                    "containment_version": CODEX_CONTAINMENT_VERSION,
+                },
+            }
+        )
+    else:
+        identity["workspace_tools"] = provider.workspace_tools
+    return identity
 
 
 def _definition_fingerprint(definition: AgentDefinition) -> str:
@@ -736,6 +783,7 @@ def _definition_fingerprint(definition: AgentDefinition) -> str:
 
 
 __all__ = [
+    "AntigravityProviderConfiguration",
     "BatchAsOfMode",
     "CODEX_NATIVE_OPTIONS",
     "CONTAINMENT_POLICY",

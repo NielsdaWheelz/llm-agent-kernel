@@ -48,7 +48,8 @@ store, memory service, delivery transport, approval policy or action ledger.
 
 ## 4. core values
 
-`NativeDefinition` binds exact `ProviderConfiguration`, `AgentRole`, provider
+`NativeDefinition` binds exact `ProviderConfiguration` (Codex) or
+`AntigravityProviderConfiguration` (SDK), `AgentRole`, provider
 output contract, maximum frozen profile, compatibility revision and finite
 `NativeControl`. its fingerprint includes complete containment, exact schemas,
 base instruction identity, tool authority and control bounds.
@@ -90,7 +91,10 @@ a native tool/permission event fences that session. a stock refusal of an
 unpublished function that executes nothing remains a model error, not native
 authority ([provider decision](https://github.com/NielsdaWheelz/llm-calling/blob/e0c30b31b0d507f77f676c2b9e4f18a7c7331815/docs/decisions/2026-10-13-codex-refused-unpublished-calls.md)).
 
-native definitions carry explicit frozen `PermissionPolicy` and `CodexNativeOptions`.
+native definitions carry an explicit frozen `PermissionPolicy` and route-specific
+authority. Codex uses `CodexNativeOptions`. Antigravity uses explicit
+`workspace_tools` under jarvis adr 0111. true permits the qualified offline
+workspace sandbox and native children. false permits only the frozen host tools.
 provider-runtime validates requested and effective authority. declared native tool
 observations stay separate from host callback receipts; only denied permission
 outcomes under `approval=deny` and enabled built-ins are accepted. unknown or
@@ -98,7 +102,12 @@ undeclared activity still fails. native commands have no callback/action replay
 contract. the native base instruction requires inspection of available evidence
 before continuing interrupted native effects.
 
-`ProviderConfiguration.cwd=None` creates a disposable directory. a configured
+antigravity child evidence is an `AgentChildObserved` bound to the exact accepted
+root and its recorded initial delivery. the optional awaited `run_native`
+observer commits this typed evidence under the current owner. it receives no
+child transcript.
+
+a provider configuration's `cwd=None` creates a disposable directory. a configured
 normalized non-root absolute cwd borrows an existing readable/traversable directory;
 `additional_dirs` is an immutable tuple of normalized absolute provider roots.
 the kernel never creates, chmods, empties or removes a borrowed cwd. one internal
@@ -114,7 +123,9 @@ account reference or a managed host reference validated by the pinned provider.
 isolated definitions require local account references. worker state is empty
 and accountless. tool network authority remains an independent policy.
 
-the host may select `CodexNativeOptions.archive_internal` to keep disposable
+antigravity leases are single-attempt and disposed after each turn. stock native
+leases retain exact healthy owner/definition/plan reuse. the host may select
+`CodexNativeOptions.archive_internal` to keep disposable
 cognition outside native memory capture. this selection changes the definition
 fingerprint. the provider owns internal marking and persistence exclusion;
 isolated native options keep their exact containment posture.
@@ -166,11 +177,15 @@ presentation and includes its revision in definition fingerprints.
 `input_batch` exposes the same timestamp/as_of frame used for steering, so a
 host renders an initial native batch without copying kernel presentation.
 `native_request_fit(definition, sections, *, operation="start"|"steer")` renders the
-actual prompt and returns the provider's `NativeRequestFit`. `actual_chars` counts
-the lowered text. `wire_bytes` measures the full envelope with fixed-width native
-identities and the largest legal rpc id. `fits` requires
-both inclusive limits. hosts own selection and admission.
-new input is polled while reasoning and callbacks wait. `NativeDelivery` retains
+actual prompt and returns its provider's `NativeRequestFit`. `actual_chars` counts
+the lowered text. `wire_bytes` measures the backend's input envelope. stock
+includes fixed-width native identities and the largest legal rpc id. `fits`
+requires both inclusive limits. hosts own selection and admission. antigravity
+accepts start fit only and rejects input the SDK would rewrite.
+
+new input is polled while reasoning and callbacks wait. antigravity leaves
+appended input pending for the next host turn and still honors preemption.
+stock uses its existing steer contract. `NativeDelivery` retains
 prepared/sent/queued/recorded/rejected facts. queued acknowledgment does not prove
 recorded input or model attention. later steer cannot reattribute an accepted
 invocation to newer inputs. ambiguous delivery never silently resends an action.
@@ -243,7 +258,8 @@ disposable inference explicitly selects `TransientModelDecisions`.
 
 native execution returns provider `AgentTerminal` with mandatory
 `NativeTerminalEvidence` or `LocalStopEvidence`. only exact own native seal can
-produce `NativeRecovery`; local stop and transient work never supply it.
+produce `NativeRecovery` for the original definition and plan; local stop and
+transient work never supply it.
 `AgentNotSubmitted` proves writer non-entry. `AgentSubmissionRejected` retains
 the typed stock size refusal and its measurements. neither incurs a model turn.
 the kernel never redispatches. with a `NativeJournal`, `NativeUncertain` preserves

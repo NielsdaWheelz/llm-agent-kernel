@@ -69,7 +69,7 @@ values/ports. reuse existing identity, context, output, dispatch and tool types.
 ~~~python
 @dataclass(frozen=True)
 class NativeDefinition:
-    provider: ProviderConfiguration
+    provider: ProviderConfiguration | AntigravityProviderConfiguration
     role: AgentRole
     output: AgentOutputSpec
     maximum_profile: FrozenCapabilityProfile
@@ -130,8 +130,11 @@ OwnerPermit, exact input ids and checkpoint; it invents no completed model decis
 extend the existing provider/session seam with acquire_native(definition, plan,
 permit, previous: ProviderSessionLease | None). the host holds that optional live
 lease per conversation in its current process and passes it explicitly to run_native;
-jobs pass no previous lease. reuse requires matching fingerprint, owner and healthy
-idle connection. otherwise discard and create fresh. persist native bindings as
+jobs pass no previous lease. stock reuse requires matching fingerprint, owner and
+healthy idle connection. otherwise discard and create fresh. antigravity sdk work
+always acquires a fresh lease and disposes it at attempt exit. it uses the same
+supervisor with explicit workspace authority and leaves appended input pending
+in the host while honoring stop and preemption. persist native bindings as
 evidence only; never reconstruct a live lease from a saved ref after owner loss.
 
 OwnerPort replaces paid-capacity reservation in native and isolated callsites.
