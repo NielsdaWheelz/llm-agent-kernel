@@ -47,6 +47,7 @@ from provider_runtime.agent_runtime import (
     ProtocolDefect,
     SessionUnavailable,
     TextContent,
+    antigravity_native_request_fit,
     codex_native_request_fit,
     thaw_json_value,
 )
@@ -72,6 +73,7 @@ from .coordination import (
     ToolDispatchPort,
 )
 from .definitions import (
+    AntigravityProviderConfiguration,
     Checkpoint,
     DispatchCompleted,
     DispatchSuspended,
@@ -173,11 +175,17 @@ def native_request_fit(
     operation: Literal["start", "steer"] = "start",
 ) -> NativeRequestFit:
     """Measure actual kernel framing against the provider's contained request bound."""
+    text = render_prompt(sections)
+    input_id = _delivery_id("request-fit", ())
+    if isinstance(definition.provider, AntigravityProviderConfiguration):
+        return antigravity_native_request_fit(
+            text, output=definition.output, input_id=input_id, operation=operation
+        )
     return codex_native_request_fit(
-        render_prompt(sections),
+        text,
         output=definition.output,
         reasoning=definition.provider.reasoning,
-        input_id=_delivery_id("request-fit", ()),
+        input_id=input_id,
         operation=operation,
     )
 
@@ -201,55 +209,74 @@ async def run_native(
 
     `TransientNative` keeps every ordering guarantee in this call's memory and
     makes no durable or recovery claim: process loss loses the attempt.
-    The optional root stock observer receives unredacted phase data after native
-    containment. It must return synchronously and must never log that data.
+    The optional tool observer receives unredacted typed native phase data after
+    containment, including qualified SDK child activity. It must return
+    synchronously and must never log that data.
     """
     if isinstance(journal, TransientNative):
         journal = _TransientJournal()
-    await owner.require_current(request.permit)
-    recovered = await journal.recover(request.attempt_id)
-    if recovered is not None:
-        if recovered.request.fingerprint != request.fingerprint:
-            raise NativeDefect("native recovery changed its frozen request")
-        await owner.require_current(request.permit)
-        return recovered.terminal
-    require_native_plan(request.plan, definition.maximum_profile)
+    configuration = definition.provider
+    disposable_sdk = isinstance(configuration, AntigravityProviderConfiguration)
     fingerprint = definition.session_fingerprint(request.plan)
-    if session is None:
-        raise NativeDefect("a new native attempt requires an explicitly acquired live session")
-    if (
-        session.definition_fingerprint != fingerprint
-        or session.owner_token != request.permit.owner_token
-    ):
-        raise NativeDefect("native session belongs to another definition, plan or owner")
-    published = lower_tools(ToolPublication(request.plan, ()))
-    budget_state = budgets.create(request.plan)
-    if budget_state.limits != request.plan.profile.run_limits:
-        raise NativeDefect("native tool budget differs from the frozen plan")
-    timeout = (
-        None
-        if request.deadline_at is None
-        else (request.deadline_at - datetime.now(UTC)).total_seconds()
+    owns_lease = (
+        session is not None
+        and session.definition_fingerprint == fingerprint
+        and session.owner_token == request.permit.owner_token
     )
-    if timeout is not None and timeout <= 0:
-        raise NativeDefect("native operation deadline already expired")
-    initial_id = _delivery_id(request.attempt_id, request.input_ids)
-    turn = provider.prepare_native_turn(
-        session,
-        (TextContent(render_prompt(request.submitted_sections)),),
-        attempt_id=request.attempt_id,
-        input_id=initial_id,
-        controls=AgentTurnControls(
-            definition.control.rpc_seconds,
-            definition.control.pending_calls,
-            definition.control.pending_call_bytes,
-        ),
-        timeout_seconds=timeout,
-    )
-    if turn.attempt.attempt_id != request.attempt_id:
-        turn.revoke()
-        await turn.close()
-        raise NativeDefect("provider preparation changed its host attempt identity")
+    turn_ready = False
+    try:
+        await owner.require_current(request.permit)
+        recovered = await journal.recover(request.attempt_id)
+        if recovered is not None:
+            if recovered.request.fingerprint != request.fingerprint:
+                raise NativeDefect("native recovery changed its frozen request")
+            if recovered.definition_fingerprint != fingerprint:
+                raise NativeDefect("native recovery belongs to another definition or plan")
+            await owner.require_current(request.permit)
+            return recovered.terminal
+        require_native_plan(request.plan, definition.maximum_profile)
+        if session is None:
+            raise NativeDefect("a new native attempt requires an explicitly acquired live session")
+        if not owns_lease:
+            raise NativeDefect("native session belongs to another definition, plan or owner")
+        native_tools = (
+            configuration.workspace_tools
+            if isinstance(configuration, AntigravityProviderConfiguration)
+            else configuration.native.builtin_tools != "disabled"
+        )
+        published = lower_tools(ToolPublication(request.plan, ()))
+        budget_state = budgets.create(request.plan)
+        if budget_state.limits != request.plan.profile.run_limits:
+            raise NativeDefect("native tool budget differs from the frozen plan")
+        timeout = (
+            None
+            if request.deadline_at is None
+            else (request.deadline_at - datetime.now(UTC)).total_seconds()
+        )
+        if timeout is not None and timeout <= 0:
+            raise NativeDefect("native operation deadline already expired")
+        initial_id = _delivery_id(request.attempt_id, request.input_ids)
+        turn = provider.prepare_native_turn(
+            session,
+            (TextContent(render_prompt(request.submitted_sections)),),
+            attempt_id=request.attempt_id,
+            input_id=initial_id,
+            controls=AgentTurnControls(
+                definition.control.rpc_seconds,
+                definition.control.pending_calls,
+                definition.control.pending_call_bytes,
+            ),
+            timeout_seconds=timeout,
+        )
+        if turn.attempt.attempt_id != request.attempt_id:
+            turn.revoke()
+            await turn.close()
+            raise NativeDefect("provider preparation changed its host attempt identity")
+        turn_ready = True
+    finally:
+        if disposable_sdk and owns_lease and session is not None and not turn_ready:
+            await _discard_sdk_lease(provider, session)
+    assert session is not None
     queue: deque[_Callback] = deque()
     queued_bytes = 0
     active: _Callback | None = None
@@ -381,6 +408,8 @@ async def run_native(
         if isinstance(result, Preempt):
             await stop(result.reason)
         elif isinstance(result, AppendInputs):
+            if disposable_sdk:
+                return
             if pending_input is None:
                 pending_input = result
             else:
@@ -414,7 +443,7 @@ async def run_native(
         before = await inputs.poll(request, checkpoint)
         if cancellation.cancelled or isinstance(before, Preempt):
             turn.revoke()
-        pending_input = before if isinstance(before, AppendInputs) else None
+        pending_input = before if not disposable_sdk and isinstance(before, AppendInputs) else None
         submit_task = asyncio.create_task(turn.submit())
         poll_task = asyncio.create_task(poll())
         cancel_wait = asyncio.create_task(cancellation.wait())
@@ -555,7 +584,7 @@ async def run_native(
                     await journal.record_outcome(request.attempt_id, terminal)
                     return terminal
                 if isinstance(event, AgentToolUse):
-                    if definition.provider.native.builtin_tools == "disabled":
+                    if not native_tools:
                         raise ProviderContainmentViolation(
                             "native provider emitted undeclared tool activity"
                         )
@@ -563,8 +592,8 @@ async def run_native(
                         on_stock_tool(event)
                 elif isinstance(event, AgentPermissionRequest):
                     if (
-                        definition.provider.native.builtin_tools == "disabled"
-                        or definition.provider.policy.approval != "deny"
+                        not native_tools
+                        or configuration.policy.approval != "deny"
                         or event.decision != "deny"
                     ):
                         raise ProviderContainmentViolation(
@@ -697,7 +726,7 @@ async def run_native(
                     request.attempt_id, "NativeSubmissionConflict", seal
                 )
                 raise NativeSubmissionConflict(
-                    "stock both accepted and refused this submission"
+                    "provider both accepted and refused this submission"
                 ) from error
             if isinstance(error, NativeDefect | ProviderDefect | ProtocolDefect) and not isinstance(
                 error, NativeUncertain
@@ -760,7 +789,7 @@ async def run_native(
         try:
             close = await turn.close()
             session.record_diagnostics(close.diagnostics)
-            if (
+            if not disposable_sdk and (
                 primary_error is not None
                 or terminal is None
                 or terminal.status != "succeeded"
@@ -775,8 +804,18 @@ async def run_native(
                 submission, AgentNotSubmitted | AgentSubmissionRejected
             ):
                 raise
+        finally:
+            if disposable_sdk:
+                await _discard_sdk_lease(provider, session)
         if steer_error is not None:
             raise steer_error
+
+
+async def _discard_sdk_lease(provider: ProviderSessionPort, session: ProviderSessionLease) -> None:
+    try:
+        await provider.discard(session)
+    except Exception as error:
+        session.record_diagnostics((f"{type(error).__name__}: SDK session cleanup failed",))
 
 
 def _delivery_id(attempt_id: str, input_ids: tuple[InputId, ...]) -> str:

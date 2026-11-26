@@ -1,4 +1,4 @@
-"""Codex session leases with explicit ownership of disposable directories."""
+"""Provider session leases with explicit ownership of disposable directories."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from provider_runtime.agent_runtime import (
     AgentSession,
     AgentTurn,
     AgentTurnControls,
+    AntigravitySdkSessionRequest,
     CodexCatalogSessionRequest,
     ContentPart,
     JsonSchemaAgentOutput,
@@ -29,6 +30,7 @@ from provider_runtime.types import CancelSignal, TokenUsage
 from .definitions import (
     KERNEL_BASE_INSTRUCTION,
     AgentDefinition,
+    AntigravityProviderConfiguration,
     OwnerPermit,
     OwnerToken,
     ProviderUsage,
@@ -45,7 +47,7 @@ class ProviderDefect(RuntimeError):
 
 
 class ProviderConfigurationError(ProviderDefect):
-    """A definition cannot be represented by the v1 Codex containment request."""
+    """A definition cannot be represented by the selected provider request."""
 
 
 class ProviderContainmentViolation(ProviderDefect):
@@ -223,9 +225,11 @@ class CodexProvider:
 
         require_native_plan(plan, definition.maximum_profile)
         fingerprint = definition.session_fingerprint(plan)
+        provider = definition.provider
         if previous is not None:
             if (
-                previous in self._leases
+                not isinstance(provider, AntigravityProviderConfiguration)
+                and previous in self._leases
                 and previous.definition_fingerprint == fingerprint
                 and previous.owner_token == permit.owner_token
                 and self._runtime.session_usable(previous.session)
@@ -234,7 +238,6 @@ class CodexProvider:
             await self.discard(previous)
         async with self._lock:
             self._require_open()
-            provider = definition.provider
             owns_cwd = provider.cwd is None
             if provider.cwd is None:
                 cwd = self._create_cwd()
@@ -245,8 +248,30 @@ class CodexProvider:
                         "borrowed provider cwd must be readable and traversable"
                     )
             try:
-                session = await self._runtime.open_session(
-                    CodexCatalogSessionRequest(
+                system = (
+                    TextContent(NATIVE_BASE_INSTRUCTION),
+                    *provider.system,
+                    TextContent(render_prompt(definition.role.instructions)),
+                )
+                tools = lower_tools(ToolPublication(plan, ())).tools
+                request = (
+                    AntigravitySdkSessionRequest(
+                        auth=provider.auth,
+                        open=NewSession(),
+                        cwd=os.fspath(cwd),
+                        policy=provider.policy,
+                        model_key=provider.model_key,
+                        agent_definition_revision=provider.agent_definition_revision,
+                        reasoning=provider.reasoning,
+                        workspace_tools=provider.workspace_tools,
+                        system=system,
+                        developer=provider.developer,
+                        additional_dirs=provider.additional_dirs,
+                        output=definition.output,
+                        tools=tools,
+                    )
+                    if isinstance(provider, AntigravityProviderConfiguration)
+                    else CodexCatalogSessionRequest(
                         auth=provider.auth,
                         open=NewSession(),
                         cwd=os.fspath(cwd),
@@ -255,19 +280,15 @@ class CodexProvider:
                         agent_definition_revision=provider.agent_definition_revision,
                         row_fingerprint=provider.row_fingerprint,
                         reasoning=provider.reasoning,
-                        system=(
-                            TextContent(NATIVE_BASE_INSTRUCTION),
-                            *provider.system,
-                            TextContent(render_prompt(definition.role.instructions)),
-                        ),
+                        system=system,
                         developer=provider.developer,
                         additional_dirs=provider.additional_dirs,
-                        mcp_servers=(),
                         output=definition.output,
                         native=provider.native,
-                        tools=lower_tools(ToolPublication(plan, ())).tools,
+                        tools=tools,
                     )
                 )
+                session = await self._runtime.open_session(request)
             except BaseException:
                 if owns_cwd:
                     self._remove_cwd(cwd)

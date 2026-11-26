@@ -35,6 +35,7 @@ from provider_runtime.types import JsonObject, JsonValue
 from .coordination import OwnerPort, PollResult
 from .definitions import (
     AgentRole,
+    AntigravityProviderConfiguration,
     Checkpoint,
     DispatchResult,
     InputId,
@@ -100,7 +101,7 @@ class NativeControl:
 
 @dataclass(frozen=True, slots=True)
 class NativeDefinition:
-    provider: ProviderConfiguration
+    provider: ProviderConfiguration | AntigravityProviderConfiguration
     role: AgentRole
     output: AgentOutputSpec
     maximum_profile: FrozenCapabilityProfile
@@ -109,9 +110,9 @@ class NativeDefinition:
     fingerprint: str = field(init=False)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.provider, ProviderConfiguration) or not isinstance(
-            self.role, AgentRole
-        ):
+        if not isinstance(
+            self.provider, ProviderConfiguration | AntigravityProviderConfiguration
+        ) or not isinstance(self.role, AgentRole):
             raise TypeError("native definition requires provider configuration and role")
         if not isinstance(self.output, TextAgentOutput | JsonSchemaAgentOutput):
             raise TypeError("native definition output is invalid")
