@@ -102,6 +102,11 @@ undeclared activity still fails. native commands have no callback/action replay
 contract. the native base instruction requires inspection of available evidence
 before continuing interrupted native effects.
 
+antigravity child evidence is an `AgentChildObserved` bound to the exact accepted
+root and its recorded initial delivery. the optional awaited `run_native`
+observer commits this typed evidence under the current owner. it receives no
+child transcript.
+
 a provider configuration's `cwd=None` creates a disposable directory. a configured
 normalized non-root absolute cwd borrows an existing readable/traversable directory;
 `additional_dirs` is an immutable tuple of normalized absolute provider roots.

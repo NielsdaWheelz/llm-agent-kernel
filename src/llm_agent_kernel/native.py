@@ -21,6 +21,7 @@ from llm_tools import (
 from provider_runtime.agent_runtime import (
     AgentAccepted,
     AgentAttempt,
+    AgentChildObserved,
     AgentControlReceipt,
     AgentEvent,
     AgentInputRecorded,
@@ -204,6 +205,7 @@ async def run_native(
     messages: NativeMessagePort,
     cancellation: CancellationToken,
     on_stock_tool: Callable[[AgentToolUse], None] | None = None,
+    on_child: Callable[[AgentChildObserved], Awaitable[None]] | None = None,
 ) -> AgentNotSubmitted | AgentSubmissionRejected | AgentTerminal:
     """Supervise one native attempt; host policy owns task continuation/recovery.
 
@@ -211,7 +213,8 @@ async def run_native(
     makes no durable or recovery claim: process loss loses the attempt.
     The optional tool observer receives unredacted typed native phase data after
     containment, including qualified SDK child activity. It must return
-    synchronously and must never log that data.
+    synchronously and must never log that data. The optional child observer
+    commits typed model and lineage evidence under the current owner.
     """
     if isinstance(journal, TransientNative):
         journal = _TransientJournal()
@@ -599,6 +602,17 @@ async def run_native(
                         raise ProviderContainmentViolation(
                             "native provider emitted undeclared permission authority"
                         )
+                elif isinstance(event, AgentChildObserved):
+                    if (
+                        not disposable_sdk
+                        or not native_tools
+                        or event.turn != submission.turn
+                        or deliveries[initial_id].state != "recorded"
+                    ):
+                        raise NativeDefect("native child observation exceeded its recorded root")
+                    if on_child is not None:
+                        await owner.require_current(request.permit)
+                        await on_child(event)
                 elif isinstance(event, AgentToolCall):
                     if event.turn != submission.turn:
                         raise NativeDefect("native callback changed its submitted turn")
