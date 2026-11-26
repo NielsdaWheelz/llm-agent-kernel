@@ -241,8 +241,11 @@ class ProviderConfiguration:
     mcp_servers: tuple[()] = field(default=(), init=False)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.auth, CredentialRef) or self.auth.kind != "local_account":
-            raise ValueError("Codex requires a local-account credential reference")
+        if not isinstance(self.auth, CredentialRef) or self.auth.kind not in {
+            "local_account",
+            "host_managed",
+        }:
+            raise ValueError("Codex requires a local account or managed host reference")
         for name, value in (
             ("model_key", self.model_key),
             ("reasoning", self.reasoning),
@@ -320,6 +323,8 @@ class AgentDefinition:
             raise ValueError("maximum profile is internally inconsistent")
         if not isinstance(self.provider, ProviderConfiguration):
             raise TypeError("definition provider configuration is invalid")
+        if self.provider.auth.kind != "local_account":
+            raise ValueError("isolated definitions require a local account reference")
         if (
             self.provider.cwd is not None
             or self.provider.additional_dirs
